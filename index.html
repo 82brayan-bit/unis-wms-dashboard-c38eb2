@@ -11072,7 +11072,7 @@ async function resolveLocationIdsForItem(itemText, customerOrgId) {
   const itemResp = await safeFetch(WMS_BASE + '/api/wms-bam/item/search-by-paging', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({currentPage:1, pageSize:20, keyword, customerId:customerOrgId || undefined})
+    body: JSON.stringify({currentPage:1, pageSize:20, keyword, customerId:customerOrgId || undefined, facilityId:FACILITY_ID, warehouseId:FACILITY_ID})
   });
   if (!itemResp || itemResp.success === false || itemResp._needsAuth) throw new Error((itemResp && (itemResp.msg || itemResp.message)) || 'Could not search WMS items.');
   const items = locExtractRows(itemResp).filter(Boolean);
@@ -11080,22 +11080,28 @@ async function resolveLocationIdsForItem(itemText, customerOrgId) {
   // If the user typed an item ID directly, also try that value.
   if (/^(ITEM-|\d+$)/i.test(keyword) && !candidateIds.includes(keyword)) candidateIds.unshift(keyword);
   const locIds = new Set();
+  const locMap = new Map();
   let invRows = 0;
   for (const itemId of candidateIds) {
     const invResp = await safeFetch(WMS_BASE + '/api/wms-bam/inventory/search-by-paging', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({currentPage:1, pageSize:500, customerId:customerOrgId || undefined, itemId, statuses:['OPEN']})
+      body: JSON.stringify({currentPage:1, pageSize:500, customerId:customerOrgId || undefined, itemId, statuses:['OPEN'], facilityId:FACILITY_ID, warehouseId:FACILITY_ID})
     });
     if (!invResp || invResp.success === false || invResp._needsAuth) continue;
     const rows = locExtractRows(invResp);
     invRows += rows.length;
     rows.forEach(r => {
       const id = r.locationId || (r.location && r.location.id);
-      if (id) locIds.add(String(id));
+      const name = r.locationName || (r.location && (r.location.name || r.location.locationName)) || r.locationCode || String(id || '');
+      if (id) {
+        const sid = String(id);
+        locIds.add(sid);
+        if (!locMap.has(sid)) locMap.set(sid, {id:sid, locationId:sid, name:name || sid, type:'LOCATION', section:'', akaName:'', aisle:'', bay:'', level:'', slot:'', supportPickType:'', status:'', occupancyStatus:''});
+      }
     });
   }
-  return {ids:Array.from(locIds), itemCount:candidateIds.length, inventoryRows:invRows};
+  return {ids:Array.from(locIds), locations:Array.from(locMap.values()), itemCount:candidateIds.length, inventoryRows:invRows};
 }
 
 // Token for an in-flight bulk load — bump to cancel previous load.
@@ -11109,6 +11115,7 @@ async function searchLocations() {
   const hasNameFilter = !!(body.names && body.names.length > 0);
   const itemFilter = ((document.getElementById('loc-item') || {}).value || '').trim();
   let itemLocationIds = null;
+  let itemFallbackLocations = [];
 
   // Show facility context in modal
   const facLabel = document.getElementById('loc-facility-label');
@@ -11130,6 +11137,7 @@ async function searchLocations() {
     try {
       const itemLookup = await resolveLocationIdsForItem(itemFilter, customerOrgId);
       itemLocationIds = itemLookup.ids || [];
+      itemFallbackLocations = itemLookup.locations || [];
       if (itemLocationIds.length === 0) {
         CC.modalResults = [];
         CC.modalTotal = 0;
@@ -11157,12 +11165,32 @@ async function searchLocations() {
   let firstRows = [];
   let total = 0;
   let live = false;
-  if (data && data.success !== false) {
+  if (data && data.success !== false && !data._needsAuth) {
     const payload = data.data || data;
     const list = payload.list || payload.results || payload.items || [];
     total = payload.totalCount ?? payload.total ?? payload.count ?? list.length;
     firstRows = applyStorageZoneFilter(list.map(mapWiseLocation));
     live = true;
+  } else if (itemFilter && itemFallbackLocations.length) {
+    // If location-master detail comes back unauthorized, still show the item’s
+    // current OPEN inventory locations from the inventory search. This avoids
+    // replacing the item search with a broad customer location list.
+    firstRows = applyStorageZoneFilter(itemFallbackLocations.map(mapWiseLocation));
+    total = firstRows.length;
+    live = true;
+    const noteEl = document.getElementById('loc-filter-note');
+    if (noteEl) { noteEl.textContent = 'Showing current inventory locations for item ' + itemFilter + '. Location detail enrichment was unavailable.'; noteEl.style.display = ''; }
+  } else if (data && (data._needsAuth || /unauthor/i.test(String(data.msg || data.message || '')))) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="color:#dc2626">Session expired or unauthorized for WMS location search. Please sign in again and retry.</td></tr>';
+    showLoadProgress(false);
+    return;
+  }
+
+  if (itemFilter && itemLocationIds) {
+    // Item searches are already narrowed by OPEN inventory location ids. Do not
+    // use a broad customer total from location search, or the modal will page
+    // through thousands of unrelated customer locations.
+    total = firstRows.length;
   }
 
   // If exact name search with customer returned 0, retry without customerIds
