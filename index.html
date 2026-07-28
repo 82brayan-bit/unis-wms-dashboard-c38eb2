@@ -18382,10 +18382,28 @@ async function dashFetchOwnershipEmployees() {
   }));
   return enriched.concat(rows.slice(40));
 }
+async function dashFetchOwnershipPhoto(empEmployeeId) {
+  if (!empEmployeeId) return null;
+  try {
+    // HRM ownership-card editor loads headshots as Attachment internal business files
+    // using BaseId=empEmployeeId and BusinessId=empEmployeeId.
+    const resp = await safeFetch('/api/proxy/hrm/Attachment/v1/internal/business/' + encodeURIComponent(empEmployeeId) + '/' + encodeURIComponent(empEmployeeId), {method:'GET', headers:{'Accept':'application/json'}});
+    if (!resp || resp._needsAuth || resp.success === false) return null;
+    const files = dashOwnershipRows(resp);
+    const first = files.find(f => /image|jpg|jpeg|png|photo/i.test([f.fileType, f.contentType, f.fileName, f.realName, f.name].filter(Boolean).join(' '))) || files[0];
+    if (!first) return null;
+    return {headPhotoUrl: first.accessUrl || first.internalUrl || first.url || first.previewUrl || '', headPhotoId: first.id || first.attachmentId || ''};
+  } catch(_) { return null; }
+}
 async function dashFetchOwnershipDetail(empEmployeeId) {
   if (!empEmployeeId) return null;
   const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/' + encodeURIComponent(empEmployeeId), {method:'GET', headers:{'Accept':'application/json'}});
-  return resp && resp.success !== false ? (resp.data || resp) : null;
+  const detail = resp && resp.success !== false ? (resp.data || resp) : null;
+  if (detail && !dashOwnershipPhotoUrl(detail)) {
+    const photo = await dashFetchOwnershipPhoto(empEmployeeId);
+    if (photo) Object.assign(detail, photo);
+  }
+  return detail;
 }
 function dashRenderEmployeeOwnership(rows) {
   const strip = document.getElementById('dash-ownership-strip');
