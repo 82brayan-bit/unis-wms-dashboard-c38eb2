@@ -9465,6 +9465,9 @@ function ccCountResultUrl(ticketId, taskId) {
 }
 const API_COUNT_PROGRESS = WMS_BASE + '/api/cyclecount-bam/cycle-count/count-progress/latest/statistics';
 const API_COUNT_RESULTS = WMS_BASE + '/api/cyclecount-app/cycle-count/count-result/search-by-paging';
+// Enriched count-result detail includes display fields such as locationName.
+// The app count-result endpoint can return only numeric locationId/systemLocationId.
+const API_COUNT_RESULTS_DETAIL = WMS_BASE + '/api/cyclecount-bam/cycle-count/count-result/detail/search-by-paging';
 // Hosted fallback build — retains the original embedded token as a
 // best-effort live-data fallback, but only uses it when it is still valid.
 // Normal login still calls Atlas password-grant and stores both
@@ -12787,11 +12790,22 @@ async function openCountResultsModal(ticketId) {
   if (title) title.textContent = 'Count Results · ' + ticketId;
   if (body) body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Loading count results…</td></tr>';
   if (m) m.classList.add('open');
-  const resp = await safeFetch(API_COUNT_RESULTS, {
+  const req = {currentPage:1,pageSize:500,searchCount:true,ticketIds:[ticketId],facilityId:FACILITY_ID,warehouseId:FACILITY_ID,sortingFields:[{field:'createdTime',orderBy:'DESC'}]};
+  // Use the BAM detail endpoint first so Tacoma and other facilities show the
+  // human-readable locationName (example: 10.040) instead of only numeric IDs.
+  let resp = await safeFetch(API_COUNT_RESULTS_DETAIL, {
     method:'POST',
     headers:{'Content-Type':'application/json','Accept':'application/json'},
-    body: JSON.stringify({currentPage:1,pageSize:500,searchCount:true,ticketIds:[ticketId],sortingFields:[{field:'createdTime',orderBy:'DESC'}]}),
+    body: JSON.stringify(req),
   });
+  // Fallback to the raw app endpoint if detail is unavailable for any tenant.
+  if (!resp || resp.success === false) {
+    resp = await safeFetch(API_COUNT_RESULTS, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify(req),
+    });
+  }
   if (!body) return;
   if (!resp || resp.success === false) {
     body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#ef4444">Could not load count results.</td></tr>';
@@ -12804,7 +12818,7 @@ async function openCountResultsModal(ticketId) {
     return;
   }
   body.innerHTML = list.map(r => {
-    const loc = r.locationName || r.location || r.locationId || r.systemLocationName || r.systemLocationId || '—';
+    const loc = r.locationName || r.systemLocationName || r.location || r.locationCode || r.systemLocationCode || r.name || r.locationId || r.systemLocationId || '—';
     const item = r.itemName || r.itemCode || r.itemId || '—';
     const uom = r.countUomName || r.countUomCode || r.countUomId || r.uom || '—';
     const baseQty = r.countItemQty ?? r.countBaseQty ?? r.baseQty ?? '—';
