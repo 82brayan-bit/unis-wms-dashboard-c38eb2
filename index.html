@@ -2517,8 +2517,9 @@ function switchFacility(newId) {
   // left the real "Facility: Valley View Warehouse" line stale in every facility.
   updateSchedulerFacilityHelp(fac);
 
-  // Rebuild the customer dropdown for this facility
+  // Rebuild the customer dropdown and counter list for this facility
   refreshFacilityCustomers();
+  populateCounterDatalist();
 
   // Re-load whichever facility-scoped view is currently open so its data
   // reflects the newly selected facility. Without this, WMS data can stay stale
@@ -11818,47 +11819,78 @@ async function populateCounterDatalist() {
   // Use cache if already loaded for this facility
   if (COUNTER_CACHE[FACILITY_ID]) {
     const cached = COUNTER_CACHE[FACILITY_ID];
-    dl.innerHTML = cached.map(c => '<option value="' + (c.name + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
+    dl.innerHTML = cached.map(c => '<option value="' + ((c.name || c.user || '') + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
     const help = document.getElementById('cc-counter-help');
-    if (help) help.textContent = cached.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID);
+    if (help) {
+      const inactiveCount = cached.filter(u => u.active === false).length;
+      help.textContent = cached.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID) + (inactiveCount ? ' · includes ' + inactiveCount + ' inactive' : '');
+    }
     return;
   }
 
   const help = document.getElementById('cc-counter-help');
   if (help) help.textContent = 'Loading users for ' + (FACILITY_NAME || FACILITY_ID) + '…';
 
-  // Paginate through all facility users
+  // Paginate through all facility users. Include inactive users so supervisors
+  // can see why a typed counter such as “Isaac” may not be assignable/active.
   let allUsers = [];
   let page = 1;
-  const pageSize = 200;
+  const pageSize = 100;
   let hasMore = true;
+  let firstFailure = null;
 
   while (hasMore) {
+    const reqBody = {currentPage: page, pageSize: pageSize, facilityIds: [FACILITY_ID], includeInactive: true};
     const resp = await safeFetch(WMS_BASE + '/api/wms-bam/user/search-by-paging', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({currentPage: page, pageSize: pageSize, facilityIds: [FACILITY_ID]}),
+      body: JSON.stringify(reqBody),
     });
 
     if (!resp || resp._needsAuth || resp.success === false) {
-      if (page === 1) console.warn('[counter] User API failed for', FACILITY_ID);
+      if (page === 1) firstFailure = resp;
+      if (page === 1) console.warn('[counter] User API failed for', FACILITY_ID, resp && (resp.msg || resp.message || resp.code));
       break;
     }
 
     const d = resp.data || resp;
-    const list = d.list || d.records || [];
+    const list = d.list || d.records || d.items || d.results || [];
     const rows = list.map(u => ({
       id: u.id || u.userId || '',
       user: u.userName || u.username || u.user || u.id || '',
       name: u.fullName || u.name || u.displayName || u.userName || '',
+      active: !(u.active === false || /inactive|disabled/i.test(String(u.status || u.activeStatus || ''))),
+      status: u.status || u.activeStatus || '',
     })).filter(u => u.user);
 
     allUsers = allUsers.concat(rows);
     const total = d.totalCount || d.total || 0;
     if (rows.length < pageSize || (total > 0 && allUsers.length >= total)) hasMore = false;
     else page++;
-    // Safety cap
+    // Safety cap: enough for 2,000 users per facility.
     if (page > 20) break;
+  }
+
+  // Some facilities return a very large user payload. If the paged pull failed
+  // immediately, retry a small first page so the UI does not incorrectly say
+  // “No users found” for warehouses like Vista.
+  if (allUsers.length === 0 && firstFailure) {
+    const retry = await safeFetch(WMS_BASE + '/api/wms-bam/user/search-by-paging', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({currentPage: 1, pageSize: 10, facilityIds: [FACILITY_ID], includeInactive: true}),
+    });
+    if (retry && !retry._needsAuth && retry.success !== false) {
+      const d = retry.data || retry;
+      const list = d.list || d.records || d.items || d.results || [];
+      allUsers = list.map(u => ({
+        id: u.id || u.userId || '',
+        user: u.userName || u.username || u.user || u.id || '',
+        name: u.fullName || u.name || u.displayName || u.userName || '',
+        active: !(u.active === false || /inactive|disabled/i.test(String(u.status || u.activeStatus || ''))),
+        status: u.status || u.activeStatus || '',
+      })).filter(u => u.user);
+    }
   }
 
   // Fallback to static Valley View users only if API returned nothing
@@ -11872,8 +11904,13 @@ async function populateCounterDatalist() {
   // Cache for this facility
   if (allUsers.length > 0) COUNTER_CACHE[FACILITY_ID] = allUsers;
 
-  dl.innerHTML = allUsers.map(c => '<option value="' + ((c.name || '') + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
-  if (help) help.textContent = allUsers.length > 0 ? allUsers.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID) : 'No users found for this warehouse';
+  dl.innerHTML = allUsers.map(c => '<option value="' + ((c.name || c.user || '') + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
+  if (help) {
+    const inactiveCount = allUsers.filter(u => u.active === false).length;
+    help.textContent = allUsers.length > 0
+      ? allUsers.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID) + (inactiveCount ? ' · includes ' + inactiveCount + ' inactive' : '')
+      : (firstFailure ? 'Could not load users for this warehouse — sign in again or refresh.' : 'No users found for this warehouse');
+  }
   console.log('[counter] Loaded', allUsers.length, 'users for', FACILITY_ID);
 }
 
