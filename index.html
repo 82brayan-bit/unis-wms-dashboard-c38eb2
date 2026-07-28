@@ -666,9 +666,9 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
               <svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
             </div>
             <div>
-              <div class="kpi-lbl">Total Inventory Value</div>
-              <div class="kpi-val">$152,450.00</div>
-              <div class="kpi-chg up">▲ 8.5% from last week</div>
+              <div class="kpi-lbl">Total Available Qty</div>
+              <div class="kpi-val" id="dash-kpi-inv-qty">—</div>
+              <div class="kpi-chg neutral" id="dash-kpi-inv-sub">Live WMS inventory</div>
             </div>
           </div>
           <div class="kpi">
@@ -677,8 +677,8 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             </div>
             <div>
               <div class="kpi-lbl">Total Items</div>
-              <div class="kpi-val">1,248</div>
-              <div class="kpi-chg up">▲ 5.2% from last week</div>
+              <div class="kpi-val" id="dash-kpi-items">—</div>
+              <div class="kpi-chg neutral" id="dash-kpi-items-sub">Unique SKUs loaded live</div>
             </div>
           </div>
           <div class="kpi">
@@ -687,8 +687,8 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             </div>
             <div>
               <div class="kpi-lbl">Tasks Completed</div>
-              <div class="kpi-val">32</div>
-              <div class="kpi-chg up">▲ 12.8% from last week</div>
+              <div class="kpi-val" id="dash-kpi-completed">—</div>
+              <div class="kpi-chg neutral" id="dash-kpi-completed-sub">Live cycle counts</div>
             </div>
           </div>
           <div class="kpi">
@@ -697,8 +697,8 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             </div>
             <div>
               <div class="kpi-lbl">Pending Tasks</div>
-              <div class="kpi-val">18</div>
-              <div class="kpi-chg down">▼ 10.0% from last week</div>
+              <div class="kpi-val" id="dash-kpi-pending">—</div>
+              <div class="kpi-chg neutral" id="dash-kpi-pending-sub">Open / in progress</div>
             </div>
           </div>
         </div>
@@ -735,15 +735,15 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             <div class="donut-wrap">
               <canvas id="donutChart" width="200" height="200"></canvas>
               <div class="donut-center">
-                <div class="big">1,248</div>
-                <div class="sm">Total Items</div>
+                <div class="big" id="dash-donut-total">—</div>
+                <div class="sm">Live Items</div>
               </div>
             </div>
             <div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#753BBD"></span>In Stock</span><div class="legend-right"><span class="legend-n">842</span><span class="legend-p">(67.6%)</span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#f97316"></span>Low Stock</span><div class="legend-right"><span class="legend-n">231</span><span class="legend-p">(18.5%)</span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#ef4444"></span>Out of Stock</span><div class="legend-right"><span class="legend-n">98</span><span class="legend-p">(7.9%)</span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#10b981"></span>On Order</span><div class="legend-right"><span class="legend-n">77</span><span class="legend-p">(6.0%)</span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#753BBD"></span>In Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-in">—</span><span class="legend-p" id="dash-legend-in-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#f97316"></span>Low Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-low">—</span><span class="legend-p" id="dash-legend-low-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#ef4444"></span>Out of Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-out">—</span><span class="legend-p" id="dash-legend-out-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#10b981"></span>Locations Used</span><div class="legend-right"><span class="legend-n" id="dash-legend-locs">—</span><span class="legend-p"></span></div></div>
             </div>
           </div>
         </div>
@@ -757,12 +757,8 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             </div>
             <table class="tbl">
               <thead><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
-              <tbody>
-                <tr><td>Wireless Mouse</td><td style="color:#9ca3af">WM-1001</td><td><span class="num-amber">5</span></td><td>10</td><td><span class="badge low">Low</span></td></tr>
-                <tr><td>Keyboard</td><td style="color:#9ca3af">KB-2002</td><td><span class="num-red">3</span></td><td>10</td><td><span class="badge low">Low</span></td></tr>
-                <tr><td>USB Cable</td><td style="color:#9ca3af">UC-3003</td><td><span class="num-amber">8</span></td><td>15</td><td><span class="badge low">Low</span></td></tr>
-                <tr><td>Office Chair</td><td style="color:#9ca3af">OC-4004</td><td><span class="num-red">2</span></td><td>5</td><td><span class="badge vlow">Very Low</span></td></tr>
-                <tr><td>Monitor 24"</td><td style="color:#9ca3af">MN-5005</td><td><span class="num-red">0</span></td><td>5</td><td><span class="badge out">Out of Stock</span></td></tr>
+              <tbody id="dash-low-stock-body">
+                <tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">Loading live low-stock rows…</td></tr>
               </tbody>
             </table>
             <div class="view-all-row" onclick="showView('alerts')">View All Alerts ›</div>
@@ -774,11 +770,11 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
               <span class="card-link" onclick="showView('tasks')">View All Tasks ›</span>
             </div>
             <div class="task-kpis">
-              <div class="task-kpi"><div class="n">50</div><div class="l">Total Tasks</div></div>
-              <div class="task-kpi"><div class="n g">32</div><div class="l">Completed</div></div>
-              <div class="task-kpi"><div class="n b">12</div><div class="l">In Progress</div></div>
-              <div class="task-kpi"><div class="n a">18</div><div class="l">Pending</div></div>
-              <div class="task-kpi"><div class="n r">6</div><div class="l">Overdue</div></div>
+              <div class="task-kpi"><div class="n" id="dash-task-total">—</div><div class="l">Total Tasks</div></div>
+              <div class="task-kpi"><div class="n g" id="dash-task-completed">—</div><div class="l">Completed</div></div>
+              <div class="task-kpi"><div class="n b" id="dash-task-progress">—</div><div class="l">In Progress</div></div>
+              <div class="task-kpi"><div class="n a" id="dash-task-pending">—</div><div class="l">Pending</div></div>
+              <div class="task-kpi"><div class="n r" id="dash-task-overdue">—</div><div class="l">Overdue</div></div>
             </div>
             <div class="prog-bar">
               <div class="prog-seg" style="width:64%;background:#10b981"></div>
@@ -787,37 +783,8 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
               <div class="prog-seg" style="width:12%;background:#ef4444"></div>
             </div>
             <div style="font-size:11.5px;font-weight:700;color:#9ca3af;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Recent Tasks</div>
-            <div class="task-rows">
-              <div class="task-row">
-                <div class="task-name">Update inventory for Warehouse A</div>
-                <span class="badge ip">In Progress</span>
-                <div class="t-who"><div class="t-avatar">JD</div>John Doe</div>
-                <div class="t-date">May 27</div>
-              </div>
-              <div class="task-row">
-                <div class="task-name">Review low stock items</div>
-                <span class="badge done">Completed</span>
-                <div class="t-who"><div class="t-avatar">JS</div>Jane Smith</div>
-                <div class="t-date">May 26</div>
-              </div>
-              <div class="task-row">
-                <div class="task-name">Create purchase order for monitors</div>
-                <span class="badge pend">Pending</span>
-                <div class="t-who"><div class="t-avatar">MJ</div>Mike Johnson</div>
-                <div class="t-date">May 28</div>
-              </div>
-              <div class="task-row">
-                <div class="task-name">Monthly inventory audit</div>
-                <span class="badge ip">In Progress</span>
-                <div class="t-who"><div class="t-avatar">SL</div>Sarah Lee</div>
-                <div class="t-date">May 30</div>
-              </div>
-              <div class="task-row">
-                <div class="task-name">Supplier data update</div>
-                <span class="badge over">Overdue</span>
-                <div class="t-who"><div class="t-avatar">JD</div>John Doe</div>
-                <div class="t-date">May 24</div>
-              </div>
+            <div class="task-rows" id="dash-task-rows">
+              <div class="tasks-empty">Loading live cycle count tasks…</div>
             </div>
             <div class="view-all-row" onclick="showView('tasks')">View All Tasks ›</div>
           </div>
@@ -2440,7 +2407,7 @@ function showDash() {
   const admSb = document.getElementById('sb-admin-settings');
   if (admSb) admSb.style.display = admIsOwner() ? '' : 'none';
   initCharts();
-  loadInsight();
+  loadDashboardLiveData();
   loadDashCycleCountKpi();
   startSyncClock();
   updateTokenStatus();
@@ -2554,13 +2521,14 @@ function switchFacility(newId) {
   refreshFacilityCustomers();
 
   // Re-load whichever facility-scoped view is currently open so its data
-  // reflects the newly selected facility. Without this, the Cycle Count /
-  // Robots / Scheduler data stayed stale until the user navigated away and
-  // back. (Dashboard, Inventory, Tasks, Alerts use static demo data and have
-  // no per-facility variation, so they intentionally don't reload here.)
+  // reflects the newly selected facility. Without this, WMS data can stay stale
+  // until the user navigates away and back.
   const activeView = document.querySelector('.view.active');
   const activeName = activeView ? activeView.id.replace(/^view-/, '') : '';
-  if (activeName === 'cycle') {
+  if (activeName === 'dashboard') {
+    loadDashboardLiveData();
+    loadDashCycleCountKpi();
+  } else if (activeName === 'cycle') {
     loadCycleCountView();
   } else if (activeName === 'robots') {
     refreshOntologyStatus();
@@ -2711,6 +2679,7 @@ function showView(name, sub) {
   }
 
   // lazy-init view-specific content
+  if (name === 'dashboard') { loadDashboardLiveData(); loadDashCycleCountKpi(); }
   if (name === 'consolidation') loadConsolidationView();
   if (name === 'replenish') loadReplenishView();
   if (name === 'replenSuggest') loadReplenSuggestView();
@@ -2845,6 +2814,12 @@ function initRobotChart() {
 }
 
 function updateLineChart(days) {
+  // Keep the dashboard live: if WMS inventory has loaded, the chart shows live
+  // available quantity by customer. Static fallback only appears before login/data load.
+  if (DASH_STATE && DASH_STATE.inventoryRows && DASH_STATE.inventoryRows.length) {
+    dashRenderInventory(DASH_STATE.inventoryRows, DASH_STATE.customerInventory ? new Set(DASH_STATE.inventoryRows.map(r => r.customerId).filter(Boolean)).size : 0);
+    return;
+  }
   const d = days==='7' ? DATA_7 : DATA_30;
   lineChart.data.labels = d.labels;
   lineChart.data.datasets[0].data = d.values;
@@ -2852,18 +2827,23 @@ function updateLineChart(days) {
 }
 
 // ═══ AI INSIGHT ═══
-async function loadInsight() {
+async function loadInsight(live) {
   const el = document.getElementById('ai-msg');
-  el.textContent = 'Analyzing warehouse data…';
+  if (!el) return;
+  el.textContent = 'Analyzing live WMS data…';
   el.classList.add('loading');
+  const invRows = (live && live.inventoryRows) || (DASH_STATE && DASH_STATE.inventoryRows) || [];
+  const tickets = (live && live.tickets) || (DASH_STATE && DASH_STATE.tickets) || [];
+  const low = invRows.filter(r => dashAvail(r) > 0 && dashAvail(r) <= 10).length;
+  const out = invRows.filter(r => dashAvail(r) <= 0).length;
+  const completed = tickets.filter(t => dashTicketStatus(t) === 'completed').length;
+  const open = tickets.length - completed;
   try {
-    const insight = await window.cowork.askClaude(
-      'You are a WMS warehouse analyst for UNIS. Write exactly ONE sharp, actionable sentence for the warehouse manager based on this data: 1,248 total SKUs, 98 out of stock (7.9%), 231 low stock (18.5%), inventory value $152,450 (▲8.5% WoW), 6 overdue tasks, Monitor 24" at 0 units, robot R-04 out of service. Lead with the most urgent action.',
-      []
-    );
+    const prompt = 'You are a WMS warehouse analyst for UNIS. Write exactly ONE sharp, actionable sentence for the warehouse manager based only on these live dashboard metrics for facility ' + (FACILITY_NAME || FACILITY_ID) + ': inventory rows sampled ' + invRows.length + ', low-stock rows ' + low + ', out-of-stock rows ' + out + ', cycle count tickets ' + tickets.length + ', completed tickets ' + completed + ', open/in-progress tickets ' + open + '. Do not mention demo data.';
+    const insight = await window.cowork.askClaude(prompt, []);
     el.textContent = insight;
   } catch(e) {
-    el.textContent = '⚠️ Monitor 24" (MN-5005) is fully out of stock and Office Chair (OC-4004) has only 2 units — raise emergency purchase orders today, and dispatch tech to R-04 before the afternoon pick wave.';
+    el.textContent = invRows.length || tickets.length ? ('Live WMS loaded: ' + out + ' out-of-stock rows, ' + low + ' low-stock rows, and ' + open + ' open cycle count tickets need review.') : 'Sign in or refresh to load live WMS inventory and cycle count metrics.';
   }
   el.classList.remove('loading');
 }
@@ -18192,6 +18172,140 @@ function ltrSaveEdit(idx) {
   document.getElementById('ltr-form').style.display = 'none';
   ltrRenderList();
   alert('Request updated and resubmitted for approval.');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD — Live WMS summary
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DASH_STATE = {inventoryRows: [], tickets: [], customerInventory: []};
+function dashNum(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+function dashFmt(v) { return Number(v || 0).toLocaleString(); }
+function dashSet(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+function dashRows(resp) {
+  const d = resp && (resp.data || resp);
+  if (!d) return [];
+  return d.list || d.records || d.items || d.results || [];
+}
+function dashInvSku(r) { return String(r.itemCode || r.itemName || r.sku || r.itemId || r.name || r.code || '').trim(); }
+function dashInvLoc(r) { return String(r.locationName || r.locationId || r.location || r.locationCode || '').trim(); }
+function dashInvCust(r) { return String(r.customerId || r.customerName || '').trim(); }
+function dashAvail(r) { return dashNum(r.availableQty ?? r.available ?? r.availableUnits ?? r.Available ?? r.qty); }
+function dashOnHand(r) { return dashNum(r.onHandQty ?? r.onHand ?? r.onHandUnits ?? r['On Hand'] ?? r.qty); }
+function dashTicketStatus(t) {
+  const st = String(t.status || t.taskStatus || '').toUpperCase();
+  if (/COMPLET|CLOSED|DONE/.test(st)) return 'completed';
+  if (/COUNTING|PROCESS|PROGRESS|START/.test(st)) return 'progress';
+  if (/CANCEL/.test(st)) return 'cancelled';
+  return 'pending';
+}
+async function dashFetchTickets() {
+  const resp = await safeFetch(WMS_BASE + '/api/cyclecount-app/cycle-count/count-ticket/search-by-paging', {
+    method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify({currentPage:1, pageSize:200, searchCount:true, facilityId:FACILITY_ID, warehouseId:FACILITY_ID, sortingFields:[{field:'createdTime',orderBy:'DESC'}]}),
+  });
+  if (!resp || resp._needsAuth || resp.success === false) return [];
+  return dashRows(resp);
+}
+async function dashFetchInventoryForCustomer(customerId) {
+  const resp = await safeFetch(WMS_BASE + '/api/wms-bam/inventory-status/search-by-paging', {
+    method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify({currentPage:1, pageSize:50, customerId, facilityId:FACILITY_ID, warehouseId:FACILITY_ID}),
+  });
+  if (!resp || resp._needsAuth || resp.success === false) return [];
+  return dashRows(resp).map(r => Object.assign({customerId}, r));
+}
+async function dashFetchInventorySample() {
+  let customers = (FACILITY_CUSTOMERS[FACILITY_ID] || []).slice(0, 12);
+  if (!customers.length) {
+    try { await fetchFacilityCustomersFromAPI(); } catch(_) {}
+    customers = (FACILITY_CUSTOMERS[FACILITY_ID] || []).slice(0, 12);
+  }
+  const batches = [];
+  for (const c of customers) batches.push(dashFetchInventoryForCustomer(c.id));
+  const results = await Promise.allSettled(batches);
+  const rows = [];
+  results.forEach(r => { if (r.status === 'fulfilled') rows.push(...r.value); });
+  return {rows, customersChecked: customers.length};
+}
+function dashRenderInventory(rows, customersChecked) {
+  const skus = new Set(rows.map(dashInvSku).filter(Boolean));
+  const locs = new Set(rows.map(dashInvLoc).filter(Boolean));
+  const totalAvail = rows.reduce((s,r)=>s+dashAvail(r),0);
+  const inStock = rows.filter(r => dashAvail(r) > 10).length;
+  const low = rows.filter(r => dashAvail(r) > 0 && dashAvail(r) <= 10).length;
+  const out = rows.filter(r => dashAvail(r) <= 0).length;
+  const total = Math.max(1, rows.length);
+  dashSet('dash-kpi-inv-qty', dashFmt(totalAvail));
+  dashSet('dash-kpi-inv-sub', customersChecked ? ('Live from ' + customersChecked + ' customer sample') : 'No customers loaded');
+  dashSet('dash-kpi-items', dashFmt(skus.size));
+  dashSet('dash-kpi-items-sub', rows.length + ' live inventory rows');
+  dashSet('dash-donut-total', dashFmt(skus.size));
+  dashSet('dash-legend-in', dashFmt(inStock)); dashSet('dash-legend-in-pct', ' (' + Math.round(inStock/total*100) + '%)');
+  dashSet('dash-legend-low', dashFmt(low)); dashSet('dash-legend-low-pct', ' (' + Math.round(low/total*100) + '%)');
+  dashSet('dash-legend-out', dashFmt(out)); dashSet('dash-legend-out-pct', ' (' + Math.round(out/total*100) + '%)');
+  dashSet('dash-legend-locs', dashFmt(locs.size));
+  if (donutChart) { donutChart.data.datasets[0].data = [inStock, low, out, locs.size]; donutChart.update(); }
+  const custNames = {}; (FACILITY_CUSTOMERS[FACILITY_ID] || []).forEach(c => custNames[c.id] = c.name || c.id);
+  const byCust = {};
+  rows.forEach(r => { const cid = dashInvCust(r) || 'UNKNOWN'; if (!byCust[cid]) byCust[cid] = 0; byCust[cid] += dashAvail(r); });
+  const chartRows = Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0, 7);
+  if (lineChart && chartRows.length) {
+    lineChart.data.labels = chartRows.map(([cid]) => String(custNames[cid] || cid).slice(0, 16));
+    lineChart.data.datasets[0].label = 'Available Qty';
+    lineChart.data.datasets[0].data = chartRows.map(x => Math.round(x[1]));
+    lineChart.options.plugins.tooltip.callbacks.label = c => ' Available Qty: ' + Number(c.raw || 0).toLocaleString();
+    lineChart.options.scales.y.ticks.callback = v => Number(v).toLocaleString();
+    lineChart.update();
+  }
+  const lowRows = rows.filter(r => dashAvail(r) <= 10).sort((a,b)=>dashAvail(a)-dashAvail(b)).slice(0,5);
+  const body = document.getElementById('dash-low-stock-body');
+  if (body) body.innerHTML = lowRows.length ? lowRows.map(r => {
+    const qty = dashAvail(r); const cls = qty <= 0 ? 'out' : qty <= 3 ? 'vlow' : 'low'; const label = qty <= 0 ? 'Out' : qty <= 3 ? 'Very Low' : 'Low';
+    return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:#9ca3af">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">No low-stock rows in the live sample.</td></tr>';
+}
+function dashRenderTasks(tickets) {
+  const counts = {total:tickets.length, completed:0, progress:0, pending:0, overdue:0};
+  const today = new Date(); today.setHours(0,0,0,0);
+  tickets.forEach(t => {
+    const k = dashTicketStatus(t); if (counts[k] != null) counts[k]++;
+    const due = t.targetCompletionDate || t.endTime || t.scheduleDate || t.expectedCompleteTime;
+    const d = due ? new Date(due) : null;
+    if (d && Number.isFinite(d.getTime()) && d < today && k !== 'completed' && k !== 'cancelled') counts.overdue++;
+  });
+  dashSet('dash-kpi-completed', dashFmt(counts.completed));
+  dashSet('dash-kpi-pending', dashFmt(counts.pending + counts.progress));
+  dashSet('dash-task-total', dashFmt(counts.total)); dashSet('dash-task-completed', dashFmt(counts.completed)); dashSet('dash-task-progress', dashFmt(counts.progress)); dashSet('dash-task-pending', dashFmt(counts.pending)); dashSet('dash-task-overdue', dashFmt(counts.overdue));
+  const total = Math.max(1, counts.total);
+  const segs = document.querySelectorAll('.prog-bar .prog-seg');
+  if (segs[0]) segs[0].style.width = Math.round(counts.completed/total*100) + '%';
+  if (segs[1]) segs[1].style.width = Math.round(counts.progress/total*100) + '%';
+  if (segs[2]) segs[2].style.width = Math.round(counts.pending/total*100) + '%';
+  if (segs[3]) segs[3].style.width = Math.round(counts.overdue/total*100) + '%';
+  const rowsEl = document.getElementById('dash-task-rows');
+  if (rowsEl) rowsEl.innerHTML = tickets.slice(0,5).map(t => {
+    const k = dashTicketStatus(t); const badge = k === 'completed' ? 'done' : k === 'progress' ? 'ip' : 'pend';
+    const who = t.counter || t.assignedUser || t.createdBy || '—'; const initials = String(who).split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase() || '—';
+    const date = (t.scheduleDate || t.createdTime || t.updatedTime || '').slice(0,10) || '—';
+    return '<div class="task-row"><div class="task-name">' + esc(t.id || t.ticketId || t.name || 'Cycle count ticket') + '</div><span class="badge ' + badge + '">' + esc(k) + '</span><div class="t-who"><div class="t-avatar">' + esc(initials) + '</div>' + esc(who) + '</div><div class="t-date">' + esc(date) + '</div></div>';
+  }).join('') || '<div class="tasks-empty">No live cycle count tasks found for this facility.</div>';
+}
+async function loadDashboardLiveData() {
+  ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending'].forEach(id => dashSet(id, '…'));
+  const ok = await ensureWiseToken(false);
+  if (!ok) {
+    dashSet('dash-kpi-inv-sub', 'Sign in to load live WMS data');
+    const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444">Please sign in to load live WMS inventory.</td></tr>';
+    return;
+  }
+  const [ticketsResult, invResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample()]);
+  const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
+  const inv = invResult.status === 'fulfilled' ? invResult.value : {rows:[], customersChecked:0};
+  DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows;
+  dashRenderTasks(tickets);
+  dashRenderInventory(inv.rows, inv.customersChecked);
+  loadInsight({tickets, inventoryRows: inv.rows});
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
