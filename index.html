@@ -653,15 +653,12 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
           <div class="card-hdr" style="align-items:center">
             <div>
               <div class="card-ttl">Employee Ownership</div>
-              <div class="scheduler-help">Live HRM ownership-card data from hrm.item.com/ownership-card.</div>
+              <div class="scheduler-help">Live HRM ownership-card employees. Click an employee circle to view the full ownership card.</div>
             </div>
             <button class="btn btn-primary" onclick="window.open('https://hrm.item.com/ownership-card','_blank')" style="font-size:12px;padding:6px 14px">Open HRM Card</button>
           </div>
-          <div class="dash-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px">
-            <div class="kpi"><div class="kpi-ico purple">👤</div><div><div class="kpi-lbl">Employee</div><div class="kpi-val" id="dash-owner-name" style="font-size:18px">—</div><div class="kpi-chg neutral" id="dash-owner-user">logged-in user</div></div></div>
-            <div class="kpi"><div class="kpi-ico blue">🏢</div><div><div class="kpi-lbl">Warehouse</div><div class="kpi-val" id="dash-owner-facility" style="font-size:18px">—</div><div class="kpi-chg neutral">current selection</div></div></div>
-            <div class="kpi"><div class="kpi-ico green">✓</div><div><div class="kpi-lbl">Position</div><div class="kpi-val" id="dash-owner-assigned" style="font-size:18px">—</div><div class="kpi-chg neutral">HRM assignment</div></div></div>
-            <div class="kpi"><div class="kpi-ico amber">●</div><div><div class="kpi-lbl">Card Status</div><div class="kpi-val" id="dash-owner-open" style="font-size:18px">—</div><div class="kpi-chg neutral" id="dash-owner-supervisor">supervisor</div></div></div>
+          <div id="dash-ownership-strip" style="display:flex;gap:18px;overflow-x:auto;padding:14px 4px 4px;min-height:132px">
+            <div style="font-size:12px;color:#9ca3af;padding:24px">Loading HRM ownership employees…</div>
           </div>
         </div>
 
@@ -18347,52 +18344,84 @@ function dashOwnershipRows(resp) {
   if (d && Array.isArray(d.records)) return d.records;
   return [];
 }
-async function dashFetchHrmCurrentUser() {
-  try {
-    const resp = await safeFetch('/api/proxy/hrm/Iclk/v1/currentuser', {method:'GET', headers:{'Accept':'application/json'}});
-    return resp && resp.success !== false ? (resp.data || resp) : null;
-  } catch(_) { return null; }
+function dashEmployeeInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '');
 }
-async function dashFetchOwnershipCard() {
-  const username = (admGetCurrentUsername ? admGetCurrentUsername() : '') || '';
-  const current = await dashFetchHrmCurrentUser();
-  const candidates = [
-    current && (current.employeeCode || current.empEmployeeCode || current.code),
-    current && (current.employeeId || current.empEmployeeId),
-    username
-  ].map(v => String(v || '').trim()).filter(Boolean);
-  for (const employeeCode of candidates) {
-    const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/page', {
-      method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body: JSON.stringify({pageIndex:1, pageSize:10, employeeCode})
-    });
-    if (!resp || resp._needsAuth || resp.success === false) continue;
-    const rows = dashOwnershipRows(resp);
-    const exact = rows.find(r => String(r.employeeCode || '').toLowerCase() === employeeCode.toLowerCase()) || rows[0];
-    if (exact) return exact;
-  }
-  return null;
+function dashOwnershipStatusColor(row) {
+  if (Number(row.status) === 1) return '#22c55e';
+  if (row.status === 0 || row.status === false) return '#f59e0b';
+  return '#06b6d4';
 }
-function dashRenderEmployeeOwnership(card) {
-  const username = (admGetCurrentUsername ? admGetCurrentUsername() : '') || ((document.getElementById('wms-user') || {}).textContent || '');
-  if (!card) {
-    dashSet('dash-owner-name', username || 'Not found');
-    dashSet('dash-owner-user', 'HRM card unavailable');
-    dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
-    dashSet('dash-owner-assigned', '—');
-    dashSet('dash-owner-open', 'No Card');
-    dashSet('dash-owner-supervisor', 'Open HRM card to create/view');
+async function dashFetchOwnershipEmployees() {
+  const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/page', {
+    method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify({pageIndex:1, pageSize:60})
+  });
+  if (!resp || resp._needsAuth || resp.success === false) return [];
+  return dashOwnershipRows(resp);
+}
+async function dashFetchOwnershipDetail(empEmployeeId) {
+  if (!empEmployeeId) return null;
+  const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/' + encodeURIComponent(empEmployeeId), {method:'GET', headers:{'Accept':'application/json'}});
+  return resp && resp.success !== false ? (resp.data || resp) : null;
+}
+function dashRenderEmployeeOwnership(rows) {
+  const strip = document.getElementById('dash-ownership-strip');
+  if (!strip) return;
+  if (!rows || !rows.length) {
+    strip.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:24px">No HRM ownership employees returned. Open HRM Card to create or update records.</div>';
     return;
   }
-  const assignment = HRM_ASSIGNMENT_LABELS[card.assignment] || card.assignment || '—';
-  const status = Number(card.status) === 1 ? 'Active Card' : 'Needs Card';
-  dashSet('dash-owner-name', String(card.fullName || username || 'Employee').slice(0, 24));
-  dashSet('dash-owner-user', card.employeeCode ? ('Employee Code ' + card.employeeCode) : (username ? '@' + username : 'HRM ownership-card'));
-  dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
-  dashSet('dash-owner-assigned', String(assignment).slice(0, 24));
-  dashSet('dash-owner-open', status);
-  dashSet('dash-owner-supervisor', card.supervisorName ? ('Supervisor: ' + card.supervisorName) : 'Supervisor unavailable');
+  strip.innerHTML = rows.slice(0, 40).map((r, idx) => {
+    const name = r.fullName || r.employeeName || r.employeeCode || 'Employee';
+    const color = dashOwnershipStatusColor(r);
+    const initials = dashEmployeeInitials(name).toUpperCase();
+    return '<div onclick="dashOpenOwnershipDetail(' + idx + ')" style="width:92px;flex:0 0 92px;text-align:center;cursor:pointer;position:relative" title="' + escAttr(name) + '">' +
+      '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,#F7F2FF,#ECFDF5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#1f2937;box-shadow:0 2px 8px rgba(0,0,0,.08)">' + esc(initials || '👤') + '</div>' +
+      '<span style="position:absolute;right:12px;top:54px;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid white"></span>' +
+      '<div style="font-size:11px;line-height:1.15;font-weight:800;color:#1f2937;white-space:normal;min-height:26px">' + esc(String(name).split(/\s+/).slice(0,2).join(' ')) + '</div>' +
+    '</div>';
+  }).join('');
 }
+function dashListText(arr, fallback) {
+  if (!arr) return fallback || '—';
+  if (Array.isArray(arr)) return arr.length ? arr.map(x => String(x).split(';;')[0]).join(', ') : (fallback || '—');
+  return String(arr || fallback || '—');
+}
+function dashScheduleText(detail) {
+  const shifts = detail && (detail.shifts || detail.dayConfigs || []);
+  if (!Array.isArray(shifts) || !shifts.length) return 'Schedule not configured';
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  return shifts.slice(0,5).map(s => (days[s.workDay] || s.weekLabel || 'DAY') + ' ' + (s.startTime || '') + '-' + (s.endTime || '')).join(' · ');
+}
+async function dashOpenOwnershipDetail(idx) {
+  dashCloseOwnershipDetail();
+  const rows = (DASH_STATE && DASH_STATE.ownershipEmployees) || [];
+  const base = rows[idx];
+  if (!base) return;
+  let detail = base;
+  try {
+    const live = await dashFetchOwnershipDetail(base.empEmployeeId || base.id);
+    if (live) detail = Object.assign({}, base, live);
+  } catch(_) {}
+  const name = detail.fullName || base.fullName || base.employeeCode || 'Employee';
+  const assignment = HRM_ASSIGNMENT_LABELS[detail.assignment] || detail.assignment || '—';
+  const status = Number(detail.status) === 1 ? 'Active Card' : 'Needs Card';
+  const rank = detail.rankBadge || '—';
+  const years = detail.yearsOfService || (detail.hireDate ? Math.max(0, Math.floor((Date.now() - new Date(detail.hireDate).getTime()) / 31557600000)) : '—');
+  const avatar = detail.headPhotoUrl ? '<img src="' + escAttr(detail.headPhotoUrl) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
+  const html = '<div class="modal-overlay open" id="dash-owner-modal" onclick="if(event.target===this)dashCloseOwnershipDetail()"><div class="modal" style="max-width:980px"><div class="modal-hdr"><h2>Employee Ownership Card</h2><button class="modal-x" onclick="dashCloseOwnershipDetail()">×</button></div>' +
+    '<div class="modal-body" style="display:grid;grid-template-columns:260px 1fr;gap:18px">' +
+      '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:#111827;color:white;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:#1f2937;margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:#6b7280;margin-top:4px">Employee Code ' + esc(detail.employeeCode || '—') + '</div></div>' +
+      '<div style="display:grid;gap:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:#111;color:#fff;border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">RANK</div><div style="font-size:36px;font-weight:900">' + esc(rank) + '</div></div><div style="background:#111;color:#fff;border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">YEAR</div><div style="font-size:36px;font-weight:900">' + esc(years) + '</div><div style="font-size:10px">OF SERVICE</div></div></div>' +
+      '<div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">SCHEDULE</div><div style="font-size:13px">' + esc(dashScheduleText(detail)) + '</div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">SKILLS</div><div style="font-size:12px">' + esc(dashListText(detail.skills)) + '</div></div><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">EQUIPMENTS</div><div style="font-size:12px">' + esc(dashListText(detail.equipments || detail.equipment)) + '</div></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">TECHNOLOGY</div><div style="font-size:12px">' + esc(dashListText(detail.technology)) + '</div></div><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">TOOLS</div><div style="font-size:12px">' + esc(dashListText(detail.tools)) + '</div></div></div>' +
+      '<div style="font-size:12px;color:#6b7280">Supervisor: ' + esc(detail.supervisorName || '—') + ' · Status: ' + esc(status) + '</div></div></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function dashCloseOwnershipDetail() { const m = document.getElementById('dash-owner-modal'); if (m) m.remove(); }
 function dashRenderTasks(tickets) {
   const counts = {total:tickets.length, completed:0, progress:0, pending:0, overdue:0};
   const today = new Date(); today.setHours(0,0,0,0);
@@ -18420,21 +18449,22 @@ function dashRenderTasks(tickets) {
   }).join('') || '<div class="tasks-empty">No live cycle count tasks found for this facility.</div>';
 }
 async function loadDashboardLiveData() {
-  ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending','dash-owner-assigned','dash-owner-open'].forEach(id => dashSet(id, '…'));
-  dashSet('dash-owner-name', (document.getElementById('settings-display-name') || {}).textContent || 'Employee');
-  dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
+  ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending'].forEach(id => dashSet(id, '…'));
+  const strip = document.getElementById('dash-ownership-strip');
+  if (strip) strip.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:24px">Loading HRM ownership employees…</div>';
   const ok = await ensureWiseToken(false);
   if (!ok) {
     dashSet('dash-kpi-inv-sub', 'Sign in to load live WMS data');
+    if (strip) strip.innerHTML = '<div style="font-size:12px;color:#ef4444;padding:24px">Sign in to load HRM ownership employees.</div>';
     const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444">Please sign in to load live WMS inventory.</td></tr>';
     return;
   }
-  const [ticketsResult, invResult, ownershipResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample(), dashFetchOwnershipCard()]);
+  const [ticketsResult, invResult, ownershipResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample(), dashFetchOwnershipEmployees()]);
   const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
   const inv = invResult.status === 'fulfilled' ? invResult.value : {rows:[], customersChecked:0};
-  const ownershipCard = ownershipResult.status === 'fulfilled' ? ownershipResult.value : null;
-  DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows; DASH_STATE.ownershipCard = ownershipCard;
-  dashRenderEmployeeOwnership(ownershipCard);
+  const ownershipEmployees = ownershipResult.status === 'fulfilled' ? ownershipResult.value : [];
+  DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows; DASH_STATE.ownershipEmployees = ownershipEmployees;
+  dashRenderEmployeeOwnership(ownershipEmployees);
   dashRenderTasks(tickets);
   dashRenderInventory(inv.rows, inv.customersChecked);
   loadInsight({tickets, inventoryRows: inv.rows});
