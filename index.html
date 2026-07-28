@@ -648,58 +648,20 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
           <span class="ai-msg loading" id="ai-msg">Analyzing warehouse data…</span>
         </div>
 
-        <!-- QUICK ACCESS -->
-        <div class="card" id="dashboard-scheduler-card" style="margin-bottom:18px;border:1.5px solid #D8C4FF;background:linear-gradient(135deg,#ffffff 0%,#F7F2FF 100%)">
+        <!-- EMPLOYEE OWNERSHIP -->
+        <div class="card" id="dashboard-employee-ownership-card" style="margin-bottom:18px;border:1.5px solid #D8C4FF;background:linear-gradient(135deg,#ffffff 0%,#F7F2FF 100%)">
           <div class="card-hdr" style="align-items:center">
             <div>
-              <div class="card-ttl">Scheduler</div>
-              <div class="scheduler-help">Create schedules, reuse saved schedules, and build cycle-count plans for the selected warehouse.</div>
+              <div class="card-ttl">Employee Ownership</div>
+              <div class="scheduler-help">Logged-in employee ownership and live cycle-count workload for the selected warehouse.</div>
             </div>
-            <button class="btn btn-primary" onclick="showView('scheduler')">Open Scheduler</button>
+            <button class="btn btn-primary" onclick="showView('countApproval')" style="font-size:12px;padding:6px 14px">Open My Work</button>
           </div>
-        </div>
-
-        <!-- KPIs -->
-        <div class="kpi-grid">
-          <div class="kpi">
-            <div class="kpi-ico blue">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-            </div>
-            <div>
-              <div class="kpi-lbl">Total Available Qty</div>
-              <div class="kpi-val" id="dash-kpi-inv-qty">—</div>
-              <div class="kpi-chg neutral" id="dash-kpi-inv-sub">Live WMS inventory</div>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-ico green">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-            </div>
-            <div>
-              <div class="kpi-lbl">Total Items</div>
-              <div class="kpi-val" id="dash-kpi-items">—</div>
-              <div class="kpi-chg neutral" id="dash-kpi-items-sub">Unique SKUs loaded live</div>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-ico purple">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            </div>
-            <div>
-              <div class="kpi-lbl">Tasks Completed</div>
-              <div class="kpi-val" id="dash-kpi-completed">—</div>
-              <div class="kpi-chg neutral" id="dash-kpi-completed-sub">Live cycle counts</div>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-ico amber">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <div>
-              <div class="kpi-lbl">Pending Tasks</div>
-              <div class="kpi-val" id="dash-kpi-pending">—</div>
-              <div class="kpi-chg neutral" id="dash-kpi-pending-sub">Open / in progress</div>
-            </div>
+          <div class="dash-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px">
+            <div class="kpi"><div class="kpi-ico purple">👤</div><div><div class="kpi-lbl">Employee</div><div class="kpi-val" id="dash-owner-name" style="font-size:18px">—</div><div class="kpi-chg neutral" id="dash-owner-user">logged-in user</div></div></div>
+            <div class="kpi"><div class="kpi-ico blue">🏢</div><div><div class="kpi-lbl">Warehouse</div><div class="kpi-val" id="dash-owner-facility" style="font-size:18px">—</div><div class="kpi-chg neutral">current selection</div></div></div>
+            <div class="kpi"><div class="kpi-ico green">✓</div><div><div class="kpi-lbl">Assigned to Me</div><div class="kpi-val" id="dash-owner-assigned">—</div><div class="kpi-chg neutral">open live tickets</div></div></div>
+            <div class="kpi"><div class="kpi-ico amber">●</div><div><div class="kpi-lbl">Facility Open</div><div class="kpi-val" id="dash-owner-open">—</div><div class="kpi-chg neutral">open / in progress</div></div></div>
           </div>
         </div>
 
@@ -18375,6 +18337,21 @@ function dashRenderInventory(rows, customersChecked) {
     return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:#9ca3af">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">No low-stock rows in the live sample.</td></tr>';
 }
+function dashTicketText(t) {
+  return [t.counter, t.assignedUser, t.assignedTo, t.createdBy, t.updatedBy, t.requester, t.requestedBy].filter(Boolean).join(' ').toLowerCase();
+}
+function dashRenderEmployeeOwnership(tickets) {
+  const username = (admGetCurrentUsername ? admGetCurrentUsername() : '') || ((document.getElementById('wms-user') || {}).textContent || '');
+  const displayName = (document.getElementById('settings-display-name') || {}).textContent || username || 'Employee';
+  const needle = String(username || displayName || '').toLowerCase();
+  const openTickets = tickets.filter(t => !['completed','cancelled'].includes(dashTicketStatus(t)));
+  const assignedMine = needle ? openTickets.filter(t => dashTicketText(t).includes(needle)).length : 0;
+  dashSet('dash-owner-name', String(displayName || username || 'Employee').slice(0, 24));
+  dashSet('dash-owner-user', username ? ('@' + username) : 'logged-in user');
+  dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
+  dashSet('dash-owner-assigned', dashFmt(assignedMine));
+  dashSet('dash-owner-open', dashFmt(openTickets.length));
+}
 function dashRenderTasks(tickets) {
   const counts = {total:tickets.length, completed:0, progress:0, pending:0, overdue:0};
   const today = new Date(); today.setHours(0,0,0,0);
@@ -18402,7 +18379,9 @@ function dashRenderTasks(tickets) {
   }).join('') || '<div class="tasks-empty">No live cycle count tasks found for this facility.</div>';
 }
 async function loadDashboardLiveData() {
-  ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending'].forEach(id => dashSet(id, '…'));
+  ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending','dash-owner-assigned','dash-owner-open'].forEach(id => dashSet(id, '…'));
+  dashSet('dash-owner-name', (document.getElementById('settings-display-name') || {}).textContent || 'Employee');
+  dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
   const ok = await ensureWiseToken(false);
   if (!ok) {
     dashSet('dash-kpi-inv-sub', 'Sign in to load live WMS data');
@@ -18413,6 +18392,7 @@ async function loadDashboardLiveData() {
   const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
   const inv = invResult.status === 'fulfilled' ? invResult.value : {rows:[], customersChecked:0};
   DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows;
+  dashRenderEmployeeOwnership(tickets);
   dashRenderTasks(tickets);
   dashRenderInventory(inv.rows, inv.customersChecked);
   loadInsight({tickets, inventoryRows: inv.rows});
