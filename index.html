@@ -653,15 +653,15 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
           <div class="card-hdr" style="align-items:center">
             <div>
               <div class="card-ttl">Employee Ownership</div>
-              <div class="scheduler-help">Logged-in employee ownership and live cycle-count workload for the selected warehouse.</div>
+              <div class="scheduler-help">Live HRM ownership-card data from hrm.item.com/ownership-card.</div>
             </div>
-            <button class="btn btn-primary" onclick="showView('countApproval')" style="font-size:12px;padding:6px 14px">Open My Work</button>
+            <button class="btn btn-primary" onclick="window.open('https://hrm.item.com/ownership-card','_blank')" style="font-size:12px;padding:6px 14px">Open HRM Card</button>
           </div>
           <div class="dash-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px">
             <div class="kpi"><div class="kpi-ico purple">👤</div><div><div class="kpi-lbl">Employee</div><div class="kpi-val" id="dash-owner-name" style="font-size:18px">—</div><div class="kpi-chg neutral" id="dash-owner-user">logged-in user</div></div></div>
             <div class="kpi"><div class="kpi-ico blue">🏢</div><div><div class="kpi-lbl">Warehouse</div><div class="kpi-val" id="dash-owner-facility" style="font-size:18px">—</div><div class="kpi-chg neutral">current selection</div></div></div>
-            <div class="kpi"><div class="kpi-ico green">✓</div><div><div class="kpi-lbl">Assigned to Me</div><div class="kpi-val" id="dash-owner-assigned">—</div><div class="kpi-chg neutral">open live tickets</div></div></div>
-            <div class="kpi"><div class="kpi-ico amber">●</div><div><div class="kpi-lbl">Facility Open</div><div class="kpi-val" id="dash-owner-open">—</div><div class="kpi-chg neutral">open / in progress</div></div></div>
+            <div class="kpi"><div class="kpi-ico green">✓</div><div><div class="kpi-lbl">Position</div><div class="kpi-val" id="dash-owner-assigned" style="font-size:18px">—</div><div class="kpi-chg neutral">HRM assignment</div></div></div>
+            <div class="kpi"><div class="kpi-ico amber">●</div><div><div class="kpi-lbl">Card Status</div><div class="kpi-val" id="dash-owner-open" style="font-size:18px">—</div><div class="kpi-chg neutral" id="dash-owner-supervisor">supervisor</div></div></div>
           </div>
         </div>
 
@@ -18337,20 +18337,61 @@ function dashRenderInventory(rows, customersChecked) {
     return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:#9ca3af">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
   }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">No low-stock rows in the live sample.</td></tr>';
 }
-function dashTicketText(t) {
-  return [t.counter, t.assignedUser, t.assignedTo, t.createdBy, t.updatedBy, t.requester, t.requestedBy].filter(Boolean).join(' ').toLowerCase();
+const HRM_ASSIGNMENT_LABELS = {1:'Driver',2:'General Labor',3:'Inventory',4:'Quality Control',5:'Housekeeping',6:'CSR',7:'Gate / Security',8:'Yard Jockey',9:'IT',10:'Lead',11:'Supervisor',12:'General Manager'};
+function dashOwnershipRows(resp) {
+  const d = resp && (resp.data != null ? resp.data : resp);
+  if (Array.isArray(d)) return d;
+  if (d && Array.isArray(d.data)) return d.data;
+  if (d && d.data && Array.isArray(d.data.data)) return d.data.data;
+  if (d && Array.isArray(d.list)) return d.list;
+  if (d && Array.isArray(d.records)) return d.records;
+  return [];
 }
-function dashRenderEmployeeOwnership(tickets) {
+async function dashFetchHrmCurrentUser() {
+  try {
+    const resp = await safeFetch('/api/proxy/hrm/Iclk/v1/currentuser', {method:'GET', headers:{'Accept':'application/json'}});
+    return resp && resp.success !== false ? (resp.data || resp) : null;
+  } catch(_) { return null; }
+}
+async function dashFetchOwnershipCard() {
+  const username = (admGetCurrentUsername ? admGetCurrentUsername() : '') || '';
+  const current = await dashFetchHrmCurrentUser();
+  const candidates = [
+    current && (current.employeeCode || current.empEmployeeCode || current.code),
+    current && (current.employeeId || current.empEmployeeId),
+    username
+  ].map(v => String(v || '').trim()).filter(Boolean);
+  for (const employeeCode of candidates) {
+    const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/page', {
+      method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body: JSON.stringify({pageIndex:1, pageSize:10, employeeCode})
+    });
+    if (!resp || resp._needsAuth || resp.success === false) continue;
+    const rows = dashOwnershipRows(resp);
+    const exact = rows.find(r => String(r.employeeCode || '').toLowerCase() === employeeCode.toLowerCase()) || rows[0];
+    if (exact) return exact;
+  }
+  return null;
+}
+function dashRenderEmployeeOwnership(card) {
   const username = (admGetCurrentUsername ? admGetCurrentUsername() : '') || ((document.getElementById('wms-user') || {}).textContent || '');
-  const displayName = (document.getElementById('settings-display-name') || {}).textContent || username || 'Employee';
-  const needle = String(username || displayName || '').toLowerCase();
-  const openTickets = tickets.filter(t => !['completed','cancelled'].includes(dashTicketStatus(t)));
-  const assignedMine = needle ? openTickets.filter(t => dashTicketText(t).includes(needle)).length : 0;
-  dashSet('dash-owner-name', String(displayName || username || 'Employee').slice(0, 24));
-  dashSet('dash-owner-user', username ? ('@' + username) : 'logged-in user');
+  if (!card) {
+    dashSet('dash-owner-name', username || 'Not found');
+    dashSet('dash-owner-user', 'HRM card unavailable');
+    dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
+    dashSet('dash-owner-assigned', '—');
+    dashSet('dash-owner-open', 'No Card');
+    dashSet('dash-owner-supervisor', 'Open HRM card to create/view');
+    return;
+  }
+  const assignment = HRM_ASSIGNMENT_LABELS[card.assignment] || card.assignment || '—';
+  const status = Number(card.status) === 1 ? 'Active Card' : 'Needs Card';
+  dashSet('dash-owner-name', String(card.fullName || username || 'Employee').slice(0, 24));
+  dashSet('dash-owner-user', card.employeeCode ? ('Employee Code ' + card.employeeCode) : (username ? '@' + username : 'HRM ownership-card'));
   dashSet('dash-owner-facility', String(FACILITY_NAME || FACILITY_ID).slice(0, 24));
-  dashSet('dash-owner-assigned', dashFmt(assignedMine));
-  dashSet('dash-owner-open', dashFmt(openTickets.length));
+  dashSet('dash-owner-assigned', String(assignment).slice(0, 24));
+  dashSet('dash-owner-open', status);
+  dashSet('dash-owner-supervisor', card.supervisorName ? ('Supervisor: ' + card.supervisorName) : 'Supervisor unavailable');
 }
 function dashRenderTasks(tickets) {
   const counts = {total:tickets.length, completed:0, progress:0, pending:0, overdue:0};
@@ -18388,11 +18429,12 @@ async function loadDashboardLiveData() {
     const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444">Please sign in to load live WMS inventory.</td></tr>';
     return;
   }
-  const [ticketsResult, invResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample()]);
+  const [ticketsResult, invResult, ownershipResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample(), dashFetchOwnershipCard()]);
   const tickets = ticketsResult.status === 'fulfilled' ? ticketsResult.value : [];
   const inv = invResult.status === 'fulfilled' ? invResult.value : {rows:[], customersChecked:0};
-  DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows;
-  dashRenderEmployeeOwnership(tickets);
+  const ownershipCard = ownershipResult.status === 'fulfilled' ? ownershipResult.value : null;
+  DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows; DASH_STATE.ownershipCard = ownershipCard;
+  dashRenderEmployeeOwnership(ownershipCard);
   dashRenderTasks(tickets);
   dashRenderInventory(inv.rows, inv.customersChecked);
   loadInsight({tickets, inventoryRows: inv.rows});
