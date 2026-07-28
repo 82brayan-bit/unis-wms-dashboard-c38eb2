@@ -15978,7 +15978,7 @@ function picalShowAddForm() {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Department</label><select class="cc-input" id="pical-add-dept" onchange="ticketOnDeptChange(\x27pical-add-dept\x27,\x27pical-add-topic\x27)"><option value="">Loading…</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Topic</label><select class="cc-input" id="pical-add-topic"><option value="">Select department first</option></select></div>' +
-    
+    '<div class="cc-field" style="margin:0"><label class="cc-label">Contact Email</label><input class="cc-input" id="pical-add-contact-email" value="' + escAttr(picalGetDefaultContactEmail()) + '" placeholder="contact@company.com"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Ticket Title</label><input class="cc-input" id="pical-add-ticket-title" placeholder="Physical Inventory Setup"/></div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px;align-items:end">' +
@@ -16024,6 +16024,8 @@ function picalSaveNew() {
   rec.deptId = deptId;
   rec.topicId = topicId;
   rec.contactEmails = contactEmailRaw.split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
+  rec.contactEmail = rec.contactEmails[0] || '';
+  rec.internalEmail = contactEmailRaw;
   rec.ticketTitle = ticketTitle;
   rec.teamId = teamSel ? teamSel.value : '';
   rec.teamName = teamSel && teamSel.selectedIndex > 0 ? teamSel.options[teamSel.selectedIndex].textContent : '';
@@ -16092,7 +16094,7 @@ function picalEditLocal(localId) {
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Department</label><select class="cc-input" id="pical-edit-dept" onchange="ticketOnDeptChange(\x27pical-edit-dept\x27,\x27pical-edit-topic\x27)"><option value="">Loading…</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Topic</label><select class="cc-input" id="pical-edit-topic"><option value="">Select department first</option></select></div>' +
-
+    '<div class="cc-field" style="margin:0"><label class="cc-label">Contact Email</label><input class="cc-input" id="pical-edit-contact-email" value="' + escAttr((rec.contactEmails && rec.contactEmails[0]) || rec.contactEmail || rec.internalEmail || picalGetDefaultContactEmail()) + '" placeholder="contact@company.com"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Ticket Title</label><input class="cc-input" id="pical-edit-ticket-title" value="' + escAttr(rec.ticketTitle || '') + '" placeholder="Physical Inventory Setup"/></div>' +
     '</div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Setup Message / Email Template</label><textarea class="cc-input" id="pical-edit-ticket-msg" rows="10" style="resize:vertical;font-size:12px" placeholder="Setup instructions...">' + esc(editMsg) + '</textarea></div>' +
@@ -16115,7 +16117,7 @@ async function picalSaveEdit(localId) {
   const date = (document.getElementById('pical-edit-date') || {}).value;
   const customerId = (document.getElementById('pical-edit-customer') || {}).value;
   const confirmation = (document.getElementById('pical-edit-confirmation') || {}).value || 'Pending';
-  const internalEmail = (document.getElementById('pical-edit-email') || {}).value || '';
+  const internalEmail = (document.getElementById('pical-edit-contact-email') || {}).value || '';
   const quoteAmount = (document.getElementById('pical-edit-quote') || {}).value || '';
   const notes = (document.getElementById('pical-edit-notes') || {}).value || '';
   if (!date) { alert('Date is required.'); return; }
@@ -16126,6 +16128,8 @@ async function picalSaveEdit(localId) {
   rec.customerId = customerId;
   rec.confirmation = confirmation;
   rec.internalEmail = internalEmail;
+  rec.contactEmail = internalEmail;
+  rec.contactEmails = internalEmail.split(/[,;\s]+/).map(e => e.trim()).filter(Boolean);
   rec.quoteAmount = quoteAmount;
   rec.notes = notes;
 
@@ -16143,7 +16147,7 @@ async function picalSaveEdit(localId) {
   // If no ticket yet and create checked, create one
   if (createTicket && !rec.ticketId) {
     const dept = rec.deptId; const topic = rec.topicId;
-    const contactEmail = rec.contactEmail; const title = rec.ticketTitle;
+    const contactEmail = (rec.contactEmails && rec.contactEmails[0]) || rec.contactEmail || rec.internalEmail; const title = rec.ticketTitle;
     const msg = rec.ticketMsg;
     if (!dept || !topic || !contactEmail || !title || !msg) {
       alert('Fill all required ticket fields (Department, Topic, Contact Email, Title, Message) to create a ticket.');
@@ -16162,7 +16166,7 @@ async function picalSaveEdit(localId) {
       try {
         await safeFetch(TICKET_API + '/' + encodeURIComponent(rec.ticketId), {
           method: 'PUT', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({teamId: parseInt(newTeamId, 10)}),
+          body: JSON.stringify({teamId: String(newTeamId)}),
         });
         rec.teamId = newTeamId;
         rec.teamName = teamSel.options[teamSel.selectedIndex].text;
@@ -16328,6 +16332,23 @@ const PICAL_TEAMS_KNOWN = [
   {id:'336699888571584512', name:'UF Buena Park Inventory', departmentId:'336664760841621504'},
 ];
 
+const PICAL_DEFAULT_CONTACT_EMAIL = '';
+
+function picalGetDefaultContactEmail() {
+  const candidates = [];
+  try {
+    const payload = decodeJwt(WISE_TOKEN);
+    const data = (payload && payload.data) || {};
+    candidates.push(data.email, data.user_email, data.userEmail, data.mail, payload.email, payload.user_email);
+    candidates.push(data.user_name, payload.sub);
+  } catch(_) {}
+  try {
+    candidates.push(localStorage.getItem('user_email'), localStorage.getItem('wise_user_email'), localStorage.getItem('contact_email'));
+  } catch(_) {}
+  candidates.push(PICAL_DEFAULT_CONTACT_EMAIL);
+  return String(candidates.find(v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())) || '').trim();
+}
+
 function picalToggleTicketFields(prefix) {
   const checked = (document.getElementById('pical-' + prefix + '-create-ticket') || {}).checked;
   const fields = document.getElementById('pical-' + prefix + '-ticket-fields');
@@ -16350,8 +16371,8 @@ function picalToggleTicketFields(prefix) {
       const titleEl = document.getElementById('pical-add-ticket-title');
       if (titleEl && !titleEl.value) titleEl.value = 'Physical Inventory Setup - ' + custName + ' - ' + dateVal;
       const emailEl = document.getElementById('pical-add-contact-email');
-      const intEmail = (document.getElementById('pical-add-email') || {}).value || '';
-      if (emailEl && !emailEl.value && intEmail) emailEl.value = intEmail.split(/[,;]/)[0].trim();
+      const intEmail = picalGetDefaultContactEmail();
+      if (emailEl && !emailEl.value && intEmail) emailEl.value = intEmail;
     }
   }
 }
