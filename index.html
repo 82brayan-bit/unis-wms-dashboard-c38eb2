@@ -18353,13 +18353,34 @@ function dashOwnershipStatusColor(row) {
   if (row.status === 0 || row.status === false) return '#f59e0b';
   return '#06b6d4';
 }
+function dashOwnershipPhotoUrl(row) {
+  const raw = row && (row.headPhotoUrl || row.photoUrl || row.avatarUrl || row.pictureUrl || row.imageUrl || row.profilePhotoUrl || row.headPhoto || row.photo);
+  if (!raw) return '';
+  const url = String(raw).trim();
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  if (url.startsWith('/')) return 'https://hrm.item.com' + url;
+  return 'https://hrm.item.com/' + url.replace(/^\/+/, '');
+}
 async function dashFetchOwnershipEmployees() {
   const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/page', {
     method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
     body: JSON.stringify({pageIndex:1, pageSize:60})
   });
   if (!resp || resp._needsAuth || resp.success === false) return [];
-  return dashOwnershipRows(resp);
+  const rows = dashOwnershipRows(resp);
+  // The list endpoint may not include the photo field. Enrich the visible roster
+  // from the HRM detail endpoint so employee circles can show the same pictures
+  // used by hrm.item.com/ownership-card when available.
+  const visible = rows.slice(0, 40);
+  const enriched = await Promise.all(visible.map(async r => {
+    try {
+      if (dashOwnershipPhotoUrl(r)) return r;
+      const detail = await dashFetchOwnershipDetail(r.empEmployeeId || r.id);
+      return detail ? Object.assign({}, r, detail) : r;
+    } catch(_) { return r; }
+  }));
+  return enriched.concat(rows.slice(40));
 }
 async function dashFetchOwnershipDetail(empEmployeeId) {
   if (!empEmployeeId) return null;
@@ -18377,8 +18398,12 @@ function dashRenderEmployeeOwnership(rows) {
     const name = r.fullName || r.employeeName || r.employeeCode || 'Employee';
     const color = dashOwnershipStatusColor(r);
     const initials = dashEmployeeInitials(name).toUpperCase();
+    const photo = dashOwnershipPhotoUrl(r);
+    const avatarHtml = photo
+      ? '<img src="' + escAttr(photo) + '" alt="' + escAttr(name) + '" onerror="this.style.display=\'none\';this.parentNode.textContent=\'' + escAttr(initials || '👤') + '\'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>'
+      : esc(initials || '👤');
     return '<div onclick="dashOpenOwnershipDetail(' + idx + ')" style="width:92px;flex:0 0 92px;text-align:center;cursor:pointer;position:relative" title="' + escAttr(name) + '">' +
-      '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,#F7F2FF,#ECFDF5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#1f2937;box-shadow:0 2px 8px rgba(0,0,0,.08)">' + esc(initials || '👤') + '</div>' +
+      '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,#F7F2FF,#ECFDF5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#1f2937;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden">' + avatarHtml + '</div>' +
       '<span style="position:absolute;right:12px;top:54px;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid white"></span>' +
       '<div style="font-size:11px;line-height:1.15;font-weight:800;color:#1f2937;white-space:normal;min-height:26px">' + esc(String(name).split(/\s+/).slice(0,2).join(' ')) + '</div>' +
     '</div>';
@@ -18410,7 +18435,8 @@ async function dashOpenOwnershipDetail(idx) {
   const status = Number(detail.status) === 1 ? 'Active Card' : 'Needs Card';
   const rank = detail.rankBadge || '—';
   const years = detail.yearsOfService || (detail.hireDate ? Math.max(0, Math.floor((Date.now() - new Date(detail.hireDate).getTime()) / 31557600000)) : '—');
-  const avatar = detail.headPhotoUrl ? '<img src="' + escAttr(detail.headPhotoUrl) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
+  const detailPhoto = dashOwnershipPhotoUrl(detail);
+  const avatar = detailPhoto ? '<img src="' + escAttr(detailPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
   const html = '<div class="modal-overlay open" id="dash-owner-modal" onclick="if(event.target===this)dashCloseOwnershipDetail()"><div class="modal" style="max-width:980px"><div class="modal-hdr"><h2>Employee Ownership Card</h2><button class="modal-x" onclick="dashCloseOwnershipDetail()">×</button></div>' +
     '<div class="modal-body" style="display:grid;grid-template-columns:260px 1fr;gap:18px">' +
       '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:#111827;color:white;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:#1f2937;margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:#6b7280;margin-top:4px">Employee Code ' + esc(detail.employeeCode || '—') + '</div></div>' +
