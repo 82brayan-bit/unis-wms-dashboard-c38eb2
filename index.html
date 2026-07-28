@@ -16329,7 +16329,18 @@ const PICAL_TEAMS_KNOWN = [
   {id:'336699888571584512', name:'UF Buena Park Inventory', departmentId:'336664760841621504'},
 ];
 
-const PICAL_DEFAULT_CONTACT_EMAIL = 'no-reply@unisco.com';
+function picalGetRequesterName() {
+  const candidates = [];
+  try {
+    const payload = decodeJwt(WISE_TOKEN);
+    const data = (payload && payload.data) || {};
+    candidates.push(data.full_name, data.fullName, data.displayName, data.name, data.employeeName);
+    candidates.push(data.user_name, payload.sub);
+  } catch(_) {}
+  const domName = (document.getElementById('user-menu-name') || {}).textContent || (document.getElementById('wms-user') || {}).textContent || '';
+  candidates.push(domName);
+  return String(candidates.find(v => String(v || '').trim() && String(v || '').trim() !== '—') || 'WMS Dashboard User').trim();
+}
 
 function picalGetDefaultContactEmail() {
   const candidates = [];
@@ -16337,13 +16348,13 @@ function picalGetDefaultContactEmail() {
     const payload = decodeJwt(WISE_TOKEN);
     const data = (payload && payload.data) || {};
     candidates.push(data.email, data.user_email, data.userEmail, data.mail, payload.email, payload.user_email);
-    candidates.push(data.user_name, payload.sub);
   } catch(_) {}
   try {
     candidates.push(localStorage.getItem('user_email'), localStorage.getItem('wise_user_email'), localStorage.getItem('contact_email'));
   } catch(_) {}
-  candidates.push(PICAL_DEFAULT_CONTACT_EMAIL);
-  return String(candidates.find(v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())) || '').trim();
+  const username = admGetCurrentUsername ? admGetCurrentUsername() : '';
+  if (username && !/@/.test(username)) candidates.push(username + '@itemgroup.com');
+  return String(candidates.find(v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())) || 'dashboard@itemgroup.com').trim();
 }
 
 function picalToggleTicketFields(prefix) {
@@ -16478,16 +16489,23 @@ async function picalCreateTicket(rec, opts) {
   }
   diag.push({step:'Validate Fields', status:'success', msg:'All required fields present. DueDate: ' + (dueDate||'none')});
 
+  const requesterName = picalGetRequesterName();
+  const requesterEmail = String(opts.contactEmail || picalGetDefaultContactEmail()).split(/[,;]/)[0].trim();
   const payload = {
     departmentId: String(opts.dept),
     topicId: String(opts.topic),
     priorityId: 1,
-    customerName: customerName,
-    customerEmail: String(opts.contactEmail || picalGetDefaultContactEmail()).split(/[,;]/)[0].trim(),
+    // Ticket "Requestor" is driven by customerName/customerEmail. Use the
+    // logged-in dashboard user here; keep the PI customer in title/message/form data.
+    customerName: requesterName,
+    customerEmail: requesterEmail,
     title: opts.title,
     message: { content: opts.msg },
     dueDate: dueDate,
-    formEntries: [],
+    formEntries: [
+      {key:'physicalInventoryCustomer', value: customerName},
+      {key:'facility', value: (FACILITY_NAME || FACILITY_ID) + ' (' + FACILITY_ID + ')'}
+    ],
   };
   diag.push({step:'Build Payload', status:'success', msg:'Keys: ' + Object.keys(payload).join(', ') + '. message.content: ' + (opts.msg||'').length + ' chars'});
 
