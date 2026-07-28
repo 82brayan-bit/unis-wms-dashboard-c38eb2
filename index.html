@@ -16290,22 +16290,35 @@ function ticketPopulateTopicSelect(selId, deptId, selectedVal) {
   const sel = document.getElementById(selId);
   if (!sel) return;
   const topics = TICKET_TOPICS_CACHE || TICKET_TOPIC_FALLBACK;
-  const filtered = deptId ? topics.filter(t => String(t.departmentId) === String(deptId)) : topics;
+  // Ticket API can return warehouse-department topics under the parent
+  // UNIS Fulfillment departmentId. Do not hide valid UF topics just because
+  // the selected department is Buena Park / another warehouse child dept.
+  let filtered = deptId ? topics.filter(t => String(t.departmentId || t.deptId || '') === String(deptId)) : topics;
+  let usedParentFallback = false;
+  if (deptId && filtered.length === 0 && String(deptId) !== String(TICKET_DEFAULT_DEPT)) {
+    filtered = topics.filter(t => String(t.departmentId || t.deptId || '') === String(TICKET_DEFAULT_DEPT));
+    usedParentFallback = filtered.length > 0;
+  }
+  if (deptId && filtered.length === 0) filtered = topics;
   sel.innerHTML = '<option value="">— Select Topic —</option>';
+  if (usedParentFallback) {
+    sel.innerHTML += '<option disabled>Using UNIS Fulfillment topics for this warehouse department</option>';
+  }
   if (filtered.length === 0) {
-    sel.innerHTML += '<option disabled>No topics for this department</option>';
+    sel.innerHTML += '<option disabled>No topics available</option>';
     return;
   }
+  const targetSelected = selectedVal || (filtered.some(t => String(t.id || t.topicId || '') === String(TICKET_DEFAULT_TOPIC)) ? TICKET_DEFAULT_TOPIC : '');
   filtered.forEach(t => {
     const id = t.id || t.topicId || '';
     const name = t.title || t.name || t.topicName || ('Topic ' + id);
-    sel.innerHTML += '<option value="' + escAttr(String(id)) + '"' + (String(id) === String(selectedVal) ? ' selected' : '') + '>' + esc(name) + '</option>';
+    sel.innerHTML += '<option value="' + escAttr(String(id)) + '"' + (String(id) === String(targetSelected) ? ' selected' : '') + '>' + esc(name) + '</option>';
   });
 }
 
 function ticketOnDeptChange(deptSelId, topicSelId) {
   const deptId = (document.getElementById(deptSelId) || {}).value || '';
-  ticketPopulateTopicSelect(topicSelId, deptId, '');
+  ticketPopulateTopicSelect(topicSelId, deptId, TICKET_DEFAULT_TOPIC);
 }
 
 let PICAL_TEAMS_CACHE = null;
