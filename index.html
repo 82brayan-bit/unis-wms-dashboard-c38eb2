@@ -18358,9 +18358,22 @@ function dashOwnershipPhotoUrl(row) {
   if (!raw) return '';
   const url = String(raw).trim();
   if (!url) return '';
-  if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
   if (url.startsWith('/')) return 'https://hrm.item.com' + url;
   return 'https://hrm.item.com/' + url.replace(/^\/+/, '');
+}
+async function dashProxyHrmImageUrl(url) {
+  const src = String(url || '').trim();
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return src;
+  try {
+    const headers = {'Accept':'image/*,*/*'};
+    if (WISE_TOKEN) headers.Authorization = 'Bearer ' + WISE_TOKEN;
+    const resp = await fetch('/api/proxy/hrm-file?url=' + encodeURIComponent(src), {headers});
+    if (!resp.ok) return src;
+    const blob = await resp.blob();
+    if (!blob || !/^image\//i.test(blob.type || '')) return src;
+    return URL.createObjectURL(blob);
+  } catch(_) { return src; }
 }
 async function dashFetchOwnershipEmployees() {
   const resp = await safeFetch('/api/proxy/hrm/employee/v1/ownership/page', {

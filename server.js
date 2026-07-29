@@ -281,6 +281,33 @@ async function handleApi(req, res, url) {
       return send(res, out.status, out.json || {success:false, msg: out.raw ? out.raw.slice(0, 300) : 'No response from HRM'});
     }
 
+    if (url.pathname === '/api/proxy/hrm-file') {
+      if (req.method !== 'GET') return send(res, 405, {success:false, msg:'Method not allowed'});
+      const requested = String(url.searchParams.get('url') || '').trim();
+      if (!requested) return send(res, 400, {success:false, msg:'Missing HRM file url'});
+      let u;
+      try {
+        u = requested.startsWith('http') ? new URL(requested) : new URL(requested.startsWith('/') ? requested : '/' + requested, 'https://hrm.item.com');
+      } catch(_) {
+        return send(res, 400, {success:false, msg:'Invalid HRM file url'});
+      }
+      if (u.hostname !== 'hrm.item.com') return send(res, 400, {success:false, msg:'Unsupported HRM file host'});
+      const authHeader = req.headers['authorization'] || '';
+      const fileOut = await new Promise(resolve => {
+        const hdrs = {'Accept':'image/*,*/*','User-Agent':'UNIS-WMS-Dashboard/1.0'};
+        if (authHeader) hdrs['Authorization'] = authHeader;
+        const r = https.request({method:'GET', host:u.hostname, path:u.pathname + u.search, headers:hdrs}, upstream => {
+          const chunks = [];
+          upstream.on('data', c => chunks.push(c));
+          upstream.on('end', () => resolve({status: upstream.statusCode || 502, headers: upstream.headers, buffer: Buffer.concat(chunks)}));
+        });
+        r.on('error', e => resolve({status:502, headers:{}, buffer:Buffer.from(e.message)}));
+        r.end();
+      });
+      res.writeHead(fileOut.status, {'Content-Type': fileOut.headers['content-type'] || 'application/octet-stream', 'Cache-Control':'private, max-age=300'});
+      return res.end(fileOut.buffer);
+    }
+
     if (url.pathname === '/api/location-tag-requests') {
       const facilityId = String(url.searchParams.get('facilityId') || 'LT_F1').replace(/[^A-Za-z0-9_-]/g, '_');
       if (req.method === 'GET') {
