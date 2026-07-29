@@ -11780,8 +11780,7 @@ async function populateCounterDatalist() {
     dl.innerHTML = cached.map(c => '<option value="' + ((c.name || c.user || '') + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
     const help = document.getElementById('cc-counter-help');
     if (help) {
-      const inactiveCount = cached.filter(u => u.active === false).length;
-      help.textContent = cached.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID) + (inactiveCount ? ' · includes ' + inactiveCount + ' inactive' : '');
+      help.textContent = cached.length + ' active user(s) available for ' + (FACILITY_NAME || FACILITY_ID);
     }
     return;
   }
@@ -11789,8 +11788,8 @@ async function populateCounterDatalist() {
   const help = document.getElementById('cc-counter-help');
   if (help) help.textContent = 'Loading users for ' + (FACILITY_NAME || FACILITY_ID) + '…';
 
-  // Paginate through all facility users. Include inactive users so supervisors
-  // can see why a typed counter such as “Isaac” may not be assignable/active.
+  // Paginate through active facility users. WMS user search does not reliably
+  // honor includeInactive; use the confirmed userStatus filter for active users.
   let allUsers = [];
   let page = 1;
   const pageSize = 100;
@@ -11798,7 +11797,7 @@ async function populateCounterDatalist() {
   let firstFailure = null;
 
   while (hasMore) {
-    const reqBody = {currentPage: page, pageSize: pageSize, facilityIds: [FACILITY_ID], includeInactive: true};
+    const reqBody = {currentPage: page, pageSize: pageSize, facilityIds: [FACILITY_ID], userStatus: 'ACTIVE'};
     const resp = await safeFetch(WMS_BASE + '/api/wms-bam/user/search-by-paging', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -11825,8 +11824,8 @@ async function populateCounterDatalist() {
     const total = d.totalCount || d.total || 0;
     if (rows.length < pageSize || (total > 0 && allUsers.length >= total)) hasMore = false;
     else page++;
-    // Safety cap: enough for 2,000 users per facility.
-    if (page > 20) break;
+    // Safety cap: enough for large facilities like Valley View (>4,500 active users).
+    if (page > 75) break;
   }
 
   // Some facilities return a very large user payload. If the paged pull failed
@@ -11836,7 +11835,7 @@ async function populateCounterDatalist() {
     const retry = await safeFetch(WMS_BASE + '/api/wms-bam/user/search-by-paging', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({currentPage: 1, pageSize: 10, facilityIds: [FACILITY_ID], includeInactive: true}),
+      body: JSON.stringify({currentPage: 1, pageSize: 10, facilityIds: [FACILITY_ID], userStatus: 'ACTIVE'}),
     });
     if (retry && !retry._needsAuth && retry.success !== false) {
       const d = retry.data || retry;
@@ -11864,10 +11863,9 @@ async function populateCounterDatalist() {
 
   dl.innerHTML = allUsers.map(c => '<option value="' + ((c.name || c.user || '') + ' (' + c.user + ')').replace(/"/g,'&quot;') + '"></option>').join('');
   if (help) {
-    const inactiveCount = allUsers.filter(u => u.active === false).length;
     help.textContent = allUsers.length > 0
-      ? allUsers.length + ' user(s) available for ' + (FACILITY_NAME || FACILITY_ID) + (inactiveCount ? ' · includes ' + inactiveCount + ' inactive' : '')
-      : (firstFailure ? 'Could not load users for this warehouse — sign in again or refresh.' : 'No users found for this warehouse');
+      ? allUsers.length + ' active user(s) available for ' + (FACILITY_NAME || FACILITY_ID)
+      : (firstFailure ? 'Could not load active users for this warehouse — sign in again or refresh.' : 'No active users found for this warehouse');
   }
   console.log('[counter] Loaded', allUsers.length, 'users for', FACILITY_ID);
 }
