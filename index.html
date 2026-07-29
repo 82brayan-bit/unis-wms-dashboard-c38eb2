@@ -13630,8 +13630,9 @@ async function submitCycleCount() {
           }
 
           if (isActiveStatus || hasValidResults) {
-            const reusedPayload = Object.assign({}, commonFields, {name: baseName + nameSuffix, customerId: customerId});
-            results.push({customerId, ticketId: existingTicket.id, ok:true, payload: reusedPayload, reused: true, msg: 'Today\'s count ticket already exists (' + existingTicket.id + ', ' + existingStatus + (hasValidResults ? ' with count results' : '') + '). Using existing.' + (priorDayWarning ? ' Note: ' + priorDayWarning : '')});
+            const existingLines = existingTicket.countLines || existingTicket.countTaskLineDtos || existingTicket.taskLines || [];
+            const reusedPayload = Object.assign({}, commonFields, {name: baseName + nameSuffix, customerId: customerId, countLines: existingLines.length ? existingLines : linesForCust});
+            results.push({customerId, ticketId: existingTicket.id, ok:true, payload: reusedPayload, lineCount: existingLines.length || linesForCust.length, reused: true, msg: 'Today\'s count ticket already exists (' + existingTicket.id + ', ' + existingStatus + (hasValidResults ? ' with count results' : '') + '). Using existing.' + (priorDayWarning ? ' Note: ' + priorDayWarning : '')});
             if (commonFields.counterUserId) {
               const last = results[results.length - 1];
               last.tasksSkipped = 'Task already exists or ticket reused — not creating duplicate task.';
@@ -13704,7 +13705,7 @@ async function submitCycleCount() {
 
     if (resp && resp.success !== false) {
       const ticketId = (resp.data && (resp.data.id || resp.data.ticketId)) || resp.id || null;
-      results.push({customerId, ticketId, ok:true, payload});
+      results.push({customerId, ticketId, ok:true, payload, lineCount: linesForCust.length});
 
       // AUTO-ASSIGN — if a Counter was set, create ONE task with ALL valid
       // location lines. Do NOT split into multiple tasks per schedule/day.
@@ -13848,7 +13849,8 @@ async function submitCycleCount() {
     (FACILITY_CUSTOMERS[FACILITY_ID]||[]).forEach(c => custLookup[c.id] = c.name);
     ok.forEach(r => {
       const nm = custLookup[r.customerId] || r.customerId;
-      const lc = (r.payload && r.payload.countLines || []).length;
+      const payloadLines = (r.payload && r.payload.countLines) || [];
+      const lc = Number.isFinite(Number(r.lineCount)) ? Number(r.lineCount) : payloadLines.length;
       let line = '  • ' + nm + ' → ' + (r.ticketId || '(no id)') + '  (' + lc + ' location' + (lc===1?'':'s') + ')';
       if (r.tasksCreated) {
         line += '  ✓ ' + r.tasksCreated + ' task' + (r.tasksCreated===1?'':'s') + ' assigned to ' + (r.assignedTo || '?');
