@@ -13827,7 +13827,8 @@ async function submitCycleCount() {
   btn.disabled = false;
 
   // Tally + summarize the result
-  const ok = results.filter(r => r.ok === true);
+  const ok = results.filter(r => r.ok === true && !r.warningOnly && r.ticketId);
+  const warnings = results.filter(r => r.warningOnly);
   const failed = results.filter(r => r.ok === false);
   const offline = results.filter(r => r.ok === null);
   // Save into local task list — only rows that actually have a ticket payload.
