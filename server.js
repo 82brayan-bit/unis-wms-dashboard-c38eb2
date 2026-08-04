@@ -96,6 +96,7 @@ function wmsUpstream(method, pathname, body, incomingHeaders, query='') {
       'Accept': 'application/json',
       'x-tenant-id': incomingHeaders['x-tenant-id'] || 'LT',
       'x-facility-id': incomingHeaders['x-facility-id'] || '',
+      'Item-Time-Zone': incomingHeaders['item-time-zone'] || 'America/Los_Angeles',
       'User-Agent': 'UNIS-WMS-Dashboard/1.0'
     };
     if (incomingHeaders['authorization']) hdrs['Authorization'] = incomingHeaders['authorization'];
@@ -267,7 +268,14 @@ async function handleApi(req, res, url) {
 
     if (url.pathname.startsWith('/api/proxy/wms/')) {
       const targetPath = url.pathname.replace('/api/proxy/wms', '');
-      if (!targetPath.startsWith('/wms/')) return send(res, 400, {success:false, msg:'Unsupported WMS proxy path'});
+      const isUserPresenceSearch = targetPath === '/mdm/user/search-by-paging';
+      const isFacilityUserSearch = targetPath === '/wms-bam/user/facility/search-by-paging';
+      if (!targetPath.startsWith('/wms/') && !isUserPresenceSearch && !isFacilityUserSearch) {
+        return send(res, 400, {success:false, msg:'Unsupported WMS proxy path'});
+      }
+      if ((isUserPresenceSearch || isFacilityUserSearch) && req.method !== 'POST') {
+        return send(res, 405, {success:false, msg:'Method not allowed'});
+      }
       const raw = (req.method === 'GET' || req.method === 'HEAD') ? '' : await readBody(req);
       const out = await wmsUpstream(req.method, '/api' + targetPath, raw, req.headers, url.search || '');
       return send(res, out.status, out.json || {success:false, msg: out.raw ? out.raw.slice(0, 300) : 'No response from WMS'});
@@ -514,7 +522,7 @@ const server = http.createServer((req,res) => {
   });
 });
 initDatabase().finally(() => {
-  server.listen(PORT, () => console.log(`UNIS WMS dashboard server listening on ${PORT}`));
+  server.listen(PORT, '0.0.0.0', () => console.log(`UNIS WMS dashboard server listening on 0.0.0.0:${PORT}`));
 });
 
 async function handleSendNotification(req, res) {

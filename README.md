@@ -1,22 +1,20 @@
 # UNIS WMS Dashboard
 
-Single-file, shareable UNIS WMS dashboard.
+UNIS WMS operations dashboard with live service integrations.
 
 ## Files
 
-- `index.html` — the only dashboard build. It is the shareable/no-embedded-credentials version; users sign in with their own access and the page can fall back to baked Wise snapshot data when live API calls are blocked.
-- `serve-local.sh` — optional convenience script that serves `index.html` on a local network.
+- `index.html` — the dashboard UI; users sign in with their own access.
+- `server.js` — the application server and constrained service proxies used by live integrations.
+- `lib/active-users.js` — browser and Node helpers for the live Active Users view.
 
 ## Run locally
 
 ```bash
-python3 -m http.server 8080
+npm ci
+PORT=8080 npm start
 ```
 
-Then open `http://localhost:8080/` or `http://localhost:8080/index.html`.
+Then open `http://localhost:8080/`. The server listens on `0.0.0.0` for container and LAN access.
 
-For LAN sharing:
-
-```bash
-./serve-local.sh
-```
+Run the automated checks with `npm test`.
