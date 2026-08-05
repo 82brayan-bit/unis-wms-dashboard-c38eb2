@@ -1600,8 +1600,9 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
             <div id="adm-user-access-list" style="margin-bottom:12px"></div>
             <div style="padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
               <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Add User Access</div>
-              <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
+              <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end">
                 <div class="cc-field" style="margin:0"><label class="cc-label">Username (IAM)</label><input class="cc-input" id="adm-add-username" placeholder="e.g. jsmith"/></div>
+                <div class="cc-field" style="margin:0"><label class="cc-label">User Action Password</label><input type="password" class="cc-input" id="adm-add-user-password" placeholder="Password for this user"/></div>
                 <div style="display:flex;gap:8px;align-items:center;font-size:11px;padding-bottom:4px">
                   <label><input type="checkbox" id="adm-mod-ltag" checked style="accent-color:#753BBD"/> Location Tag</label>
                   <label><input type="checkbox" id="adm-mod-vlg" checked style="accent-color:#753BBD"/> VLG</label>
@@ -1609,6 +1610,7 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("da
                 </div>
                 <button class="btn btn-primary" onclick="admAddUser()" style="font-size:12px;padding:6px 14px;height:36px">Add User</button>
               </div>
+              <div style="font-size:10px;color:#9ca3af;margin-top:6px">Each user can have a separate action password. Passwords are stored locally in this browser and are never displayed.</div>
             </div>
           </div>
 
@@ -14784,27 +14786,34 @@ function admGetUserAccess() {
 function admSetUserAccess(list) {
   try { localStorage.setItem('adm_user_access', JSON.stringify(list)); } catch(_) {}
 }
+function admNormUser(username) { return String(username || '').trim().toLowerCase(); }
+function admFindUserAccessEntry(module) {
+  const username = admNormUser(admGetCurrentUsername());
+  if (!username) return null;
+  const access = admGetUserAccess();
+  return access.find(a => admNormUser(a.username) === username && a.facility === FACILITY_ID && a.enabled && (!module || (a.modules || []).includes(module))) || null;
+}
 
 function admIsUserAllowed(module) {
   if (admIsOwner()) return true;
-  const username = admGetCurrentUsername();
-  if (!username) return false;
-  const access = admGetUserAccess();
-  const entry = access.find(a => a.username === username && a.facility === FACILITY_ID && a.enabled);
-  if (!entry) return false;
-  if (!entry.modules || !entry.modules.includes(module)) return false;
-  return true;
+  return !!admFindUserAccessEntry(module);
 }
 
 function ltagRequirePassword() {
   const module = 'LocationTag';
-  if (!admIsOwner() && !admIsUserAllowed(module)) {
-    alert('You do not hrd access for this action at ' + (FACILITY_NAME || FACILITY_ID) + '. Contact Brayan Escobar.');
+  const owner = admIsOwner();
+  const entry = owner ? null : admFindUserAccessEntry(module);
+  if (!owner && !entry) {
+    alert('You do not have access for this action at ' + (FACILITY_NAME || FACILITY_ID) + '. Contact Brayan Escobar.');
     return false;
   }
-  const input = prompt('This action requires authorization.\nEnter the action password for ' + (FACILITY_NAME || FACILITY_ID) + ':');
+  const expectedPassword = owner
+    ? admGetFacilityPassword(FACILITY_ID)
+    : (entry.userPassword || entry.password || admGetFacilityPassword(FACILITY_ID));
+  const promptLabel = owner ? 'facility action password' : 'your assigned action password';
+  const input = prompt('This action requires authorization.\nEnter ' + promptLabel + ' for ' + (FACILITY_NAME || FACILITY_ID) + ':');
   if (input === null) return false;
-  if (input !== admGetFacilityPassword(FACILITY_ID)) { alert('Incorrect password. Changes are not allowed.'); return false; }
+  if (input !== expectedPassword) { alert('Incorrect password. Changes are not allowed.'); return false; }
   return true;
 }
 
@@ -17184,7 +17193,23 @@ function admShowPwMsg(text, color) {
 function admExportSettings() {
   const data = {};
   const keys = ['adm_pref_defaultFacility', 'facility_id', 'physical_inv_cal_' + FACILITY_ID, 'count_calendar_' + FACILITY_ID, 'adm_user_access'];
-  keys.forEach(k => { try { const v = localStorage.getItem(k); if (v) data[k] = v; } catch(_) {} });
+  keys.forEach(k => {
+    try {
+      const v = localStorage.getItem(k);
+      if (!v) return;
+      if (k === 'adm_user_access') {
+        const safeAccess = JSON.parse(v).map(a => {
+          const copy = Object.assign({}, a);
+          delete copy.userPassword;
+          delete copy.password;
+          return copy;
+        });
+        data[k] = JSON.stringify(safeAccess);
+      } else {
+        data[k] = v;
+      }
+    } catch(_) {}
+  });
   data._exportedAt = new Date().toISOString();
   data._facility = FACILITY_ID;
   data._note = 'Passwords are NOT included for security. User access policy is included.';
@@ -17207,9 +17232,24 @@ function admImportSettings(event) {
       let imported = 0;
       Object.keys(data).forEach(k => {
         if (k.startsWith('_') || k === 'adm_action_password') return;
-        try { localStorage.setItem(k, data[k]); imported++; } catch(_) {}
+        try {
+          if (k === 'adm_user_access') {
+            const current = admGetUserAccess();
+            const incoming = JSON.parse(data[k] || '[]');
+            incoming.forEach(row => {
+              const existing = current.find(a => admNormUser(a.username) === admNormUser(row.username) && a.facility === row.facility);
+              if (existing && (existing.userPassword || existing.password) && !(row.userPassword || row.password)) {
+                row.userPassword = existing.userPassword || existing.password;
+              }
+            });
+            localStorage.setItem(k, JSON.stringify(incoming));
+          } else {
+            localStorage.setItem(k, data[k]);
+          }
+          imported++;
+        } catch(_) {}
       });
-      alert('Imported ' + imported + ' setting(s). Action password was not changed.');
+      alert('Imported ' + imported + ' setting(s). Action passwords were not changed.');
       admInitSettings();
     } catch(_) { alert('Invalid settings file.'); }
   };
@@ -17234,27 +17274,44 @@ function admRenderUserAccess() {
     container.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:8px">No users configured for ' + esc(FACILITY_NAME || FACILITY_ID) + '. Only owner (bescobar) has access.</div>';
     return;
   }
-  container.innerHTML = '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Username</th><th style="padding:4px 6px;text-align:left">Modules</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px">Actions</th></tr></thead><tbody>' +
+  container.innerHTML = '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Username</th><th style="padding:4px 6px;text-align:left">Modules</th><th style="padding:4px 6px;text-align:left">Password</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px">Actions</th></tr></thead><tbody>' +
     facAccess.map((a, i) => {
       const idx = access.indexOf(a);
-      return '<tr style="border-top:1px solid #f3f4f6"><td style="padding:4px 6px">' + esc(a.username) + '</td><td style="padding:4px 6px;font-size:10px">' + esc((a.modules || []).join(', ')) + '</td><td style="padding:4px 6px"><span style="color:' + (a.enabled ? '#059669' : '#dc2626') + ';font-weight:600">' + (a.enabled ? 'Enabled' : 'Disabled') + '</span></td><td style="padding:4px 6px;text-align:center"><span style="color:#753BBD;cursor:pointer;margin-right:6px" onclick="admToggleUser(' + idx + ')">' + (a.enabled ? 'Disable' : 'Enable') + '</span><span style="color:#dc2626;cursor:pointer" onclick="admRemoveUser(' + idx + ')">Remove</span></td></tr>';
+      const hasPassword = !!(a.userPassword || a.password);
+      return '<tr style="border-top:1px solid #f3f4f6"><td style="padding:4px 6px">' + esc(a.username) + '</td><td style="padding:4px 6px;font-size:10px">' + esc((a.modules || []).join(', ')) + '</td><td style="padding:4px 6px"><span style="color:' + (hasPassword ? '#059669' : '#d97706') + ';font-weight:600">' + (hasPassword ? 'Custom' : 'Facility') + '</span></td><td style="padding:4px 6px"><span style="color:' + (a.enabled ? '#059669' : '#dc2626') + ';font-weight:600">' + (a.enabled ? 'Enabled' : 'Disabled') + '</span></td><td style="padding:4px 6px;text-align:center"><span style="color:#753BBD;cursor:pointer;margin-right:6px" onclick="admSetUserPassword(' + idx + ')">Set Password</span><span style="color:#753BBD;cursor:pointer;margin-right:6px" onclick="admToggleUser(' + idx + ')">' + (a.enabled ? 'Disable' : 'Enable') + '</span><span style="color:#dc2626;cursor:pointer" onclick="admRemoveUser(' + idx + ')">Remove</span></td></tr>';
     }).join('') + '</tbody></table>';
 }
 
 function admAddUser() {
   const username = (document.getElementById('adm-add-username') || {}).value.trim();
+  const userPassword = (document.getElementById('adm-add-user-password') || {}).value || '';
   if (!username) { alert('Enter a username.'); return; }
+  if (!userPassword) { alert('Enter a user action password.'); return; }
   const modules = [];
   if (document.getElementById('adm-mod-ltag') && document.getElementById('adm-mod-ltag').checked) modules.push('LocationTag');
   if (document.getElementById('adm-mod-vlg') && document.getElementById('adm-mod-vlg').checked) modules.push('VLG');
   if (document.getElementById('adm-mod-replen') && document.getElementById('adm-mod-replen').checked) modules.push('ReplenCreate');
   if (modules.length === 0) { alert('Select at least one module.'); return; }
   const access = admGetUserAccess();
-  const existing = access.find(a => a.username === username && a.facility === FACILITY_ID);
-  if (existing) { existing.modules = modules; existing.enabled = true; }
-  else access.push({ username, facility: FACILITY_ID, modules, enabled: true });
+  const existing = access.find(a => admNormUser(a.username) === admNormUser(username) && a.facility === FACILITY_ID);
+  if (existing) { existing.modules = modules; existing.enabled = true; existing.userPassword = userPassword; delete existing.password; }
+  else access.push({ username, facility: FACILITY_ID, modules, enabled: true, userPassword });
   admSetUserAccess(access);
   document.getElementById('adm-add-username').value = '';
+  const pwEl = document.getElementById('adm-add-user-password'); if (pwEl) pwEl.value = '';
+  admRenderUserAccess();
+}
+
+function admSetUserPassword(idx) {
+  const access = admGetUserAccess();
+  const entry = access[idx];
+  if (!entry) return;
+  const pw = prompt('Set a new action password for ' + entry.username + ' at ' + (FACILITY_NAME || FACILITY_ID) + ':');
+  if (pw === null) return;
+  if (!pw) { alert('Password cannot be blank.'); return; }
+  entry.userPassword = pw;
+  delete entry.password;
+  admSetUserAccess(access);
   admRenderUserAccess();
 }
 
