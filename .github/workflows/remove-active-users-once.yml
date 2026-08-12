@@ -1,0 +1,67 @@
+name: Remove Active Users sidebar entry
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/remove-active-users-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  remove-sidebar-entry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Remove only the Active Users navigation block
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("index.html")
+          lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+          starts = [
+              i for i, line in enumerate(lines)
+              if 'data-view="activeUsers"' in line
+              and "onclick=\"showView('activeUsers')\"" in line
+          ]
+          if len(starts) != 1:
+              raise SystemExit(f"Expected exactly one Active Users nav block; found {len(starts)}")
+
+          start = starts[0]
+          end = next(
+              (i for i in range(start + 1, min(start + 7, len(lines)))
+               if lines[i].strip() == "</div>"),
+              None,
+          )
+          if end is None:
+              raise SystemExit("Could not find closing div for Active Users nav block")
+
+          block = "".join(lines[start:end + 1])
+          if ">Active Users<" not in block:
+              raise SystemExit("Matched block does not contain the Active Users label")
+
+          del lines[start:end + 1]
+          updated = "".join(lines)
+          if 'data-view="activeUsers"' in updated:
+              raise SystemExit("Active Users navigation marker remains after removal")
+          path.write_text(updated, encoding="utf-8")
+
+      - name: Run tests
+        run: npm test
+
+      - name: Commit change and remove one-time workflow
+        run: |
+          rm .github/workflows/remove-active-users-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html .github/workflows/remove-active-users-once.yml
+          git diff --cached --check
+          git commit -m "Remove Active Users sidebar module"
+          git push origin master
