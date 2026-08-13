@@ -268,14 +268,7 @@ async function handleApi(req, res, url) {
 
     if (url.pathname.startsWith('/api/proxy/wms/')) {
       const targetPath = url.pathname.replace('/api/proxy/wms', '');
-      const isUserPresenceSearch = targetPath === '/mdm/user/search-by-paging';
-      const isFacilityUserSearch = targetPath === '/wms-bam/user/facility/search-by-paging';
-      if (!targetPath.startsWith('/wms/') && !isUserPresenceSearch && !isFacilityUserSearch) {
-        return send(res, 400, {success:false, msg:'Unsupported WMS proxy path'});
-      }
-      if ((isUserPresenceSearch || isFacilityUserSearch) && req.method !== 'POST') {
-        return send(res, 405, {success:false, msg:'Method not allowed'});
-      }
+      if (!targetPath.startsWith('/wms/')) return send(res, 400, {success:false, msg:'Unsupported WMS proxy path'});
       const raw = (req.method === 'GET' || req.method === 'HEAD') ? '' : await readBody(req);
       const out = await wmsUpstream(req.method, '/api' + targetPath, raw, req.headers, url.search || '');
       return send(res, out.status, out.json || {success:false, msg: out.raw ? out.raw.slice(0, 300) : 'No response from WMS'});

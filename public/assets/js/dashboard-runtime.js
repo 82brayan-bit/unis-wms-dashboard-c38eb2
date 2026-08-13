@@ -215,8 +215,6 @@ function switchFacility(newId) {
     // Inventory is now live and facility-scoped; refresh it immediately when
     // the warehouse changes so the table never shows another facility's data.
     loadLiveInventory();
-  } else if (activeName === 'activeUsers') {
-    loadActiveUsers(true);
   }
 
   setLiveStatus(false);
@@ -303,7 +301,6 @@ async function fetchFacilityCustomersFromAPI() {
 // ═══ VIEW ROUTING ═══
 const VIEW_META = {
   dashboard: {t:'Dashboard', s:'Overview of inventory status and task progress'},
-  activeUsers: {t:'Active Users', s:'People currently active in mobile WMS at this warehouse'},
   inventory: {t:'Inventory', s:'All tracked SKUs, on-hand quantities, and locations'},
   tasks:     {t:'Tasks', s:'Warehouse tasks across all teams and shifts'},
   calendar:  {t:'Physical Inventory Calendar', s:'Confirmed physical inventory dates and schedules'},
@@ -358,7 +355,6 @@ function showView(name, sub) {
 
   // lazy-init view-specific content
   if (name === 'dashboard') { loadDashboardLiveData(); loadDashCycleCountKpi(); }
-  if (name === 'activeUsers') loadActiveUsers(false);
   if (name === 'consolidation') loadConsolidationView();
   if (name === 'replenish') loadReplenishView();
   if (name === 'replenSuggest') loadReplenSuggestView();
@@ -377,213 +373,6 @@ function showView(name, sub) {
 
   // scroll to top of main
   window.scrollTo({top:0, behavior:'smooth'});
-}
-
-const ACTIVE_USERS_STATE = {
-  rows: [],
-  facilityId: '',
-  loadedAt: null,
-  loading: false,
-  requestId: 0,
-  directoryComplete: true
-};
-
-function activeUsersResponseError(payload) {
-  if (!payload) return 'unavailable';
-  const message = String(payload.msg || payload.message || '');
-  if (payload._needsAuth || /unauthor|session|token/i.test(message)) return 'session';
-  if (payload.success === false || (payload.code != null && String(payload.code) !== '0')) return 'unavailable';
-  return '';
-}
-
-function setActiveUsersLoading(loading) {
-  ACTIVE_USERS_STATE.loading = loading;
-  const button = document.getElementById('active-users-refresh');
-  if (!button) return;
-  button.disabled = loading;
-  const label = button.querySelector('span');
-  if (label) label.textContent = loading ? 'Refreshing...' : 'Refresh';
-}
-
-function showActiveUsersState(title, message, action) {
-  const state = document.getElementById('active-users-state');
-  const table = document.getElementById('active-users-table-wrap');
-  if (!state || !table) return;
-  const actions = {
-    retry: '<button class="btn btn-secondary" onclick="loadActiveUsers(true)">Try again</button>',
-    reconnect: '<button class="btn btn-secondary" onclick="activeUsersReconnect()">Reconnect</button>',
-    clear: '<button class="btn btn-secondary" onclick="clearActiveUsersSearch()">Clear search</button>'
-  };
-  table.style.display = 'none';
-  state.style.display = 'block';
-  state.innerHTML = '<strong>' + esc(title) + '</strong>' + esc(message) + (actions[action] || '');
-}
-
-async function fetchActiveUserProfiles(facilityId) {
-  const profiles = [];
-  const pageSize = 200;
-  let page = 1;
-  let totalPages = 1;
-  do {
-    const payload = await safeFetch(API.activeUserProfiles, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json', 'item-time-zone':'America/Los_Angeles'},
-      body: JSON.stringify({
-        currentPage: page,
-        pageSize,
-        searchCount: true,
-        facilityIds: [facilityId],
-        isMobileOnline: true,
-        sortingFields: [{field:'lastMobileActiveTime', orderBy:'DESC'}]
-      })
-    });
-    const error = activeUsersResponseError(payload);
-    if (error) throw new Error(error);
-    const list = ActiveUsersData.extractList(payload);
-    profiles.push(...list);
-    const data = payload.data || {};
-    const reportedPages = Number(data.totalPage || 0);
-    totalPages = reportedPages > 0 ? reportedPages : (list.length === pageSize ? page + 1 : page);
-    page += 1;
-  } while (page <= totalPages && page <= 20);
-  return [...new Map(profiles.map(profile => [String(profile.userId || ''), profile])).values()];
-}
-
-async function fetchActiveUserDirectory(userIds, facilityId) {
-  const chunks = [];
-  for (let index = 0; index < userIds.length; index += 100) chunks.push(userIds.slice(index, index + 100));
-  let directoryComplete = true;
-  const groups = await Promise.all(chunks.map(async ids => {
-    const payload = await safeFetch(API.facilityUsers, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json', 'item-time-zone':'America/Los_Angeles'},
-      body: JSON.stringify({currentPage:1, pageSize:ids.length, userIds:ids, facilityIds:[facilityId]})
-    });
-    const error = activeUsersResponseError(payload);
-    if (error === 'session') throw new Error('session');
-    if (error) { directoryComplete = false; return []; }
-    return ActiveUsersData.extractList(payload);
-  }));
-  return { users: groups.flat(), directoryComplete };
-}
-
-async function loadActiveUsers(force) {
-  if (ACTIVE_USERS_STATE.loading && !force) return;
-  if (!window.ActiveUsersData) {
-    showActiveUsersState('Active user status is unavailable', 'The current activity view could not be prepared. Refresh the page and try again.', 'retry');
-    return;
-  }
-  const facilityId = FACILITY_ID;
-  const facilityName = FACILITY_NAME || FACILITY_ID;
-  const requestId = ++ACTIVE_USERS_STATE.requestId;
-  const facilityLabel = document.getElementById('active-users-facility');
-  const count = document.getElementById('active-users-count');
-  const summary = document.getElementById('active-users-summary-text');
-  if (facilityLabel) facilityLabel.textContent = 'Online mobile WMS activity at ' + facilityName;
-  if (count) count.textContent = '—';
-  if (summary) summary.textContent = 'Checking current activity';
-  setActiveUsersLoading(true);
-  showActiveUsersState('Loading active users...', 'Checking current mobile WMS activity for this warehouse.');
-  try {
-    const profiles = await fetchActiveUserProfiles(facilityId);
-    const userIds = profiles.map(profile => String(profile.userId || '')).filter(Boolean);
-    const directory = userIds.length
-      ? await fetchActiveUserDirectory(userIds, facilityId)
-      : {users:[], directoryComplete:true};
-    if (requestId !== ACTIVE_USERS_STATE.requestId || facilityId !== FACILITY_ID) return;
-    ACTIVE_USERS_STATE.rows = ActiveUsersData.mergeProfiles(profiles, directory.users, {id:facilityId, name:facilityName});
-    ACTIVE_USERS_STATE.facilityId = facilityId;
-    ACTIVE_USERS_STATE.loadedAt = new Date();
-    ACTIVE_USERS_STATE.directoryComplete = directory.directoryComplete;
-    renderActiveUsers();
-  } catch (error) {
-    if (requestId !== ACTIVE_USERS_STATE.requestId) return;
-    ACTIVE_USERS_STATE.rows = [];
-    if (count) count.textContent = '—';
-    if (summary) summary.textContent = 'Current activity unavailable';
-    if (error && error.message === 'session') {
-      showActiveUsersState('Reconnect to view active users', 'Your WMS session needs to be refreshed before current activity can be loaded.', 'reconnect');
-    } else {
-      showActiveUsersState('Active user status is temporarily unavailable', 'Current mobile activity could not be loaded. Try again in a moment.', 'retry');
-    }
-  } finally {
-    if (requestId === ACTIVE_USERS_STATE.requestId) setActiveUsersLoading(false);
-  }
-}
-
-function activeUserInitials(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-  return (parts.slice(0, 2).map(part => part.charAt(0)).join('') || 'WU').toUpperCase();
-}
-
-function formatActiveUserTime(value) {
-  const date = new Date(value || '');
-  if (!Number.isFinite(date.getTime())) return {relative:'Not reported', absolute:''};
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
-  let relative = 'Just now';
-  if (minutes >= 1440) relative = Math.floor(minutes / 1440) + 'd ago';
-  else if (minutes >= 60) relative = Math.floor(minutes / 60) + 'h ago';
-  else if (minutes >= 1) relative = minutes + 'm ago';
-  return {
-    relative,
-    absolute: date.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'})
-  };
-}
-
-function renderActiveUsers() {
-  if (!window.ActiveUsersData) return;
-  if (ACTIVE_USERS_STATE.facilityId && ACTIVE_USERS_STATE.facilityId !== FACILITY_ID) return;
-  const query = (document.getElementById('active-users-search') || {}).value || '';
-  const rows = ActiveUsersData.filterRows(ACTIVE_USERS_STATE.rows, query);
-  const state = document.getElementById('active-users-state');
-  const table = document.getElementById('active-users-table-wrap');
-  const body = document.getElementById('active-users-body');
-  const count = document.getElementById('active-users-count');
-  const summary = document.getElementById('active-users-summary-text');
-  if (!state || !table || !body || !count || !summary) return;
-  count.textContent = String(ACTIVE_USERS_STATE.rows.length);
-  if (!ACTIVE_USERS_STATE.rows.length) {
-    summary.textContent = 'online mobile users';
-    showActiveUsersState('No active users reported', 'No mobile WMS users are currently reported online for this warehouse.');
-    return;
-  }
-  if (!rows.length) {
-    summary.textContent = 'online mobile users';
-    showActiveUsersState('No matching active users', 'Try a different name, username, user type, or warehouse.', 'clear');
-    return;
-  }
-  const updated = ACTIVE_USERS_STATE.loadedAt
-    ? ACTIVE_USERS_STATE.loadedAt.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'})
-    : '';
-  summary.textContent = query.trim()
-    ? rows.length + ' of ' + ACTIVE_USERS_STATE.rows.length + ' online mobile users'
-    : 'online mobile users' + (updated ? ' · Updated ' + updated : '') + (ACTIVE_USERS_STATE.directoryComplete ? '' : ' · Some names unavailable');
-  body.innerHTML = rows.map(row => {
-    const activity = formatActiveUserTime(row.lastActivity);
-    return '<tr>' +
-      '<td><div class="active-users-person"><div class="active-users-avatar">' + esc(activeUserInitials(row.displayName)) + '</div><div><div class="active-users-name">' + esc(row.displayName) + '</div><div class="active-users-secondary">' + esc(row.userName ? '@' + row.userName : 'Username unavailable') + '</div></div></div></td>' +
-      '<td><span class="badge ok"><span class="active-users-dot"></span>Online</span></td>' +
-      '<td><div style="font-weight:600;color:#374151">' + esc(activity.relative) + '</div><div class="active-users-secondary">' + esc(activity.absolute) + '</div></td>' +
-      '<td>' + esc(row.userType) + '</td>' +
-      '<td><div style="font-weight:600;color:#374151">' + esc(row.facilityName) + '</div></td>' +
-      '</tr>';
-  }).join('');
-  state.style.display = 'none';
-  table.style.display = 'block';
-}
-
-function clearActiveUsersSearch() {
-  const search = document.getElementById('active-users-search');
-  if (search) { search.value = ''; search.focus(); }
-  renderActiveUsers();
-}
-
-async function activeUsersReconnect() {
-  const action = document.querySelector('#active-users-state .btn');
-  if (action) { action.disabled = true; action.textContent = 'Reconnecting...'; }
-  const refreshed = await refreshAccessToken();
-  if (refreshed) await loadActiveUsers(true);
-  else await showReconnect();
 }
 
 function toggleInv(e) {
@@ -7303,8 +7092,6 @@ const API = {
   // Silent renewal — POST {refreshToken: "..."} (camelCase!) returns a new
   // access_token without re-prompting for the password.
   refreshAuth:     '/api/proxy/auth/refresh',
-  activeUserProfiles: '/api/proxy/wms/mdm/user/search-by-paging',
-  facilityUsers:   '/api/proxy/wms/wms-bam/user/facility/search-by-paging',
   // Customers (master data)
   customers:       WMS_BASE + '/api/mdm/customer/search-by-paging',
   // Locations

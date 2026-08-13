@@ -404,22 +404,6 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 .consol-status.dropped{background:#ECFDF5;color:#047857}
 .consol-status.open{background:#EFF6FF;color:#2563eb}
 
-/* Active mobile WMS sessions */
-.active-users-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid #f3f4f6;flex-wrap:wrap}
-.active-users-search{width:min(320px,100%);height:38px;padding:8px 12px;border:1.5px solid #e5e7eb;border-radius:8px;font:inherit;font-size:13px;outline:none}
-.active-users-search:focus{border-color:#753BBD;box-shadow:0 0 0 3px rgba(117,59,189,.12)}
-.active-users-summary{display:flex;align-items:center;gap:9px;font-size:12px;color:#6b7280;min-height:24px}
-.active-users-count{font-size:20px;font-weight:800;color:#1a1f2e;font-variant-numeric:tabular-nums}
-.active-users-dot{width:8px;height:8px;background:#10b981;border-radius:50%;box-shadow:0 0 0 3px rgba(16,185,129,.14);display:inline-block;margin-right:7px}
-.active-users-person{display:flex;align-items:center;gap:10px;min-width:180px}
-.active-users-avatar{width:34px;height:34px;border-radius:50%;background:#F7F2FF;color:#5F2E98;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
-.active-users-name{font-weight:700;color:#1a1f2e}
-.active-users-secondary{font-size:11px;color:#9ca3af;margin-top:2px}
-.active-users-state{padding:42px 20px;text-align:center;color:#6b7280;font-size:13px}
-.active-users-state strong{display:block;color:#1a1f2e;font-size:14px;margin-bottom:5px}
-.active-users-state .btn{margin-top:14px}
-#active-users-table-wrap{max-height:calc(100vh - 245px);overflow:auto!important}
-.active-users-table thead th{position:sticky;top:0;z-index:2;background:#FCFAFF}
 @media (max-width:760px){
   .sidebar{position:static;width:100%;height:auto;display:block;overflow:visible}
   .sb-logo{padding:12px 14px}
@@ -435,8 +419,4 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
   .date-badge,.notif,.user-info{display:none}
   .user-pill{padding:4px}
   .page{padding:14px;gap:14px}
-  .active-users-table{min-width:760px}
-  .active-users-toolbar{align-items:flex-start}
-  .active-users-summary{width:100%}
-  #active-users-table-wrap{max-height:calc(100vh - 300px)}
 }

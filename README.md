@@ -6,7 +6,6 @@ UNIS WMS operations dashboard with live service integrations.
 
 - `index.html` — the dashboard UI; users sign in with their own access.
 - `server.js` — the application server and constrained service proxies used by live integrations.
-- `lib/active-users.js` — browser and Node helpers for the live Active Users view.
 
 ## Run locally
 

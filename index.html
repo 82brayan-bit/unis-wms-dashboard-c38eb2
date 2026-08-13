@@ -11,7 +11,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>UNIS WMS — Inventory & Task Controller</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
-<script src="/lib/active-users.js"></script>
 <link rel="stylesheet" href="/assets/css/dashboard.css"/>
 </head>
 <body>
@@ -1750,39 +1749,6 @@
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ════ VIEW: ACTIVE USERS ════ -->
-      <div class="view" id="view-activeUsers">
-        <div class="card" style="padding:0;overflow:hidden">
-          <div class="card-hdr" style="padding:18px 18px 14px;margin:0;border-bottom:1px solid #f3f4f6;gap:14px;flex-wrap:wrap">
-            <div>
-              <div class="card-ttl">Active mobile users</div>
-              <div class="scheduler-help" id="active-users-facility">Online WMS activity for the selected warehouse</div>
-            </div>
-            <button class="btn btn-secondary" id="active-users-refresh" onclick="loadActiveUsers(true)" aria-label="Refresh active users">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              <span>Refresh</span>
-            </button>
-          </div>
-          <div class="active-users-toolbar">
-            <div class="active-users-summary" aria-live="polite">
-              <span class="active-users-count" id="active-users-count">—</span>
-              <span id="active-users-summary-text">Waiting to load current activity</span>
-            </div>
-            <input class="active-users-search" id="active-users-search" type="search" placeholder="Search active users…" oninput="renderActiveUsers()" aria-label="Search active users"/>
-          </div>
-          <div id="active-users-state" class="active-users-state" aria-live="polite">
-            <strong>Loading active users…</strong>
-            Checking current mobile WMS activity for this warehouse.
-          </div>
-          <div id="active-users-table-wrap" style="display:none;overflow-x:auto">
-            <table class="tbl active-users-table" style="margin:0">
-              <thead><tr><th>User</th><th>Status</th><th>Last activity</th><th>User type</th><th>Warehouse</th></tr></thead>
-              <tbody id="active-users-body"></tbody>
-            </table>
           </div>
         </div>
       </div>
