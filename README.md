@@ -11,9 +11,10 @@ UNIS WMS operations dashboard with live service integrations.
 
 ```bash
 npm ci
+npm run build
 PORT=8080 npm start
 ```
 
-Then open `http://localhost:8080/`. The server listens on `0.0.0.0` for container and LAN access.
+Then open `http://localhost:8080/`. The server listens on `0.0.0.0` for container and LAN access. When `dist/index.html` exists, the server uses the hashed, compressed production build. Without `dist/`, it serves the source files for local development.
 
-Run the automated checks with `npm test`.
+Run the automated checks with `npm test`. Size reports are available through `npm run measure`, `npm run measure:dist`, and `npm run measure:page -- http://127.0.0.1:8080/`.

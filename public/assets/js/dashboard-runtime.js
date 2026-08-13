@@ -74,15 +74,13 @@ function updateTopbarDateRange() {
 }
 updateTopbarDateRange();
 
-function showDash() {
+async function showDash() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   // Show Admin Settings sidebar only for owner
   const admSb = document.getElementById('sb-admin-settings');
   if (admSb) admSb.style.display = admIsOwner() ? '' : 'none';
   initCharts();
-  loadDashboardLiveData();
-  loadDashCycleCountKpi();
   startSyncClock();
   updateTokenStatus();
   if (!window.__wmsTokenTimersStarted) {
@@ -95,7 +93,9 @@ function showDash() {
   // Also try once on dashboard show in case the stored token is already
   // near (or past) expiry (e.g. tab was left open overnight).
   tickTokenRefresh();
-  populateFacilitySwitcher();
+  await populateFacilitySwitcher();
+  loadDashboardLiveData();
+  loadDashCycleCountKpi();
   // Sync chrome (top bar, user menu, settings) with whoever's logged in.
   // We pull user_name from the JWT when possible so this works even if
   // localStorage was pre-seeded (no fresh form input).
@@ -114,7 +114,7 @@ function showDash() {
 }
 
 // Populate the facility <select> with all facilities the user has access to.
-function populateFacilitySwitcher() {
+async function populateFacilitySwitcher() {
   const sel = document.getElementById('facility-switcher');
   if (!sel) return;
   // Restore last-chosen facility from localStorage (default: LT_F1)
@@ -153,6 +153,28 @@ function populateFacilitySwitcher() {
   const fac = facList.find(f => f.id === saved) || facList[0];
   FACILITY_ID = fac.id;
   FACILITY_NAME = fac.name || fac.id;
+  setFacilityLookupLoading(fac);
+  const result = await FacilityData.loadLatest(fac.id);
+  if (result.stale || FACILITY_ID !== fac.id) return;
+  finishFacilityLookup(fac, result);
+}
+
+function setFacilityLookupLoading(fac) {
+  const sel = document.getElementById('facility-switcher');
+  if (sel) sel.setAttribute('aria-busy', 'true');
+  const help = document.getElementById('sched-facility-help');
+  if (help) help.innerHTML = 'Facility: <strong>' + esc(fac.name || fac.id) + '</strong> · Loading warehouse lookup data…';
+  [document.getElementById('cc-customer'), document.getElementById('loc-customer')].forEach(select => {
+    if (select) select.innerHTML = '<option value="">Loading warehouse data…</option>';
+  });
+}
+
+function finishFacilityLookup(fac, result) {
+  const sel = document.getElementById('facility-switcher');
+  if (sel) sel.removeAttribute('aria-busy');
+  if (result && result.error) {
+    console.warn('[facility-data] Cached lookup unavailable for', fac.id, result.error);
+  }
   updateSchedulerFacilityHelp(fac);
   refreshFacilityCustomers();
 }
@@ -171,9 +193,10 @@ function updateSchedulerFacilityHelp(fac) {
   }
 }
 
-function switchFacility(newId) {
-  const fac = FACILITIES.find(f => f.id === newId);
-  if (!fac) return;
+async function switchFacility(newId) {
+  const selected = document.getElementById('facility-switcher');
+  const selectedOption = selected && selected.options ? selected.options[selected.selectedIndex] : null;
+  const fac = FACILITIES.find(f => f.id === newId) || {id:newId, name:selectedOption ? selectedOption.textContent.replace(/\s*\([^)]*\)\s*$/, '') : newId};
   FACILITY_ID = fac.id;
   FACILITY_NAME = fac.name;
   try { localStorage.setItem('facility_id', newId); } catch(_) {}
@@ -185,14 +208,16 @@ function switchFacility(newId) {
   const sync = document.getElementById('sync-lbl');
   if (sync) sync.textContent = 'just now';
 
+  setFacilityLookupLoading(fac);
+  const result = await FacilityData.loadLatest(fac.id);
+  if (result.stale || FACILITY_ID !== fac.id) return;
+  finishFacilityLookup(fac, result);
+
   // Refresh scheduler help text with this facility's stats. Target the
   // dedicated facility-help element by id — NOT querySelector('.scheduler-help'),
   // which matched the first of 14 help blocks (the generic instructions) and
   // left the real "Facility: Valley View Warehouse" line stale in every facility.
-  updateSchedulerFacilityHelp(fac);
-
-  // Rebuild the customer dropdown and counter list for this facility
-  refreshFacilityCustomers();
+  // Rebuild the counter list after the selected facility's cached lookup is ready.
   populateCounterDatalist();
 
   // Re-load whichever facility-scoped view is currently open so its data
@@ -7433,323 +7458,7 @@ const ALL_CUSTOMERS_MASTER = {
 };
 
 // Per-facility customer list (sorted by name) with USABLE-row counts.
-const FACILITY_CUSTOMERS = {
-  'LT_F1':[
-    {id:'ORG-34557',code:'VITCOO0001',name:'ALL MARKET INC / VITA COCO',count:8813},
-    {id:'ORG-43317',code:'AMILYN0001',name:'AMIEE LYNN, LNC.',count:70},
-    {id:'ORG-786631',code:'AMAPRE0001',name:'AMZN PREP - RGS',count:5},
-    {id:'ORG-707046',code:'AMZPRE0001',name:'Amzn Prep – Mattresses',count:9},
-    {id:'ORG-746193',code:'ASEVER0001',name:'AS EVER ENTERPRISES, LLC',count:873},
-    {id:'ORG-748213',code:'BABINC0001',name:'BABYARK INC',count:109},
-    {id:'ORG-663868',code:'BIRCON0001',name:'BIRDS OF CONDOR USA INC.',count:1111},
-    {id:'ORG-554407',code:'BOOCOM0001',name:'BOOSTED COMMERCE',count:794},
-    {id:'ORG-780772',code:'BOUECU0001',name:'BOUNDLESS EC US LLC',count:278},
-    {id:'ORG-690767',code:'BUMPRO0001',name:'BUMP PRODUCTS, LLC',count:47},
-    {id:'ORG-40858',code:'CMPUSA0002',name:'CMPC USA (Cut Paper and Rolls)',count:103},
-    {id:'ORG-614843',code:'CMPUSA0001',name:'CMPC USA INC',count:0},
-    {id:'ORG-614850',code:'COMREA0001',name:'COME READY FOODS LLC',count:127},
-    {id:'ORG-676256',code:'COMMBI0001',name:'COMMBI',count:3},
-    {id:'ORG-40861',code:'DELPRO0002',name:'DELTA ELECTRONICS (AMERICAS) LTD - NEW',count:1459},
-    {id:'ORG-660613',code:'DIVLLC0001',name:'DIVERGENTIP, LLC DBA BRUVI',count:29},
-    {id:'ORG-747717',code:'DRUINC0001',name:'DRUPLEY INC / DBA GRAZA',count:121},
-    {id:'ORG-654693',code:'DUPRAY0001',name:'DUPRAY USA LLC',count:547},
-    {id:'ORG-49546',code:'ESINTL0001',name:'E&S INTERNATIONAL ENTERPRISES, INC',count:66},
-    {id:'ORG-606771',code:'ELEBRA0001',name:'ELEVATE BRANDS OPCO LLC',count:579},
-    {id:'ORG-685226',code:'ELEBRA0002',name:'ELEVATE BRANDS UK OPCO LTD',count:6},
-    {id:'ORG-738412',code:'EMBTEC0001',name:'EMBER TECHNOLOGIES, INC.',count:991},
-    {id:'ORG-716205',code:'ENCPAC0001',name:'ENCORE PACIFIC BRANDS',count:2},
-    {id:'ORG-729253',code:'FHIRST0001',name:'FHIRST',count:1},
-    {id:'ORG-368834',code:'FLAANT0001',name:'FLAG & ANTHEM',count:20286},
-    {id:'ORG-674362',code:'GIMHEA0001',name:'GIMME HEALTH FOODS, INC.',count:405},
-    {id:'ORG-655875',code:'GURUNA0001',name:'GURUNANDA, LLC',count:8799},
-    {id:'ORG-731029',code:'HAZION0001',name:'HAZION LLC',count:0},
-    {id:'ORG-668388',code:'HIHLOG0005',name:'HIH LOGISTICS INC -- LaMirada',count:186},
-    {id:'ORG-742268',code:'HININC0001',name:'HINT INC.',count:360},
-    {id:'ORG-439376',code:'THEFEEL001',name:'INNOVATIVE HEALTH PARTNERS DBA THE FEELIST',count:32},
-    {id:'ORG-672896',code:'KACTEA0001',name:'KACE TEA LLC',count:120},
-    {id:'ORG-585450',code:'KARAKA0001',name:'KARAKA, LLC',count:3795},
-    {id:'ORG-536926',code:'KINHAW0001',name:'KING\'S HAWAIIAN',count:1255},
-    {id:'ORG-313396',code:'LAJOLG0001',name:'LA JOLLA GROUP',count:89},
-    {id:'ORG-754962',code:'LENINT0001',name:'LENNOX INDUSTRIES INC.',count:405},
-    {id:'ORG-685351',code:'MAMCHI0001',name:'MAMMA CHIA',count:596},
-    {id:'ORG-647815',code:'MELDRI0001',name:'MELOGRANO DRINKS LLC',count:79},
-    {id:'ORG-714892',code:'NATDEC0001',name:'NATURAL DECADENCE LLC',count:63},
-    {id:'ORG-786594',code:'NETHEA0001',name:'NET HEALTH SHOPS LLC',count:290},
-    {id:'ORG-436686',code:'NORSTA0001',name:'NORTH STAR CONTAINER, LLC',count:2},
-    {id:'ORG-34818',code:'NZXT0001',name:'NZXT',count:2039},
-    {id:'ORG-582444',code:'OPACAM0001',name:'OPAL CAMERA',count:13},
-    {id:'ORG-655338',code:'ORGLLC0001',name:'ORGAIN, LLC.',count:22039},
-    {id:'ORG-601372',code:'OVEFOO0001',name:'OVERSEAS FOOD TRADING',count:338},
-    {id:'ORG-755323',code:'PLEGLO0002',name:'PLEASS GLOBAL LIMITED',count:51},
-    {id:'ORG-723744',code:'PM&J0001',name:'PM&J',count:9},
-    {id:'ORG-739504',code:'POMINC0004',name:'POMPEIAN INC',count:94},
-    {id:'ORG-582188',code:'PREBRA0001',name:'PREFERRED BRANDS INTERNATIONAL',count:558},
-    {id:'ORG-697431',code:'PRISMA0001',name:'PRISMA INTERNATIONAL LLC',count:40},
-    {id:'ORG-753909',code:'PUNBUN0002',name:'PUNK BUNNY LLC',count:21},
-    {id:'ORG-625904',code:'RECSPO0001',name:'RECOVERY SPORTS LLC',count:80},
-    {id:'ORG-641207',code:'RIOROU0001',name:'RIO ROUTER INC',count:82},
-    {id:'ORG-629731',code:'RISCOR0001',name:'RISE BEVERAGES LLC dba RISE BREWING COMPANY',count:338},
-    {id:'ORG-646997',code:'RITBEV0001',name:'RITUAL BEVERAGE COMPANY',count:487},
-    {id:'ORG-665253',code:'RNCTEC0001',name:'RN CHIDAKASHI TECHNOLOGIES INC.',count:1},
-    {id:'ORG-616507',code:'ROABEV0001',name:'ROAR BEVERAGES INC',count:2208},
-    {id:'ORG-55783',code:'SANWIN0001',name:'SANS WINE & SPIRITS',count:306},
-    {id:'ORG-676237',code:'SELCOM0001',name:'SELLERX COMMERCE GMBH',count:1421},
-    {id:'ORG-731558',code:'SELEIG0001',name:'SELLERX EIGHT GMBH',count:134},
-    {id:'ORG-708068',code:'SELFIV0001',name:'SELLERX FIVE GMBH',count:10},
-    {id:'ORG-697437',code:'SELTWO0001',name:'SELLERX TWO GMBH',count:3},
-    {id:'ORG-214099',code:'SIMMOD0001',name:'SIMPLE MODERN',count:3898},
-    {id:'ORG-654546',code:'CONSPO0001',name:'SLINGER BAG AMERICAS INC.',count:8},
-    {id:'ORG-582983',code:'SMEUSA0001',name:'SMEG USA INC',count:1},
-    {id:'ORG-666684',code:'INGBRO0001',name:'SOURCE86',count:1},
-    {id:'ORG-540512',code:'SOUGLA0001',name:'SOUTHERN GLAZER\'S WINE AND SPIRITS, LLC',count:3349},
-    {id:'ORG-740120',code:'SPLWAT0001',name:'SPLENDOR WATER LLC',count:214},
-    {id:'ORG-697436',code:'STRETT0001',name:'STRETTON ONLINE LTD',count:888},
-    {id:'ORG-685228',code:'SUNNIN0001',name:'SUN NINJA LLC',count:178},
-    {id:'ORG-122044',code:'TCLNOR0001',name:'TCL NORTH AMERICA',count:230},
-    {id:'ORG-7984',code:'TEST-GENERIC',name:'Test-Generic',count:0},
-    {id:'ORG-617365',code:'MURRHI0001',name:'THE MURRIETA RHINO HOLDCO LLC',count:50},
-    {id:'ORG-697616',code:'ONBEAN0001',name:'THE ONLY BEAN LLC',count:31},
-    {id:'ORG-658391',code:'OUAIPG0001',name:'THE OUAI',count:179},
-    {id:'ORG-651924',code:'SHOSTO0001',name:'THE SHOWROOM STORE INC.',count:103},
-    {id:'ORG-654730',code:'THOSPO0001',name:'THOROGOOD SPORTS LTD c/o MXP PRIME PLATFORM',count:442},
-    {id:'ORG-698137',code:'BYTDAN0001',name:'TIKTOK INC.',count:247},
-    {id:'ORG-697435',code:'TINYYO0001',name:'TINYYO LIMITED',count:280},
-    {id:'ORG-685227',code:'TORQUA0001',name:'TORQUAY ETRADING LLC',count:2932},
-    {id:'ORG-306334',code:'TPVUSA0001',name:'TPV USA',count:181},
-    {id:'ORG-779252',code:'TRILLC0001',name:'TRIPLELITE, LLC',count:195},
-    {id:'ORG-43765',code:'TURBEA0001',name:'TURTLE BEACH',count:126},
-    {id:'ORG-7564',code:'UNIS',name:'UNIS',count:3},
-    {id:'ORG-644329',code:'THEAMB0001',name:'UNIVERA BRANDS',count:579},
-    {id:'ORG-723580',code:'UPTENE0001',name:'UPTIME ENERGY INC',count:301},
-    {id:'ORG-597709',code:'UTCGEN0001',name:'UTC GENERAL TRADING LLC',count:46},
-    {id:'ORG-735240',code:'VAONIS0001',name:'VAONIS',count:0},
-    {id:'ORG-656608',code:'VITDTC0001',name:'VITA COCO - DTC',count:208},
-    {id:'ORG-625907',code:'WATPLU0001',name:'WATER PLUS LLC',count:33},
-    {id:'ORG-740008',code:'WISMET0001',name:'WISMETTAC ASIAN FOODS INC.',count:72},
-    {id:'ORG-639212',code:'WOOFLA0001',name:'WOODY FLAW CREST INC',count:42},
-    {id:'ORG-625900',code:'ZENBEV0001',name:'ZEN BEVERAGE LLC',count:164},
-  ],
-  'LT_F11':[
-    {id:'ORG-734453',code:'ADOLLC0001',name:'ADOORN LLC',count:0},
-    {id:'ORG-610136',code:'AVIINT0001',name:'AVIRON INTERACTIVE INC',count:0},
-    {id:'ORG-251164',code:'BENPUB0001',name:'BENDON PUBLISHING INC.',count:0},
-    {id:'ORG-658878',code:'BOE0001',name:'BOEVT (HONG KONG) CO., LTD',count:0},
-    {id:'ORG-617369',code:'BRUMAT0001',name:'BRUMATE LLC',count:0},
-    {id:'ORG-588501',code:'BTSWIM0001',name:'BT SWIM LLC',count:0},
-    {id:'ORG-618245',code:'CORHOM0001',name:'CORE HOME',count:0},
-    {id:'ORG-781755',code:'DAGDOV0002',name:'DAGNE DOVER',count:0},
-    {id:'ORG-49546',code:'ESINTL0001',name:'E&S INTERNATIONAL ENTERPRISES, INC',count:0},
-    {id:'ORG-685121',code:'FLEPAC0001',name:'FLEET PACKAGING INC.',count:0},
-    {id:'ORG-424390',code:'GALANZ0001',name:'GALANZ AMERICAS LIMITED COMPANY',count:0},
-    {id:'ORG-468031',code:'GLOBTV0001',name:'GLOBAL TV CONCEPTS, LTD',count:0},
-    {id:'ORG-596709',code:'GLOAME0001',name:'GLOVIS AMERICA',count:0},
-    {id:'ORG-512496',code:'HISUSA0001',name:'HISENSE USA CORPORATION',count:0},
-    {id:'ORG-610090',code:'HUMCRE0001',name:'HUMBLE CREW',count:0},
-    {id:'ORG-623581',code:'LIBBRA0001',name:'LIBERATED BRANDS USA LLC',count:0},
-    {id:'ORG-399175',code:'LIPCOM0001',name:'LIPPERT COMPONENTS, INC.',count:0},
-    {id:'ORG-594671',code:'LOTBEL0001',name:'LOTUS BELLE TENTS USA LIMITED',count:0},
-    {id:'ORG-503911',code:'MEHBUIL0001',name:'MHE Builders, Inc',count:0},
-    {id:'ORG-269553',code:'MIDAME0001',name:'Midea America Corp',count:0},
-    {id:'ORG-786740',code:'NYDAPP0001',name:'NYDJ Apparel LLC',count:0},
-    {id:'ORG-468030',code:'OVELAN0001',name:'OVERLAND',count:0},
-    {id:'ORG-601372',code:'OVEFOO0001',name:'OVERSEAS FOOD TRADING',count:0},
-    {id:'ORG-34535',code:'PLALLC0001',name:'PLANAHEAD',count:0},
-    {id:'ORG-645195',code:'QUEOND0001',name:'QUE ONDA BEVERAGE, INC',count:0},
-    {id:'ORG-616507',code:'ROABEV0001',name:'ROAR BEVERAGES INC',count:0},
-    {id:'ORG-703793',code:'SHEEXN0001',name:'SHEEX, INC.',count:0},
-    {id:'ORG-122044',code:'TCLNOR0001',name:'TCL NORTH AMERICA',count:0},
-    {id:'ORG-539187',code:'THELUM0001',name:'THE LUMISTELLA COMPANY',count:0},
-    {id:'ORG-651924',code:'SHOSTO0001',name:'THE SHOWROOM STORE INC.',count:0},
-    {id:'ORG-216833',code:'TOUIND0001',name:'TOUGHBUILT INDUSTRIES, INC.',count:0},
-    {id:'ORG-44402',code:'TSAC',name:'Trend Smart America Ltd.',count:0},
-    {id:'ORG-7564',code:'UNIS',name:'UNIS',count:0},
-    {id:'ORG-657713',code:'VTREK0001',name:'VTREK GROUP INT\'L LTD',count:0},
-  ],
-  'LT_F40':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:690},
-    {id:'ORG-492910',code:'ATEGRO0001',name:'ATERIAN GROUP, INC.',count:455},
-    {id:'ORG-642594',code:'CKNSAL0001',name:'CKNAPP SALES INC',count:1},
-    {id:'ORG-601916',code:'CODRES0001',name:'CODA RESOURCES',count:65},
-    {id:'ORG-680557',code:'LAUSAU0001',name:'LAUNDRY SAUCE',count:64},
-    {id:'ORG-680567',code:'HEXCLA0001',name:'ONE SOURCE TO MARKET, LLC dba HEXCLAD COOKWARE',count:139},
-    {id:'ORG-688334',code:'?',name:'ORG-688334',count:1},
-    {id:'ORG-728840',code:'?',name:'ORG-728840',count:42},
-    {id:'ORG-729245',code:'PLABAB0001',name:'PLANTBABY, INC.',count:68},
-    {id:'ORG-674186',code:'RIOTEN0001',name:'teaRIOT LLC dba RIOT Energy',count:77},
-    {id:'ORG-644329',code:'THEAMB0001',name:'UNIVERA BRANDS',count:97},
-  ],
-  'LT_F42':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:360},
-    {id:'ORG-654930',code:'MONENE0001',name:'MONSTER ENERGY COMPANY',count:593},
-    {id:'ORG-269553',code:'?',name:'ORG-269553',count:240},
-    {id:'ORG-659732',code:'STAELI0001',name:'STAR ELITE INC.',count:808},
-  ],
-  'LT_F46':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:1623},
-    {id:'ORG-43317',code:'AMILYN0001',name:'AMIEE LYNN, LNC.',count:123},
-    {id:'ORG-313396',code:'LAJOLG0001',name:'LA JOLLA GROUP',count:175},
-    {id:'ORG-153859',code:'?',name:'ORG-153859',count:14},
-    {id:'ORG-651924',code:'SHOSTO0001',name:'THE SHOWROOM STORE INC.',count:15},
-    {id:'ORG-639212',code:'WOOFLA0001',name:'WOODY FLAW CREST INC',count:50},
-  ],
-  'LT_ORG-2':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:43},
-  ],
-  'LT_ORG-34646':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:475},
-    {id:'ORG-380516',code:'?',name:'(unknown)',count:2},
-    {id:'ORG-526536',code:'ACMFOO0001',name:'ACME FOOD SALES INC',count:32},
-    {id:'ORG-610136',code:'AVIINT0001',name:'AVIRON INTERACTIVE INC',count:1},
-    {id:'ORG-34803',code:'BANINT0001',name:'BANYAN INTERNATIONAL',count:1},
-    {id:'ORG-89149',code:'BEXENT0001',name:'BEXCO ENTERPRISES, INC',count:297},
-    {id:'ORG-750948',code:'CHROBI0134',name:'C.H. ROBINSON - CREMER',count:8},
-    {id:'ORG-35654',code:'PHILLIPS',name:'C.H.Robinson-Philips Healthcare',count:19},
-    {id:'ORG-614843',code:'CMPUSA0001',name:'CMPC USA INC',count:57},
-    {id:'ORG-545639',code:'GARANI0001',name:'GARAN, INC.',count:3},
-    {id:'ORG-644789',code:'JACRET0001',name:'JACENT RETAIL GROUP',count:3},
-    {id:'ORG-542361',code:'LISUSA0001',name:'Lisse USA LLC.',count:31},
-    {id:'ORG-292328',code:'LUNWEL0001',name:'Luna Wellness LLC',count:1},
-    {id:'ORG-334823',code:'?',name:'ORG-334823',count:633},
-    {id:'ORG-35844',code:'?',name:'ORG-35844',count:306},
-    {id:'ORG-482782',code:'?',name:'ORG-482782',count:19},
-    {id:'ORG-511560',code:'?',name:'ORG-511560',count:11},
-    {id:'ORG-633558',code:'?',name:'ORG-633558',count:1},
-    {id:'ORG-722133',code:'?',name:'ORG-722133',count:4},
-    {id:'ORG-742926',code:'?',name:'ORG-742926',count:2},
-    {id:'ORG-426951',code:'SLEINT0001',name:'SLEEPWORLD INTERNATIONAL LLC',count:13},
-    {id:'ORG-668309',code:'TCLECO0001',name:'TCL - ECOM',count:9},
-    {id:'ORG-306334',code:'TPVUSA0001',name:'TPV USA',count:14},
-    {id:'ORG-622367',code:'WALONG0001',name:'WALONG MARKETING INC',count:56},
-    {id:'ORG-639212',code:'WOOFLA0001',name:'WOODY FLAW CREST INC',count:2},
-  ],
-  'LT_ORG-35184':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:9},
-    {id:'ORG-747911',code:'IGLWAR0001',name:'IGL WAREHOUSE, LLC',count:286},
-  ],
-  'LT_ORG-45230':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:854},
-    {id:'ORG-47584',code:'?',name:'(unknown)',count:2},
-    {id:'ORG-35654',code:'PHILLIPS',name:'C.H.Robinson-Philips Healthcare',count:4},
-    {id:'ORG-345753',code:'CHRMON0001',name:'CHR C/O MONSANTO',count:55},
-    {id:'ORG-301889',code:'GENHOL0001',name:'Generac Holdings Inc.',count:1},
-    {id:'ORG-48310',code:'HIHHOU0001',name:'HIH LOGISTICS, INC - USA (TRINA SOLAR) - HOUSTON',count:288},
-    {id:'ORG-34588',code:'JSONSE0001',name:'JSONIC SERVICES INC',count:479},
-    {id:'ORG-231518',code:'MSINTE0001',name:'MS INTERNATIONAL',count:39},
-    {id:'ORG-314947',code:'?',name:'ORG-314947',count:21},
-    {id:'ORG-560757',code:'?',name:'ORG-560757',count:8},
-    {id:'ORG-698514',code:'?',name:'ORG-698514',count:5},
-    {id:'ORG-532381',code:'RAVAME0001',name:'RAVAGO AMERICAS LLC',count:21},
-    {id:'ORG-659224',code:'ROYDIS0001',name:'ROYALTY DISTRIBUTION',count:2},
-    {id:'ORG-594369',code:'SCHELE0001',name:'SCHINDLER ELEVATOR CORPORATION',count:178},
-    {id:'ORG-364706',code:'SECLAR0001',name:'SEC LARGE PROJECTS',count:43},
-    {id:'ORG-469446',code:'CONCOM0001',name:'THE CONVEYANCE COMPANY',count:9},
-    {id:'ORG-7564',code:'UNIS',name:'UNIS',count:1},
-    {id:'ORG-651467',code:'URBPRO0001',name:'URB PRODUCTS LLC',count:9},
-  ],
-  'LT_ORG-61213':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:1074},
-    {id:'ORG-657088',code:'?',name:'(unknown)',count:8},
-    {id:'ORG-671898',code:'ASHBEV0001',name:'ASHOC BEVERAGE, LLC.',count:7},
-    {id:'ORG-492910',code:'ATEGRO0001',name:'ATERIAN GROUP, INC.',count:2},
-    {id:'ORG-661097',code:'BEAMAZ0001',name:'BE AMAZED MEDIA LTD',count:1},
-    {id:'ORG-660934',code:'BYAVA0001',name:'BYAVA',count:10},
-    {id:'ORG-606797',code:'DELINT0001',name:'DELMAR INTERNATIONAL INC',count:2},
-    {id:'ORG-717416',code:'DUKCAN0001',name:'DUKE CANNON SUPPLY CO.',count:18},
-    {id:'ORG-672189',code:'EDNNON0001',name:'EDNA\'S NON-ALCOHOLIC COCKTAIL COMPANY LTD.',count:2},
-    {id:'ORG-694847',code:'HONSTI0001',name:'EN-R-G FOODS LLC DBA HONEY STINGER',count:17},
-    {id:'ORG-716581',code:'SUMCOR0001',name:'FABLE & FERN, LLC',count:2},
-    {id:'ORG-640233',code:'FROHEA0001',name:'FRONT 1 HEALTH PARTNERS',count:2},
-    {id:'ORG-301889',code:'GENHOL0001',name:'Generac Holdings Inc.',count:1},
-    {id:'ORG-612197',code:'GREAME0001',name:'GREAT AMERICAN FOODS, INC',count:2},
-    {id:'ORG-716447',code:'KHLINC0001',name:'KHLOUD, INC.',count:5},
-    {id:'ORG-678447',code:'MIKHOT0001',name:'MIKE\'S HOT HONEY, INC.',count:3},
-    {id:'ORG-654868',code:'MONFOO0001',name:'MONOGRAM FOOD SOLUTIONS, LLC',count:3},
-    {id:'ORG-689039',code:'NOVODX0001',name:'NOVO-DX',count:11},
-    {id:'ORG-424390',code:'?',name:'ORG-424390',count:1},
-    {id:'ORG-630589',code:'?',name:'ORG-630589',count:1},
-    {id:'ORG-656602',code:'?',name:'ORG-656602',count:1},
-    {id:'ORG-657269',code:'?',name:'ORG-657269',count:2},
-    {id:'ORG-662107',code:'?',name:'ORG-662107',count:1},
-    {id:'ORG-668294',code:'?',name:'ORG-668294',count:1},
-    {id:'ORG-721130',code:'?',name:'ORG-721130',count:1},
-    {id:'ORG-734900',code:'?',name:'ORG-734900',count:1},
-    {id:'ORG-742630',code:'?',name:'ORG-742630',count:1},
-    {id:'ORG-599658',code:'PIPSNA0001',name:'PIPSNACK LLC',count:14},
-    {id:'ORG-753909',code:'PUNBUN0002',name:'PUNK BUNNY LLC',count:1},
-    {id:'ORG-689012',code:'RESLLC0001',name:'RESTAURANTWARE LLC',count:7},
-    {id:'ORG-727155',code:'RIPVAN0001',name:'RIP VAN, INC.',count:3},
-    {id:'ORG-637532',code:'SLEDOC0001',name:'SLEEP DOCTOR HOLDINGS LLC',count:5},
-    {id:'ORG-50369',code:'TEST00001',name:'Test-Small Parcel',count:1},
-    {id:'ORG-658391',code:'OUAIPG0001',name:'THE OUAI',count:13},
-    {id:'ORG-43765',code:'TURBEA0001',name:'TURTLE BEACH',count:730},
-    {id:'ORG-7564',code:'UNIS',name:'UNIS',count:30},
-    {id:'ORG-715284',code:'UPSNAC0001',name:'UPSNACK BRANDS, INC.',count:33},
-    {id:'ORG-618478',code:'VANBOR0001',name:'VANTAGE TRANSITION LLC',count:12},
-    {id:'ORG-666002',code:'WELTRA0001',name:'WELL ROOTED',count:7},
-  ],
-  'LT_ORG-67669':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:239},
-    {id:'ORG-610136',code:'AVIINT0001',name:'AVIRON INTERACTIVE INC',count:52},
-    {id:'ORG-89149',code:'BEXENT0001',name:'BEXCO ENTERPRISES, INC',count:170},
-    {id:'ORG-601916',code:'CODRES0001',name:'CODA RESOURCES',count:12},
-    {id:'ORG-49546',code:'ESINTL0001',name:'E&S INTERNATIONAL ENTERPRISES, INC',count:2},
-    {id:'ORG-535408',code:'GENCLE0001',name:'GENERAC CLEAN ENERGY',count:45},
-    {id:'ORG-313396',code:'LAJOLG0001',name:'LA JOLLA GROUP',count:137},
-    {id:'ORG-251164',code:'?',name:'ORG-251164',count:10},
-    {id:'ORG-273393',code:'?',name:'ORG-273393',count:114},
-    {id:'ORG-34535',code:'?',name:'ORG-34535',count:7},
-    {id:'ORG-468030',code:'?',name:'ORG-468030',count:121},
-    {id:'ORG-468031',code:'?',name:'ORG-468031',count:4},
-    {id:'ORG-512496',code:'?',name:'ORG-512496',count:140},
-    {id:'ORG-594671',code:'?',name:'ORG-594671',count:6},
-    {id:'ORG-600135',code:'?',name:'ORG-600135',count:6},
-    {id:'ORG-610090',code:'?',name:'ORG-610090',count:43},
-    {id:'ORG-617369',code:'?',name:'ORG-617369',count:62},
-    {id:'ORG-618245',code:'?',name:'ORG-618245',count:5},
-    {id:'ORG-700498',code:'?',name:'ORG-700498',count:2},
-    {id:'ORG-703793',code:'?',name:'ORG-703793',count:1},
-    {id:'ORG-734453',code:'?',name:'ORG-734453',count:57},
-    {id:'ORG-7767',code:'?',name:'ORG-7767',count:100},
-    {id:'ORG-80114',code:'?',name:'ORG-80114',count:71},
-    {id:'ORG-422942',code:'OUTER0001',name:'OUTER, INC.',count:40},
-    {id:'ORG-594369',code:'SCHELE0001',name:'SCHINDLER ELEVATOR CORPORATION',count:95},
-    {id:'ORG-582983',code:'SMEUSA0001',name:'SMEG USA INC',count:20},
-    {id:'ORG-122044',code:'TCLNOR0001',name:'TCL NORTH AMERICA',count:443},
-    {id:'ORG-644329',code:'THEAMB0001',name:'UNIVERA BRANDS',count:1},
-  ],
-  'LT_ORG-7759':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:292},
-    {id:'ORG-397172',code:'SHANIN0001',name:'SharkNinja Sales Company',count:1687},
-    {id:'ORG-68727',code:'SUNPOW0001',name:'SUNPOWER CORPORATION',count:3},
-    {id:'ORG-661232',code:'TPLINK0001',name:'TP-LINK',count:18},
-  ],
-  'LT_ORG-7941':[
-    {id:'__UNASSIGNED__',code:'(unassigned)',name:'(unassigned)',count:1577},
-    {id:'ORG-585447',code:'?',name:'(unknown)',count:3},
-    {id:'ORG-526536',code:'ACMFOO0001',name:'ACME FOOD SALES INC',count:6},
-    {id:'ORG-739273',code:'ANDADV0001',name:'ANDERSON ADVANCED INGREDIENTS',count:4},
-    {id:'ORG-411925',code:'ASUS0001',name:'ASUS',count:11},
-    {id:'ORG-535171',code:'ASUS0002',name:'ASUS - NON BONDED',count:30},
-    {id:'ORG-734788',code:'CHROBI0131',name:'C.H. ROBINSON - AVID',count:2},
-    {id:'ORG-268297',code:'CHRCVS0001',name:'C.H.Robinson-CVS',count:14},
-    {id:'ORG-614843',code:'CMPUSA0001',name:'CMPC USA INC',count:1},
-    {id:'ORG-34513',code:'CONLUM0001',name:'CONCANNON LUMBER COMPANY',count:153},
-    {id:'ORG-606797',code:'DELINT0001',name:'DELMAR INTERNATIONAL INC',count:5},
-    {id:'ORG-545639',code:'GARANI0001',name:'GARAN, INC.',count:3},
-    {id:'ORG-399175',code:'LIPCOM0001',name:'LIPPERT COMPONENTS, INC.',count:7},
-    {id:'ORG-631013',code:'MAMSOL0001',name:'MAMMC SOLUTIONS',count:7},
-    {id:'ORG-251164',code:'?',name:'ORG-251164',count:2},
-    {id:'ORG-608490',code:'?',name:'ORG-608490',count:2},
-    {id:'ORG-7832',code:'?',name:'ORG-7832',count:1},
-    {id:'ORG-422942',code:'OUTER0001',name:'OUTER, INC.',count:35},
-    {id:'ORG-724593',code:'QUAPLY0001',name:'QUALITY PLYWOOD PRODUCTS LLC',count:10},
-    {id:'ORG-606743',code:'SHAUSA0001',name:'SHAYNE USA LLC',count:2},
-    {id:'ORG-654546',code:'CONSPO0001',name:'SLINGER BAG AMERICAS INC.',count:3},
-    {id:'ORG-7984',code:'TEST-GENERIC',name:'Test-Generic',count:1},
-    {id:'ORG-626137',code:'URESOL0001',name:'UREE SOLAR',count:107},
-    {id:'ORG-190344',code:'UTDRAY0001',name:'UT-DRAYAGE',count:1},
-  ],
-};
+const FACILITY_CUSTOMERS = FacilityData.customers;
 
 // Per-facility, per-customer USABLE location rows in TUPLE format:
 // [name, picktype_code, occ_code, type_code] — trailing empties trimmed.

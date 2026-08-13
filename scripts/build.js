@@ -1,0 +1,118 @@
+'use strict';
+
+const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
+const zlib = require('node:zlib');
+const esbuild = require('esbuild');
+
+const ROOT = path.resolve(__dirname, '..');
+const DIST = path.join(ROOT, 'dist');
+const PUBLIC = path.join(ROOT, 'public');
+const TEXT_EXTENSIONS = new Set(['.html','.css','.js','.json','.svg','.txt','.md']);
+
+function hash(buffer) {
+  return crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 10);
+}
+
+function hashedName(relativePath, buffer) {
+  const extension = path.extname(relativePath);
+  const stem = relativePath.slice(0, -extension.length);
+  return stem + '.' + hash(buffer) + extension;
+}
+
+function write(relativePath, buffer, manifest, sourcePath) {
+  const target = path.join(DIST, relativePath);
+  fs.mkdirSync(path.dirname(target), {recursive:true});
+  fs.writeFileSync(target, buffer);
+  if (sourcePath) manifest[sourcePath] = '/' + relativePath.replaceAll(path.sep, '/');
+}
+
+function compressFile(relativePath) {
+  const extension = path.extname(relativePath).toLowerCase();
+  if (!TEXT_EXTENSIONS.has(extension)) return;
+  const target = path.join(DIST, relativePath);
+  const source = fs.readFileSync(target);
+  fs.writeFileSync(target + '.gz', zlib.gzipSync(source, {level:9}));
+  fs.writeFileSync(target + '.br', zlib.brotliCompressSync(source, {params:{[zlib.constants.BROTLI_PARAM_QUALITY]:11}}));
+}
+
+function replacePaths(contents, manifest) {
+  return contents.replace(/\/assets\/[A-Za-z0-9_./-]+/g, value => manifest[value] || value);
+}
+
+async function minifyJavaScript(source, sourcePath, identifiers) {
+  return (await esbuild.transform(source, {
+    loader:'js', target:['es2020'], minifySyntax:true,
+    minifyWhitespace:true, minifyIdentifiers:identifiers, legalComments:'none', sourcefile:sourcePath
+  })).code;
+}
+
+async function minifyModule(source, sourcePath) {
+  return (await esbuild.transform(source, {
+    loader:'js', format:'esm', target:['es2020'], minify:true,
+    treeShaking:true, legalComments:'none', sourcefile:sourcePath
+  })).code;
+}
+
+async function main() {
+  fs.rmSync(DIST, {recursive:true, force:true});
+  fs.mkdirSync(DIST, {recursive:true});
+  const manifest = {};
+
+  const dataDir = path.join(PUBLIC, 'assets/data/facilities');
+  for (const filename of fs.readdirSync(dataDir).filter(name => name.endsWith('.js')).sort()) {
+    const sourcePath = '/assets/data/facilities/' + filename;
+    const output = Buffer.from(await minifyModule(fs.readFileSync(path.join(dataDir, filename), 'utf8'), sourcePath));
+    write(hashedName('assets/data/facilities/' + filename, output), output, manifest, sourcePath);
+  }
+
+  for (const directory of ['brand','fonts','icons']) {
+    const sourceDir = path.join(PUBLIC, 'assets', directory);
+    for (const filename of fs.readdirSync(sourceDir).sort()) {
+      const sourcePath = '/assets/' + directory + '/' + filename;
+      const buffer = fs.readFileSync(path.join(sourceDir, filename));
+      write(hashedName('assets/' + directory + '/' + filename, buffer), buffer, manifest, sourcePath);
+    }
+  }
+
+  const jsDir = path.join(PUBLIC, 'assets/js');
+  for (const filename of fs.readdirSync(jsDir).filter(name => name.endsWith('.js') && name !== 'facility-customer-locations.js').sort()) {
+    const sourcePath = '/assets/js/' + filename;
+    let source = replacePaths(fs.readFileSync(path.join(jsDir, filename), 'utf8'), manifest);
+    if (filename === 'facility-data-loader.js') {
+      for (const [input, output] of Object.entries(manifest)) {
+        if (input.startsWith('/assets/data/facilities/')) source = source.replaceAll(input.split('/').pop(), output.split('/').pop());
+      }
+    }
+    const preserveGlobals = filename !== 'theme.js' && filename !== 'facility-data-loader.js';
+    const output = Buffer.from(await minifyJavaScript(source, sourcePath, !preserveGlobals));
+    write(hashedName('assets/js/' + filename, output), output, manifest, sourcePath);
+  }
+
+  const cssDir = path.join(PUBLIC, 'assets/css');
+  for (const filename of fs.readdirSync(cssDir).filter(name => name.endsWith('.css')).sort()) {
+    const sourcePath = '/assets/css/' + filename;
+    const source = replacePaths(fs.readFileSync(path.join(cssDir, filename), 'utf8'), manifest);
+    const output = Buffer.from((await esbuild.transform(source, {loader:'css',minify:true,legalComments:'none',sourcefile:sourcePath})).code);
+    write(hashedName('assets/css/' + filename, output), output, manifest, sourcePath);
+  }
+
+  const html = replacePaths(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), manifest);
+  write('index.html', Buffer.from(html));
+  write('asset-manifest.json', Buffer.from(JSON.stringify(manifest, null, 2) + '\n'));
+
+  const builtFiles = [];
+  function collect(directory) {
+    for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) collect(full);
+      else if (!entry.name.endsWith('.gz') && !entry.name.endsWith('.br')) builtFiles.push(path.relative(DIST, full));
+    }
+  }
+  collect(DIST);
+  builtFiles.forEach(compressFile);
+  process.stdout.write('Built ' + builtFiles.length + ' production files in dist/.\n');
+}
+
+main().catch(error => { console.error(error); process.exit(1); });

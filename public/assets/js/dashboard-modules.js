@@ -1,15 +1,9 @@
 
 
-// Backwards-compat alias: VALLEY_VIEW_CUSTOMERS = FACILITY_CUSTOMERS['LT_F1']
-const VALLEY_VIEW_CUSTOMERS = FACILITY_CUSTOMERS['LT_F1'];
-// Backwards-compat: CUSTOMER_LOCATIONS_SAMPLE points to LT_F1
-const CUSTOMER_LOCATIONS_SAMPLE = FACILITY_CUSTOMER_LOCATIONS['LT_F1'] || {};
-
-
 // Fallback option lists used when the WMS endpoint is unreachable
 // (CORS / not authenticated / wrong path). Replace freely.
 const FALLBACK = {
-  customers: VALLEY_VIEW_CUSTOMERS,
+  customers: [],
   // Wise's real CountTicketType enum (verified from a rejection error:
   // accepted = [BY_ITEM_LOCATION, BY_ITEM, BY_LOCATION]).
   ccTypes: [

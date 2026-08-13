@@ -7,6 +7,8 @@ const { Pool } = require('pg');
 const abcSlotting = require('./lib/abc-slotting');
 const PORT = process.env.PORT || 8080;
 const ROOT = __dirname;
+const DIST_ROOT = path.join(ROOT, 'dist');
+const HAS_DIST = fs.existsSync(path.join(DIST_ROOT, 'index.html'));
 
 const ROBOT_COUNT_API_URL = process.env.ROBOT_COUNT_API_URL || 'https://pget47t1vc.execute-api.us-west-2.amazonaws.com/prd/download_object';
 const ROBOT_COUNT_API_KEY = process.env.ROBOT_COUNT_API_KEY || '';
@@ -151,6 +153,25 @@ function hrmUpstream(method, pathname, body, incomingHeaders, query='') {
 function contentType(file) {
   const ext = path.extname(file).toLowerCase();
   return ({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.ico':'image/x-icon'}[ext] || 'application/octet-stream');
+}
+
+function isHashedAsset(pathname) {
+  return /\.[0-9a-f]{10}\.[a-z0-9]+$/i.test(pathname);
+}
+
+function acceptsEncoding(header, encoding) {
+  return String(header || '').split(',').some(value => {
+    const parts = value.trim().toLowerCase().split(';');
+    if (parts[0] !== encoding && parts[0] !== '*') return false;
+    const quality = parts.find(part => part.trim().startsWith('q='));
+    return !quality || Number(quality.trim().slice(2)) > 0;
+  });
+}
+
+function selectCompressedFile(full, acceptEncoding) {
+  if (acceptsEncoding(acceptEncoding, 'br') && fs.existsSync(full + '.br')) return {file:full + '.br', encoding:'br'};
+  if (acceptsEncoding(acceptEncoding, 'gzip') && fs.existsSync(full + '.gz')) return {file:full + '.gz', encoding:'gzip'};
+  return {file:full, encoding:''};
 }
 
 function ticketUpstream(method, apiPath, body, authHeader) {
@@ -505,16 +526,23 @@ const server = http.createServer((req,res) => {
   }
   if (url.pathname.startsWith('/api/')) return handleApi(req,res,url);
   const assetRequest = url.pathname === '/assets' || url.pathname.startsWith('/assets/');
-  const staticRoot = assetRequest ? path.join(ROOT, 'public') : ROOT;
+  const staticRoot = HAS_DIST ? DIST_ROOT : (assetRequest ? path.join(ROOT, 'public') : ROOT);
   let file = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   file = path.normalize(file).replace(/^([/\\])+/, '');
   const full = path.resolve(staticRoot, file);
   if (full !== staticRoot && !full.startsWith(staticRoot + path.sep)) {
     return send(res, 403, 'Forbidden', {'Content-Type':'text/plain'});
   }
-  fs.readFile(full, (err, data) => {
+  const selected = selectCompressedFile(full, req.headers['accept-encoding']);
+  fs.readFile(selected.file, (err, data) => {
     if (err) return send(res, 404, 'Not found', {'Content-Type':'text/plain'});
-    res.writeHead(200, {'Content-Type': contentType(full), 'Cache-Control':'no-store'});
+    const headers = {
+      'Content-Type': contentType(full),
+      'Cache-Control': isHashedAsset(url.pathname) ? 'public, max-age=31536000, immutable' : 'no-store',
+      'Vary':'Accept-Encoding'
+    };
+    if (selected.encoding) headers['Content-Encoding'] = selected.encoding;
+    res.writeHead(200, headers);
     res.end(data);
   });
 });
