@@ -511,10 +511,14 @@ const server = http.createServer((req,res) => {
     return handleSendNotification(req, res);
   }
   if (url.pathname.startsWith('/api/')) return handleApi(req,res,url);
+  const assetRequest = url.pathname === '/assets' || url.pathname.startsWith('/assets/');
+  const staticRoot = assetRequest ? path.join(ROOT, 'public') : ROOT;
   let file = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   file = path.normalize(file).replace(/^([/\\])+/, '');
-  const full = path.join(ROOT, file);
-  if (!full.startsWith(ROOT)) return send(res, 403, 'Forbidden', {'Content-Type':'text/plain'});
+  const full = path.resolve(staticRoot, file);
+  if (full !== staticRoot && !full.startsWith(staticRoot + path.sep)) {
+    return send(res, 403, 'Forbidden', {'Content-Type':'text/plain'});
+  }
   fs.readFile(full, (err, data) => {
     if (err) return send(res, 404, 'Not found', {'Content-Type':'text/plain'});
     res.writeHead(200, {'Content-Type': contentType(full), 'Cache-Control':'no-store'});
