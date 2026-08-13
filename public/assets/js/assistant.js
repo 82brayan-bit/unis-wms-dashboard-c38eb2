@@ -23,7 +23,7 @@ function aiShowSuggestions() {
   ];
   const el = document.getElementById('ai-suggestions');
   if (!el) return;
-  el.innerHTML = suggestions.map(s => '<span onclick="aiAsk(\'' + s.replace(/'/g,"\\'") + '\')" style="font-size:10px;padding:3px 8px;border-radius:12px;background:#F3EEFF;color:#5B21B6;cursor:pointer;white-space:nowrap">' + s + '</span>').join('');
+  el.innerHTML = suggestions.map(s => '<span onclick="aiAsk(\'' + s.replace(/'/g,"\\'") + '\')" style="font-size:10px;padding:3px 8px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);cursor:pointer;white-space:nowrap">' + s + '</span>').join('');
 }
 
 function aiAddMsg(role, text) {
@@ -39,7 +39,7 @@ function aiRenderMessages() {
     const isUser = m.role === 'user';
     return '<div style="margin-bottom:10px;display:flex;justify-content:' + (isUser ? 'flex-end' : 'flex-start') + '">' +
       '<div style="max-width:85%;padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.5;' +
-      (isUser ? 'background:#753BBD;color:white' : 'background:#f3f4f6;color:#1f2937') + '">' +
+      (isUser ? 'background:var(--primary);color:var(--primary-foreground)' : 'background:var(--muted);color:var(--foreground)') + '">' +
       esc(m.text) + '</div></div>';
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -120,7 +120,7 @@ function aiClear() {
 
 // ═══ ABC INVENTORY SLOTTING MODULE ═══
 const ABC_STATE = {items: [], recommendations: [], dashboard: null, initialized: false};
-function abcSetStatus(msg, color) { const el = document.getElementById('abc-status'); if (el) { el.textContent = msg || ''; el.style.color = color || '#6b7280'; } }
+function abcSetStatus(msg, color) { const el = document.getElementById('abc-status'); if (el) { el.textContent = msg || ''; el.style.color = color || 'var(--muted-foreground)'; } }
 function abcCustomerId() { return (document.getElementById('abc-customer') || {}).value || ''; }
 function abcScopeQuery() { return 'facilityId=' + encodeURIComponent(FACILITY_ID) + '&customerId=' + encodeURIComponent(abcCustomerId()); }
 function abcConfigPayload() {
@@ -161,7 +161,7 @@ async function abcFetchJson(url, opts) {
   return d;
 }
 async function abcRefreshAll() {
-  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', '#dc2626'); return; }
+  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
   abcSetStatus('Loading ABC results…');
   try {
     const [dash, items, recs] = await Promise.all([
@@ -171,34 +171,34 @@ async function abcRefreshAll() {
     ]);
     ABC_STATE.dashboard = dash; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
     abcRenderDashboard(); abcRenderItems(); abcRenderRecommendations();
-    abcSetStatus(dash.empty ? 'No official analysis exists yet for this customer.' : 'ABC results loaded.', dash.empty ? '#d97706' : '#059669');
-  } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', '#dc2626'); }
+    abcSetStatus(dash.empty ? 'No official analysis exists yet for this customer.' : 'ABC results loaded.', dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
+  } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', 'var(--destructive)'); }
 }
 async function abcSyncFromWms() {
-  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', '#dc2626'); return; }
+  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
   const startDate = (document.getElementById('abc-start') || {}).value;
   const endDate = (document.getElementById('abc-end') || {}).value;
-  if (!startDate || !endDate) { abcSetStatus('Select a date range.', '#dc2626'); return; }
+  if (!startDate || !endDate) { abcSetStatus('Select a date range.', 'var(--destructive)'); return; }
   abcSetStatus('Syncing SKU, location, inventory, inbound, and outbound data from WMS…');
   try {
     const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
     const d = await abcFetchJson('/api/abc-slotting/sync-wms', {method:'POST', body:JSON.stringify(body)});
     const s = d.summary || {};
-    abcSetStatus('WMS sync complete: ' + (s.skuMaster || 0) + ' SKU(s), ' + (s.locations || 0) + ' location(s), ' + (s.inboundTransactions || 0) + ' inbound row(s), ' + (s.outboundTransactions || 0) + ' outbound row(s).', '#059669');
-  } catch(e) { abcSetStatus(e.message || 'WMS sync failed.', '#dc2626'); }
+    abcSetStatus('WMS sync complete: ' + (s.skuMaster || 0) + ' SKU(s), ' + (s.locations || 0) + ' location(s), ' + (s.inboundTransactions || 0) + ' inbound row(s), ' + (s.outboundTransactions || 0) + ' outbound row(s).', 'var(--chart-3)');
+  } catch(e) { abcSetStatus(e.message || 'WMS sync failed.', 'var(--destructive)'); }
 }
 async function abcRunAnalysis() {
-  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', '#dc2626'); return; }
+  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
   const startDate = (document.getElementById('abc-start') || {}).value;
   const endDate = (document.getElementById('abc-end') || {}).value;
-  if (!startDate || !endDate) { abcSetStatus('Select a date range.', '#dc2626'); return; }
+  if (!startDate || !endDate) { abcSetStatus('Select a date range.', 'var(--destructive)'); return; }
   abcSetStatus('Running server-side ABC analysis…');
   try {
     const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, method:(document.getElementById('abc-method')||{}).value || 'outbound_units', analysisType:(document.getElementById('abc-analysis-type')||{}).value || 'combined', config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
     const d = await abcFetchJson('/api/abc-slotting/run-analysis', {method:'POST', body:JSON.stringify(body)});
-    abcSetStatus('Analysis completed: ' + (d.resultCount || 0) + ' SKU(s).', '#059669');
+    abcSetStatus('Analysis completed: ' + (d.resultCount || 0) + ' SKU(s).', 'var(--chart-3)');
     await abcRefreshAll();
-  } catch(e) { abcSetStatus(e.message || 'Analysis failed.', '#dc2626'); }
+  } catch(e) { abcSetStatus(e.message || 'Analysis failed.', 'var(--destructive)'); }
 }
 function abcRenderDashboard() {
   const dash = ABC_STATE.dashboard || {}; const abc = {}; (dash.abcCounts || []).forEach(r => abc[r.abc_class] = r.count);
@@ -217,7 +217,7 @@ function abcRenderItems() {
   let rows = ABC_STATE.items || [];
   if (q) rows = rows.filter(r => String(r.sku || '').toLowerCase().includes(q));
   if (cls) rows = rows.filter(r => r.abc_class === cls);
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:#9ca3af">No SKU analysis rows found. Import data and run analysis.</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted-foreground)">No SKU analysis rows found. Import data and run analysis.</td></tr>'; return; }
   body.innerHTML = rows.map(r => '<tr>' +
     '<td style="font-family:monospace">' + esc(r.sku || '') + '</td>' +
     '<td><strong>' + esc(r.abc_class || '—') + '</strong></td>' +
@@ -235,16 +235,16 @@ function abcRenderItems() {
 function abcRenderRecommendations() {
   const body = document.getElementById('abc-recs-body'); if (!body) return;
   const rows = ABC_STATE.recommendations || [];
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:#9ca3af">No slotting recommendations found.</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted-foreground)">No slotting recommendations found.</td></tr>'; return; }
   body.innerHTML = rows.map(r => '<tr>' +
     '<td style="font-family:monospace">' + esc(r.sku || '') + '</td>' +
     '<td>' + esc(r.current_storage_type || r.current_location || '—') + '</td>' +
-    '<td><strong>' + esc(r.recommended_storage_type || '—') + '</strong><br><span style="font-size:10px;color:#6b7280">' + esc(r.recommended_zone || '') + ' ' + esc(r.recommended_level || '') + '</span></td>' +
+    '<td><strong>' + esc(r.recommended_storage_type || '—') + '</strong><br><span style="font-size:10px;color:var(--muted-foreground)">' + esc(r.recommended_zone || '') + ' ' + esc(r.recommended_level || '') + '</span></td>' +
     '<td style="max-width:360px;font-size:11px">' + esc(r.reason || '—') + '</td>' +
     '<td>' + esc(r.priority || '—') + '</td>' +
     '<td>' + esc(r.approval_status || 'PENDING') + '</td>' +
     '<td>' + esc(r.assigned_user || '—') + '</td>' +
-    '<td><span style="color:#059669;cursor:pointer;font-size:11px;font-weight:700;margin-right:8px" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'approve\')">Approve</span><span style="color:#dc2626;cursor:pointer;font-size:11px;font-weight:700;margin-right:8px" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'reject\')">Reject</span><span style="color:#753BBD;cursor:pointer;font-size:11px;font-weight:700" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'assign\')">Assign</span></td>' +
+    '<td><span style="color:var(--chart-3);cursor:pointer;font-size:11px;font-weight:700;margin-right:8px" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'approve\')">Approve</span><span style="color:var(--destructive);cursor:pointer;font-size:11px;font-weight:700;margin-right:8px" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'reject\')">Reject</span><span style="color:var(--primary);cursor:pointer;font-size:11px;font-weight:700" onclick="abcRecommendationAction(\'' + escAttr(r.id) + '\',\'assign\')">Assign</span></td>' +
     '</tr>').join('');
 }
 async function abcRecommendationAction(id, action) {
@@ -254,9 +254,9 @@ async function abcRecommendationAction(id, action) {
   catch(e) { alert(e.message || 'Recommendation update failed.'); }
 }
 async function abcSaveConfig() {
-  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', '#dc2626'); return; }
-  try { await abcFetchJson('/api/abc-slotting/config', {method:'POST', body:JSON.stringify({facilityId:FACILITY_ID, customerId:abcCustomerId(), config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''})}); abcSetStatus('Configuration saved.', '#059669'); }
-  catch(e) { abcSetStatus(e.message || 'Could not save configuration.', '#dc2626'); }
+  if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
+  try { await abcFetchJson('/api/abc-slotting/config', {method:'POST', body:JSON.stringify({facilityId:FACILITY_ID, customerId:abcCustomerId(), config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''})}); abcSetStatus('Configuration saved.', 'var(--chart-3)'); }
+  catch(e) { abcSetStatus(e.message || 'Could not save configuration.', 'var(--destructive)'); }
 }
 function abcExportRecommendations() {
   const rows = ABC_STATE.recommendations || [];

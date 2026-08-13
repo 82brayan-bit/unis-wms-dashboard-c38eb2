@@ -163,7 +163,7 @@ function updateSchedulerFacilityHelp(fac) {
   const customers = FACILITY_CUSTOMERS[fac.id] || [];
   const locCount = customers.reduce((s,c)=>s+(c.count||0),0);
   if (customers.length === 0) {
-    help.innerHTML = 'Facility: <strong>' + esc(fac.name) + '</strong> (' + fac.id + ') · <span style="color:#9ca3af">No cached location data. Use Add Count Line to search live WMS locations.</span>';
+    help.innerHTML = 'Facility: <strong>' + esc(fac.name) + '</strong> (' + fac.id + ') · <span style="color:var(--muted-foreground)">No cached location data. Use Add Count Line to search live WMS locations.</span>';
   } else if (fac.id === 'LT_F1') {
     help.innerHTML = 'Facility: <strong>' + fac.name + '</strong> · ' + customers.length + ' customers · ' + locCount.toLocaleString() + ' locations cached · Real Wise snapshot 2026-05-27';
   } else {
@@ -406,6 +406,86 @@ function toggleCycle(e) {
 // ═══ CHARTS ═══
 let lineChart, donutChart, robotChart;
 
+function chartCssColor(token, mixPercent) {
+  const probe = document.createElement('span');
+  probe.style.color = mixPercent == null
+    ? 'var(' + token + ')'
+    : 'color-mix(in srgb,var(' + token + ') ' + mixPercent + '%,transparent)';
+  document.body.appendChild(probe);
+  const color = getComputedStyle(probe).color;
+  probe.remove();
+  return color;
+}
+
+function chartTheme() {
+  return {
+    foreground: chartCssColor('--foreground'),
+    mutedForeground: chartCssColor('--muted-foreground'),
+    card: chartCssColor('--card'),
+    border: chartCssColor('--border'),
+    muted: chartCssColor('--muted'),
+    primary: chartCssColor('--primary'),
+    primarySoft: chartCssColor('--primary', 14),
+    primaryTransparent: chartCssColor('--primary', 1),
+    chart2: chartCssColor('--chart-2'),
+    chart3: chartCssColor('--chart-3'),
+    chart3Soft: chartCssColor('--chart-3', 18),
+    chart3Transparent: chartCssColor('--chart-3', 1),
+    destructive: chartCssColor('--destructive')
+  };
+}
+
+function themedChartOptions(theme) {
+  return {
+    color: theme.foreground,
+    borderColor: theme.border,
+    backgroundColor: theme.card,
+    titleColor: theme.foreground,
+    bodyColor: theme.foreground
+  };
+}
+
+function refreshChartTheme() {
+  if (typeof Chart === 'undefined') return;
+  const theme = chartTheme();
+  [lineChart, robotChart].forEach(chart => {
+    if (!chart) return;
+    chart.options.color = theme.foreground;
+    chart.options.plugins.tooltip = Object.assign({}, chart.options.plugins.tooltip, themedChartOptions(theme));
+    Object.values(chart.options.scales || {}).forEach(scale => {
+      if (scale.ticks) scale.ticks.color = theme.mutedForeground;
+      if (scale.grid && scale.grid.display !== false) scale.grid.color = theme.muted;
+    });
+  });
+  if (lineChart) {
+    lineChart.data.datasets[0].borderColor = theme.primary;
+    lineChart.data.datasets[0].pointBackgroundColor = theme.primary;
+    lineChart.data.datasets[0].backgroundColor = ctx => {
+      const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 250);
+      gradient.addColorStop(0, theme.primarySoft);
+      gradient.addColorStop(1, theme.primaryTransparent);
+      return gradient;
+    };
+    lineChart.update('none');
+  }
+  if (donutChart) {
+    donutChart.options.color = theme.foreground;
+    donutChart.options.plugins.tooltip = Object.assign({}, donutChart.options.plugins.tooltip, themedChartOptions(theme));
+    donutChart.data.datasets[0].backgroundColor = [theme.primary, theme.chart2, theme.destructive, theme.chart3];
+    donutChart.update('none');
+  }
+  if (robotChart) {
+    robotChart.data.datasets[0].borderColor = theme.chart3;
+    robotChart.data.datasets[0].backgroundColor = ctx => {
+      const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, theme.chart3Soft);
+      gradient.addColorStop(1, theme.chart3Transparent);
+      return gradient;
+    };
+    robotChart.update('none');
+  }
+}
+
 const DATA_7 = {
   labels: ['May 20','May 21','May 22','May 23','May 24','May 25','May 26'],
   values: [122000, 148000, 140000, 124000, 165000, 158000, 152450]
@@ -416,6 +496,7 @@ const DATA_30 = {
 };
 
 function initCharts() {
+  const theme = chartTheme();
   const lctx = document.getElementById('lineChart').getContext('2d');
   lineChart = new Chart(lctx, {
     type: 'line',
@@ -424,25 +505,26 @@ function initCharts() {
       datasets: [{
         label: 'Inventory Value (USD)',
         data: DATA_7.values,
-        borderColor: '#753BBD',
+        borderColor: theme.primary,
         backgroundColor: (ctx) => {
           const g = ctx.chart.ctx.createLinearGradient(0,0,0,250);
-          g.addColorStop(0,'rgba(117,59,189,.14)');
-          g.addColorStop(1,'rgba(117,59,189,.01)');
+          g.addColorStop(0,theme.primarySoft);
+          g.addColorStop(1,theme.primaryTransparent);
           return g;
         },
         borderWidth: 2.5,
-        pointBackgroundColor: '#753BBD',
+        pointBackgroundColor: theme.primary,
         pointRadius: 4, pointHoverRadius: 6,
         fill: true, tension: 0.4
       }]
     },
     options: {
       responsive:true, maintainAspectRatio:true,
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' $'+c.raw.toLocaleString()}}},
+      color:theme.foreground,
+      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' $'+c.raw.toLocaleString()}})},
       scales:{
-        y:{beginAtZero:false, ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'K', font:{size:11}}, grid:{color:'#f3f4f6'}},
-        x:{ticks:{font:{size:11}}, grid:{display:false}}
+        y:{beginAtZero:false, ticks:{color:theme.mutedForeground,callback:v=>'$'+(v/1000).toFixed(0)+'K', font:{size:11}}, grid:{color:theme.muted}},
+        x:{ticks:{color:theme.mutedForeground,font:{size:11}}, grid:{display:false}}
       }
     }
   });
@@ -452,11 +534,12 @@ function initCharts() {
     type: 'doughnut',
     data: {
       labels:['In Stock','Low Stock','Out of Stock','On Order'],
-      datasets:[{data:[842,231,98,77], backgroundColor:['#753BBD','#f97316','#ef4444','#10b981'], borderWidth:0, hoverOffset:6}]
+      datasets:[{data:[842,231,98,77], backgroundColor:[theme.primary,theme.chart2,theme.destructive,theme.chart3], borderWidth:0, hoverOffset:6}]
     },
     options:{
       responsive:false, cutout:'72%',
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' '+c.label+': '+c.raw+' items'}}}
+      color:theme.foreground,
+      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+c.label+': '+c.raw+' items'}})}
     }
   });
 }
@@ -467,26 +550,30 @@ function initRobotChart() {
   if (!el) return;
   const labels = Array.from({length:24}, (_,i)=> (i<10?'0':'') + i + ':00');
   const data = [120,110,95,85,80,90,110,135,160,178,182,175,168,172,180,185,170,162,155,148,140,135,128,122];
+  const theme = chartTheme();
   robotChart = new Chart(el.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [{
       label: 'Picks/hr (fleet avg)', data,
-      borderColor: '#10b981',
+      borderColor: theme.chart3,
       backgroundColor: (ctx) => {
         const g = ctx.chart.ctx.createLinearGradient(0,0,0,200);
-        g.addColorStop(0,'rgba(16,185,129,.18)');
-        g.addColorStop(1,'rgba(16,185,129,.01)');
+        g.addColorStop(0,theme.chart3Soft);
+        g.addColorStop(1,theme.chart3Transparent);
         return g;
       },
       borderWidth:2.5, fill:true, tension:0.4, pointRadius:0, pointHoverRadius:5
     }]},
     options: {
       responsive:true, maintainAspectRatio:true,
-      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>' '+c.raw+' picks/hr'}}},
-      scales:{y:{beginAtZero:true, ticks:{font:{size:11}}, grid:{color:'#f3f4f6'}}, x:{ticks:{font:{size:10}, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false}}}
+      color:theme.foreground,
+      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+c.raw+' picks/hr'}})},
+      scales:{y:{beginAtZero:true, ticks:{color:theme.mutedForeground,font:{size:11}}, grid:{color:theme.muted}}, x:{ticks:{color:theme.mutedForeground,font:{size:10}, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false}}}
     }
   });
 }
+
+window.addEventListener('item-theme-change', refreshChartTheme);
 
 function updateLineChart(days) {
   // Keep the dashboard live: if WMS inventory has loaded, the chart shows live
@@ -613,18 +700,18 @@ function updateTokenStatus() {
   if (!el) return;
   const payload = decodeJwt(WISE_TOKEN);
   if (!payload || !payload.exp) {
-    if (hasStoredRefreshToken()) el.innerHTML = '<span style="color:#92400e">· session ready</span>';
-    else el.innerHTML = '<span style="color:#ef4444">· reconnect required</span>';
+    if (hasStoredRefreshToken()) el.innerHTML = '<span style="color:var(--chart-4)">· session ready</span>';
+    else el.innerHTML = '<span style="color:var(--destructive)">· reconnect required</span>';
     return;
   }
   const msLeft = (payload.exp * 1000) - Date.now();
   if (msLeft <= 0) {
     el.innerHTML = hasStoredRefreshToken()
-      ? '<span style="color:#92400e">· refreshing session</span>'
-      : '<span style="color:#ef4444">· reconnect required</span>';
+      ? '<span style="color:var(--chart-4)">· refreshing session</span>'
+      : '<span style="color:var(--destructive)">· reconnect required</span>';
   } else {
     // Keep the status business-facing; the app refreshes automatically in the background.
-    el.innerHTML = '<span style="color:#065f46">· session active</span>';
+    el.innerHTML = '<span style="color:var(--chart-3)">· session active</span>';
   }
 }
 

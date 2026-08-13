@@ -10,18 +10,25 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>UNIS WMS — Inventory & Task Controller</title>
+<link rel="icon" href="/assets/brand/item-logo-light.svg" type="image/svg+xml"/>
+<script src="/assets/js/theme.js"></script>
+<script>ItemTheme.initializeTheme();</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/assets/css/item-tokens.css"/>
 <link rel="stylesheet" href="/assets/css/dashboard.css"/>
 </head>
 <body>
 
 <!-- ═══════════════ LOGIN ═══════════════ -->
 <div id="login-screen">
+  <button class="theme-toggle login-theme-toggle" type="button" data-theme-toggle aria-label="Switch theme" aria-pressed="false">
+    <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+    <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    <span data-theme-label>Theme</span>
+  </button>
   <div class="login-wrap">
     <div class="login-brand">
-      <div class="login-brand-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-      </div>
+      <img class="item-brand-logo login-brand-logo" data-item-logo src="/assets/brand/item-logo-light.svg" alt="Item"/>
       <div>
         <div class="login-brand-name">UNIS WMS</div>
         <div class="login-brand-sub">Inventory &amp; Task Controller</div>
@@ -53,9 +60,7 @@
   <aside class="sidebar">
     <div class="sb-logo">
       <div class="sb-logo-inner">
-        <div class="sb-logo-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-        </div>
+        <img class="item-brand-logo sidebar-brand-logo" data-item-logo src="/assets/brand/item-logo-light.svg" alt="Item"/>
         <div class="sb-logo-text">
           Inventory &amp; Task
           <span>Controller · UNIS WMS</span>
@@ -180,9 +185,9 @@
     <div class="wms-bar">
       <div class="wms-dot"></div>
       <span>Connected to <strong>UNIS WMS</strong> · unis.item.com · Facility:
-        <select id="facility-switcher" onchange="switchFacility(this.value)" style="background:#dcfce7;border:1px solid #86efac;color:#065f46;font-weight:700;font-size:12px;padding:2px 6px;border-radius:5px;margin:0 4px;cursor:pointer"></select>
+        <select id="facility-switcher" onchange="switchFacility(this.value)" style="background:color-mix(in srgb,var(--chart-3) 16%,var(--card));border:1px solid color-mix(in srgb,var(--chart-3) 38%,var(--border));color:var(--chart-3);font-weight:700;font-size:12px;padding:2px 6px;border-radius:5px;margin:0 4px;cursor:pointer"></select>
         · User: <strong id="wms-user">—</strong></span>
-      <span style="margin-left:4px;color:#9ca3af">· Last sync: <span id="sync-lbl">just now</span></span>
+      <span style="margin-left:4px;color:var(--muted-foreground)">· Last sync: <span id="sync-lbl">just now</span></span>
       <span id="token-status" style="margin-left:8px"></span>
       <a onclick="showReconnect()" style="margin-left:8px;cursor:pointer">⚿ Reconnect</a>
       <a onclick="refreshAll()">↻ Refresh</a>
@@ -199,6 +204,11 @@
         <input placeholder="Search products, tasks, etc…" type="text"/>
       </div>
       <div class="topbar-right">
+        <button class="theme-toggle topbar-theme-toggle" type="button" data-theme-toggle aria-label="Switch theme" aria-pressed="false">
+          <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span class="theme-toggle-label" data-theme-label>Theme</span>
+        </button>
         <div class="date-badge" id="topbar-date-range">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span id="topbar-date-text"></span>
@@ -213,7 +223,7 @@
             <div class="name">Admin</div>
             <div class="role">Administrator</div>
           </div>
-          <svg style="width:12px;height:12px;color:#9ca3af;margin-left:2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg style="width:12px;height:12px;color:var(--muted-foreground);margin-left:2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           <div class="user-menu" id="user-menu" onclick="event.stopPropagation()">
             <div class="user-menu-hdr">
               <div class="user-menu-name" id="user-menu-name">—</div>
@@ -238,7 +248,7 @@
       <!-- ════ VIEW: DASHBOARD ════ -->
       <div class="view active" id="view-dashboard">
         <!-- EMPLOYEE OWNERSHIP -->
-        <div class="card" id="dashboard-employee-ownership-card" style="margin-bottom:18px;border:1.5px solid #D8C4FF;background:linear-gradient(135deg,#ffffff 0%,#F7F2FF 100%)">
+        <div class="card" id="dashboard-employee-ownership-card" style="margin-bottom:18px;border:1.5px solid color-mix(in srgb,var(--primary) 35%,var(--border));background:linear-gradient(135deg,var(--card) 0%,color-mix(in srgb,var(--primary) 10%,var(--card)) 100%)">
           <div class="card-hdr" style="align-items:center">
             <div>
               <div class="card-ttl">Employee Ownership</div>
@@ -246,7 +256,7 @@
             </div>
           </div>
           <div id="dash-ownership-strip" style="display:flex;gap:18px;overflow-x:auto;padding:14px 4px 4px;min-height:132px">
-            <div style="font-size:12px;color:#9ca3af;padding:24px">Loading HRM ownership employees…</div>
+            <div style="font-size:12px;color:var(--muted-foreground);padding:24px">Loading HRM ownership employees…</div>
           </div>
         </div>
 
@@ -259,7 +269,7 @@
             </div>
             <button class="btn btn-secondary" onclick="loadDashCycleCountKpi()" style="font-size:12px;padding:5px 12px">Refresh</button>
           </div>
-          <div id="dash-cc-kpi" style="padding:12px;font-size:12px;color:#9ca3af">Click Refresh or sign in to load cycle count KPIs.</div>
+          <div id="dash-cc-kpi" style="padding:12px;font-size:12px;color:var(--muted-foreground)">Click Refresh or sign in to load cycle count KPIs.</div>
         </div>
 
         <!-- CHARTS -->
@@ -287,10 +297,10 @@
               </div>
             </div>
             <div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#753BBD"></span>In Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-in">—</span><span class="legend-p" id="dash-legend-in-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#f97316"></span>Low Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-low">—</span><span class="legend-p" id="dash-legend-low-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#ef4444"></span>Out of Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-out">—</span><span class="legend-p" id="dash-legend-out-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#10b981"></span>Locations Used</span><div class="legend-right"><span class="legend-n" id="dash-legend-locs">—</span><span class="legend-p"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--primary)"></span>In Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-in">—</span><span class="legend-p" id="dash-legend-in-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span>Low Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-low">—</span><span class="legend-p" id="dash-legend-low-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span>Out of Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-out">—</span><span class="legend-p" id="dash-legend-out-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span>Locations Used</span><div class="legend-right"><span class="legend-n" id="dash-legend-locs">—</span><span class="legend-p"></span></div></div>
             </div>
           </div>
         </div>
@@ -305,7 +315,7 @@
             <table class="tbl">
               <thead><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
               <tbody id="dash-low-stock-body">
-                <tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">Loading live low-stock rows…</td></tr>
+                <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)">Loading live low-stock rows…</td></tr>
               </tbody>
             </table>
             <div class="view-all-row" onclick="showView('alerts')">View All Alerts ›</div>
@@ -324,12 +334,12 @@
               <div class="task-kpi"><div class="n r" id="dash-task-overdue">—</div><div class="l">Overdue</div></div>
             </div>
             <div class="prog-bar">
-              <div class="prog-seg" style="width:64%;background:#10b981"></div>
-              <div class="prog-seg" style="width:24%;background:#753BBD"></div>
-              <div class="prog-seg" style="width:36%;background:#f97316"></div>
-              <div class="prog-seg" style="width:12%;background:#ef4444"></div>
+              <div class="prog-seg" style="width:64%;background:var(--chart-3)"></div>
+              <div class="prog-seg" style="width:24%;background:var(--primary)"></div>
+              <div class="prog-seg" style="width:36%;background:var(--chart-2)"></div>
+              <div class="prog-seg" style="width:12%;background:var(--destructive)"></div>
             </div>
-            <div style="font-size:11.5px;font-weight:700;color:#9ca3af;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Recent Tasks</div>
+            <div style="font-size:11.5px;font-weight:700;color:var(--muted-foreground);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Recent Tasks</div>
             <div class="task-rows" id="dash-task-rows">
               <div class="tasks-empty">Loading live cycle count tasks…</div>
             </div>
@@ -342,27 +352,27 @@
       <div class="view" id="view-inventory">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
           <div>
-            <div style="font-size:15px;font-weight:700;color:#1f2937" id="inv-title">Inventory</div>
-            <div style="font-size:12px;color:#6b7280" id="inv-facility-label">Select a warehouse to view live inventory</div>
+            <div style="font-size:15px;font-weight:700;color:var(--foreground)" id="inv-title">Inventory</div>
+            <div style="font-size:12px;color:var(--muted-foreground)" id="inv-facility-label">Select a warehouse to view live inventory</div>
           </div>
           <button class="btn btn-primary" onclick="loadLiveInventory()" style="font-size:12px;padding:6px 14px" id="inv-refresh-btn">Load Live Inventory</button>
         </div>
         <div class="kpi-grid" id="inv-kpis">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Records</div><div class="kpi-val" id="inv-kpi-total">—</div><div class="kpi-chg neutral" id="inv-kpi-total-sub">load to see</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Locations Used</div><div class="kpi-val" id="inv-kpi-locs">—</div><div class="kpi-chg neutral">occupied</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Items</div><div class="kpi-val" id="inv-kpi-items">—</div><div class="kpi-chg neutral">unique SKUs</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></div><div><div class="kpi-lbl">Customers</div><div class="kpi-val" id="inv-kpi-custs">—</div><div class="kpi-chg neutral">with inventory</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Records</div><div class="kpi-val" id="inv-kpi-total">—</div><div class="kpi-chg neutral" id="inv-kpi-total-sub">load to see</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Locations Used</div><div class="kpi-val" id="inv-kpi-locs">—</div><div class="kpi-chg neutral">occupied</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Items</div><div class="kpi-val" id="inv-kpi-items">—</div><div class="kpi-chg neutral">unique SKUs</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg></div><div><div class="kpi-lbl">Customers</div><div class="kpi-val" id="inv-kpi-custs">—</div><div class="kpi-chg neutral">with inventory</div></div></div>
         </div>
 
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-            <span style="font-size:13px;font-weight:600;color:#374151" id="inv-sub-title">Live Inventory</span>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="inv-sub-title">Live Inventory</span>
             <input class="cc-input" id="inv-search" placeholder="Filter by item, location, customer…" style="width:220px;font-size:12px;padding:5px 10px" oninput="invFilterTable()"/>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Location</th><th>Item</th><th>Customer</th><th>Qty</th><th>UOM</th><th>Status</th><th>Pick Type</th></tr></thead>
-              <tbody id="inv-tbody"><tr><td colspan="7" style="text-align:center;padding:40px;color:#9ca3af">Click "Load Live Inventory" to fetch data for the selected warehouse.</td></tr></tbody>
+              <tbody id="inv-tbody"><tr><td colspan="7" style="text-align:center;padding:40px;color:var(--muted-foreground)">Click "Load Live Inventory" to fetch data for the selected warehouse.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -372,10 +382,10 @@
       <!-- ════ VIEW: TASKS ════ -->
       <div class="view" id="view-tasks">
         <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg></div><div><div class="kpi-lbl">Total Tasks</div><div class="kpi-val">50</div><div class="kpi-chg neutral">Week of May 20</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val">32</div><div class="kpi-chg up">▲ 12.8%</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">In Progress</div><div class="kpi-val">12</div><div class="kpi-chg neutral">on track</div></div></div>
-          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div><div><div class="kpi-lbl">Overdue</div><div class="kpi-val">6</div><div class="kpi-chg down">action required</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg></div><div><div class="kpi-lbl">Total Tasks</div><div class="kpi-val">50</div><div class="kpi-chg neutral">Week of May 20</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val">32</div><div class="kpi-chg up">▲ 12.8%</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">In Progress</div><div class="kpi-val">12</div><div class="kpi-chg neutral">on track</div></div></div>
+          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div><div><div class="kpi-lbl">Overdue</div><div class="kpi-val">6</div><div class="kpi-chg down">action required</div></div></div>
         </div>
 
         <div class="card">
@@ -409,12 +419,12 @@
       <div class="view" id="view-calendar">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:38px;height:38px;border-radius:8px;background:#FEE2E2;display:flex;align-items:center;justify-content:center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div style="width:38px;height:38px;border-radius:8px;background:color-mix(in srgb,var(--destructive) 18%,var(--card));display:flex;align-items:center;justify-content:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <div>
-              <div style="font-size:15px;font-weight:700;color:#1f2937">Physical Inventory Calendar</div>
-              <div style="font-size:12px;color:#6b7280" id="pical-subtitle">Confirmed physical inventory dates for this facility</div>
+              <div style="font-size:15px;font-weight:700;color:var(--foreground)">Physical Inventory Calendar</div>
+              <div style="font-size:12px;color:var(--muted-foreground)" id="pical-subtitle">Confirmed physical inventory dates for this facility</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -430,17 +440,17 @@
           <div id="pical-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px"></div>
         </div>
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6">
-            <span style="font-size:13px;font-weight:600;color:#374151" id="pical-list-title">Physical inventory dates</span>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted)">
+            <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="pical-list-title">Physical inventory dates</span>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Date</th><th>Customer</th><th>Confirmation</th><th>Quote Amount</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
-              <tbody id="pical-tbody"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Click Refresh to load physical inventory dates.</td></tr></tbody>
+              <tbody id="pical-tbody"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">Click Refresh to load physical inventory dates.</td></tr></tbody>
             </table>
           </div>
         </div>
-        <div style="margin-top:12px;font-size:11px;color:#9ca3af">Cycle count schedules are managed separately under Cycle Count → Count Calendar. Only physical inventory events appear here.</div>
+        <div style="margin-top:12px;font-size:11px;color:var(--muted-foreground)">Cycle count schedules are managed separately under Cycle Count → Count Calendar. Only physical inventory events appear here.</div>
       </div>
 
       <!-- ════ VIEW: SCHEDULER ════ -->
@@ -459,9 +469,9 @@
           <div class="cc-form" style="grid-template-columns:1fr;margin-bottom:0">
             <div class="cc-field">
               <label class="cc-label">Schedule source</label>
-              <div style="display:flex;gap:0;border:1.5px solid #e5e7eb;border-radius:9px;overflow:hidden;width:fit-content">
-                <button type="button" id="sched-mode-existing-btn" onclick="setScheduleMode('existing')" style="padding:8px 16px;border:none;background:#753BBD;color:white;font-size:13px;font-weight:600;cursor:pointer">Use existing schedule</button>
-                <button type="button" id="sched-mode-new-btn" onclick="setScheduleMode('new')" style="padding:8px 16px;border:none;background:white;color:#6b7280;font-size:13px;font-weight:600;cursor:pointer;border-left:1.5px solid #e5e7eb">Create new schedule</button>
+              <div style="display:flex;gap:0;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;width:fit-content">
+                <button type="button" id="sched-mode-existing-btn" onclick="setScheduleMode('existing')" style="padding:8px 16px;border:none;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;cursor:pointer">Use existing schedule</button>
+                <button type="button" id="sched-mode-new-btn" onclick="setScheduleMode('new')" style="padding:8px 16px;border:none;background:var(--card);color:var(--muted-foreground);font-size:13px;font-weight:600;cursor:pointer;border-left:1.5px solid var(--border)">Create new schedule</button>
               </div>
             </div>
           </div>
@@ -473,19 +483,19 @@
               <select class="cc-input" id="sched-existing-select" onchange="onExistingScheduleChange()">
                 <option value="">Loading schedules…</option>
               </select>
-              <div class="scheduler-help" style="margin-top:4px" id="sched-existing-help">Loaded from <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px">POST /api/cyclecount-app/cycle-count/schedule/search-by-paging</code></div>
-              <div id="sched-existing-summary" style="margin-top:10px;display:none;padding:10px 14px;background:#F7F2FF;border:1px solid #D8C4FF;border-radius:8px;font-size:13px;color:#5F2E98"></div>
+              <div class="scheduler-help" style="margin-top:4px" id="sched-existing-help">Loaded from <code style="background:var(--muted);padding:1px 5px;border-radius:3px">POST /api/cyclecount-app/cycle-count/schedule/search-by-paging</code></div>
+              <div id="sched-existing-summary" style="margin-top:10px;display:none;padding:10px 14px;background:color-mix(in srgb,var(--primary) 10%,var(--card));border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border));border-radius:8px;font-size:13px;color:var(--primary)"></div>
             </div>
           </div>
 
           <!-- Mode: Create new / Wise schedule manager -->
           <div id="sched-new-block" style="margin-top:22px;display:none">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
-              <h2 style="margin:0;font-size:28px;font-weight:700;color:#111827">Schedule</h2>
-              <button type="button" onclick="showWiseAddScheduleForm()" style="border:none;background:transparent;color:#753BBD;font-size:16px;font-weight:700;cursor:pointer">+ Add Schedule</button>
+              <h2 style="margin:0;font-size:28px;font-weight:700;color:var(--foreground)">Schedule</h2>
+              <button type="button" onclick="showWiseAddScheduleForm()" style="border:none;background:transparent;color:var(--primary);font-size:16px;font-weight:700;cursor:pointer">+ Add Schedule</button>
             </div>
 
-            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:18px">
+            <div style="background:var(--accent);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">
               <label class="cc-label" style="display:block;margin-bottom:8px">Name</label>
               <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
                 <input type="text" class="cc-input" id="sched-wise-search-name" placeholder="Name" style="width:260px"/>
@@ -494,7 +504,7 @@
               </div>
             </div>
 
-            <div id="sched-wise-add-form" style="display:none;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:18px">
+            <div id="sched-wise-add-form" style="display:none;background:var(--accent);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px">
               <div class="cc-form" style="margin:0">
                 <div class="cc-field" style="grid-column:1 / 3">
                   <label class="cc-label"><span class="req">*</span>Schedule name</label>
@@ -512,7 +522,7 @@
                 <div class="cc-field">
                   <label class="cc-label"><span class="req">*</span>Start Time</label>
                   <input type="datetime-local" class="cc-input date" id="cc-sched-date" step="60" onchange="ccCheckScheduleDateInline()"/>
-                  <div id="cc-sched-date-warn" style="display:none;font-size:10px;color:#d97706;margin-top:4px;padding:4px 6px;background:#FEF3C7;border-radius:4px"></div>
+                  <div id="cc-sched-date-warn" style="display:none;font-size:10px;color:var(--chart-4);margin-top:4px;padding:4px 6px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:4px"></div>
                 </div>
                 <div class="cc-field">
                   <label class="cc-label"><span class="req">*</span>End Time</label>
@@ -525,27 +535,27 @@
               </div>
             </div>
 
-            <div style="border:1px solid #d1d5db;border-radius:2px;overflow:hidden">
+            <div style="border:1px solid var(--input);border-radius:2px;overflow:hidden">
               <table style="width:100%;border-collapse:collapse;font-size:14px">
                 <thead>
-                  <tr style="background:#ffffff;color:#374151;text-align:left">
-                    <th style="padding:14px 16px;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db">Name</th>
-                    <th style="padding:14px 16px;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db">Recurrence Type</th>
-                    <th style="padding:14px 16px;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db">Start Time</th>
-                    <th style="padding:14px 16px;border-right:1px solid #d1d5db;border-bottom:1px solid #d1d5db">End Time</th>
-                    <th style="padding:14px 16px;border-bottom:1px solid #d1d5db">Actions</th>
+                  <tr style="background:var(--card);color:var(--foreground);text-align:left">
+                    <th style="padding:14px 16px;border-right:1px solid var(--input);border-bottom:1px solid var(--input)">Name</th>
+                    <th style="padding:14px 16px;border-right:1px solid var(--input);border-bottom:1px solid var(--input)">Recurrence Type</th>
+                    <th style="padding:14px 16px;border-right:1px solid var(--input);border-bottom:1px solid var(--input)">Start Time</th>
+                    <th style="padding:14px 16px;border-right:1px solid var(--input);border-bottom:1px solid var(--input)">End Time</th>
+                    <th style="padding:14px 16px;border-bottom:1px solid var(--input)">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="sched-wise-table-body">
-                  <tr><td colspan="5" style="padding:26px;text-align:center;color:#6b7280;font-weight:600">No Data</td></tr>
+                  <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted-foreground);font-weight:600">No Data</td></tr>
                 </tbody>
               </table>
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-top:1px solid #d1d5db;color:#374151;font-weight:600">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-top:1px solid var(--input);color:var(--foreground);font-weight:600">
                 <span id="sched-wise-results">0 Results</span>
                 <div style="display:flex;align-items:center;gap:14px">
                   <span>Show:</span>
                   <select class="cc-input" style="width:80px;padding:8px 10px"><option>10</option><option>25</option><option>50</option></select>
-                  <span style="color:#9ca3af">‹</span><span style="background:#753BBD;color:white;border-radius:9px;padding:8px 14px">1</span><span style="color:#9ca3af">›</span>
+                  <span style="color:var(--muted-foreground)">‹</span><span style="background:var(--primary);color:var(--primary-foreground);border-radius:9px;padding:8px 14px">1</span><span style="color:var(--muted-foreground)">›</span>
                 </div>
               </div>
             </div>
@@ -625,7 +635,7 @@
                 <option value="CASE_COUNT">Case Count</option>
                 <option value="PALLET_COUNT">Pallet Count</option>
               </select>
-              <div id="cc-method-help" style="display:none;font-size:11px;color:#6b7280;margin-top:4px;padding:6px 8px;background:#f9fafb;border-radius:4px;border:1px solid #e5e7eb"></div>
+              <div id="cc-method-help" style="display:none;font-size:11px;color:var(--muted-foreground);margin-top:4px;padding:6px 8px;background:var(--accent);border-radius:4px;border:1px solid var(--border)"></div>
             </div>
             <div class="cc-field">
               <label class="cc-label">Ignore Collect Fields</label>
@@ -650,7 +660,7 @@
 
         <div class="card" id="count-lines-card">
           <div class="card-hdr">
-            <div class="card-ttl">Count Lines <span id="cc-lines-count" style="font-weight:500;color:#9ca3af;font-size:13px">(0)</span></div>
+            <div class="card-ttl">Count Lines <span id="cc-lines-count" style="font-weight:500;color:var(--muted-foreground);font-size:13px">(0)</span></div>
             <div style="display:flex;gap:8px;align-items:center">
               <span class="results-count" id="cc-lines-summary"></span>
               <button class="btn btn-secondary" onclick="openLocationModal()" id="cc-add-line-btn-2" disabled>+ Add Locations</button>
@@ -676,7 +686,7 @@
         <div class="card" id="saved-cycle-counts-card">
           <div class="card-hdr">
             <div>
-              <div class="card-ttl">Saved Cycle Counts <span id="tasks-count" style="font-weight:500;color:#9ca3af;font-size:13px">(0)</span></div>
+              <div class="card-ttl">Saved Cycle Counts <span id="tasks-count" style="font-weight:500;color:var(--muted-foreground);font-size:13px">(0)</span></div>
               <div class="scheduler-help">Tasks you've created here. Track completion % and edit any of them.</div>
             </div>
           </div>
@@ -689,17 +699,17 @@
       <!-- ════ VIEW: CYCLE COUNT ════ -->
       <div class="view" id="view-cycle">
         <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><polyline points="21 4 21 10 15 10"/></svg></div><div><div class="kpi-lbl">Total Cycle Counts</div><div class="kpi-val" id="cc-kpi-total">—</div><div class="kpi-chg neutral" id="cc-kpi-total-sub">at this facility</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Open / In Progress</div><div class="kpi-val" id="cc-kpi-open">—</div><div class="kpi-chg neutral" id="cc-kpi-open-sub">awaiting completion</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val" id="cc-kpi-done">—</div><div class="kpi-chg neutral" id="cc-kpi-done-sub">closed tickets</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg></div><div><div class="kpi-lbl">Next Scheduled Count</div><div class="kpi-val" id="cc-kpi-next" style="font-size:18px">—</div><div class="kpi-chg neutral" id="cc-kpi-next-sub">none</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><polyline points="21 4 21 10 15 10"/></svg></div><div><div class="kpi-lbl">Total Cycle Counts</div><div class="kpi-val" id="cc-kpi-total">—</div><div class="kpi-chg neutral" id="cc-kpi-total-sub">at this facility</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Open / In Progress</div><div class="kpi-val" id="cc-kpi-open">—</div><div class="kpi-chg neutral" id="cc-kpi-open-sub">awaiting completion</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val" id="cc-kpi-done">—</div><div class="kpi-chg neutral" id="cc-kpi-done-sub">closed tickets</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg></div><div><div class="kpi-lbl">Next Scheduled Count</div><div class="kpi-val" id="cc-kpi-next" style="font-size:18px">—</div><div class="kpi-chg neutral" id="cc-kpi-next-sub">none</div></div></div>
         </div>
 
         <div class="bottom-row">
           <div class="card">
             <div class="card-hdr">
               <div>
-                <div class="card-ttl">Recent Cycle Counts <span id="cc-recent-count" style="font-weight:500;color:#9ca3af;font-size:13px"></span></div>
+                <div class="card-ttl">Recent Cycle Counts <span id="cc-recent-count" style="font-weight:500;color:var(--muted-foreground);font-size:13px"></span></div>
                 <div class="scheduler-help" id="cc-recent-meta">Live from Wise · POST /api/cyclecount-app/cycle-count/count-ticket/search-by-paging</div>
               </div>
               <span class="card-link" onclick="loadCycleCountView()">↻ Refresh</span>
@@ -713,7 +723,7 @@
             <table class="tbl" id="cc-recent-tbl">
               <thead><tr><th>Ticket</th><th>Customer</th><th>Type</th><th>Method</th><th>Locations</th><th>Results</th><th>Scheduled</th><th>Created by</th><th>Status</th></tr></thead>
               <tbody id="cc-recent-body">
-                <tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Click Cycle Count in the sidebar to load…</td></tr>
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">Click Cycle Count in the sidebar to load…</td></tr>
               </tbody>
             </table>
           </div>
@@ -724,19 +734,19 @@
               <span class="card-link">Schedule Count ›</span>
             </div>
             <div>
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="font-weight:600">Zone A — High Velocity</span><span style="color:#6b7280">96% counted</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="font-weight:600">Zone A — High Velocity</span><span style="color:var(--muted-foreground)">96% counted</span></div>
               <div class="cc-progress"><div class="cc-bar"><div class="cc-bar-fill" style="width:96%"></div></div><span class="cc-pct">96%</span></div>
 
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone B — Medium Velocity</span><span style="color:#6b7280">78% counted</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone B — Medium Velocity</span><span style="color:var(--muted-foreground)">78% counted</span></div>
               <div class="cc-progress"><div class="cc-bar"><div class="cc-bar-fill" style="width:78%"></div></div><span class="cc-pct">78%</span></div>
 
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone C — Low Velocity</span><span style="color:#6b7280">82% counted</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone C — Low Velocity</span><span style="color:var(--muted-foreground)">82% counted</span></div>
               <div class="cc-progress"><div class="cc-bar"><div class="cc-bar-fill" style="width:82%"></div></div><span class="cc-pct">82%</span></div>
 
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone D — Bulk/Furniture</span><span style="color:#6b7280">64% counted</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Zone D — Bulk/Furniture</span><span style="color:var(--muted-foreground)">64% counted</span></div>
               <div class="cc-progress"><div class="cc-bar"><div class="cc-bar-fill" style="width:64%"></div></div><span class="cc-pct">64%</span></div>
 
-              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Receiving Hold</span><span style="color:#6b7280">100% counted</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin:14px 0 4px"><span style="font-weight:600">Receiving Hold</span><span style="color:var(--muted-foreground)">100% counted</span></div>
               <div class="cc-progress"><div class="cc-bar"><div class="cc-bar-fill" style="width:100%"></div></div><span class="cc-pct">100%</span></div>
             </div>
           </div>
@@ -747,9 +757,9 @@
           <table class="tbl">
             <thead><tr><th>SKU</th><th>Location</th><th>System Qty</th><th>Counted</th><th>Variance</th><th>Value</th><th>Action</th></tr></thead>
             <tbody>
-              <tr><td style="color:#9ca3af">OC-4004</td><td>D-01-02</td><td>5</td><td>2</td><td><span class="num-red">-3</span></td><td>-$540</td><td><span class="badge warn">Investigate</span></td></tr>
-              <tr><td style="color:#9ca3af">MN-5005</td><td>A-08-07</td><td>2</td><td>0</td><td><span class="num-red">-2</span></td><td>-$598</td><td><span class="badge err">Adjust</span></td></tr>
-              <tr><td style="color:#9ca3af">WB-8008</td><td>A-09-05</td><td>90</td><td>92</td><td><span class="num-green">+2</span></td><td>+$118</td><td><span class="badge warn">Review</span></td></tr>
+              <tr><td style="color:var(--muted-foreground)">OC-4004</td><td>D-01-02</td><td>5</td><td>2</td><td><span class="num-red">-3</span></td><td>-$540</td><td><span class="badge warn">Investigate</span></td></tr>
+              <tr><td style="color:var(--muted-foreground)">MN-5005</td><td>A-08-07</td><td>2</td><td>0</td><td><span class="num-red">-2</span></td><td>-$598</td><td><span class="badge err">Adjust</span></td></tr>
+              <tr><td style="color:var(--muted-foreground)">WB-8008</td><td>A-09-05</td><td>90</td><td>92</td><td><span class="num-green">+2</span></td><td>+$118</td><td><span class="badge warn">Review</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -774,8 +784,8 @@
             <button class="btn btn-secondary" onclick="exportCountApprovalCsv()">Export</button>
             <button class="btn btn-secondary" onclick="alert('Report generation is not configured yet.')">Report</button>
             <button class="btn btn-primary" onclick="alert('Select rejected result rows to create recount tasks.')">Create Recount Task</button>
-            <button class="btn" style="background:#15803d;color:white" onclick="batchApproveCountResults()">Batch Approve</button>
-            <button class="btn" style="background:#dc2626;color:white" onclick="batchRejectCountResults()">Batch Reject</button>
+            <button class="btn" style="background:var(--chart-3);color:var(--primary-foreground)" onclick="batchApproveCountResults()">Batch Approve</button>
+            <button class="btn" style="background:var(--destructive);color:var(--destructive-foreground)" onclick="batchRejectCountResults()">Batch Reject</button>
             <button class="btn btn-primary" onclick="loadCountApprovalView()">Search</button>
           </div>
         </div>
@@ -783,7 +793,7 @@
           <div class="results-wrap" style="border-radius:0;overflow:auto">
             <table class="tbl" id="cra-table" style="min-width:1400px">
               <thead><tr><th><input type="checkbox" id="cra-select-all" onchange="toggleAllApprovalRows(this.checked)"/></th><th>Task</th><th>Ticket</th><th>Location</th><th>Status</th><th>Count Type</th><th>Type</th><th>Adjustment ID</th><th>Item</th><th>Count Qty</th><th>System Qty</th><th>Diff</th></tr></thead>
-              <tbody id="cra-body"><tr><td colspan="12" style="text-align:center;padding:32px;color:#9ca3af">Click Search to load count results.</td></tr></tbody>
+              <tbody id="cra-body"><tr><td colspan="12" style="text-align:center;padding:32px;color:var(--muted-foreground)">Click Search to load count results.</td></tr></tbody>
             </table>
           </div>
           <div class="pagination"><span id="cra-results-count">0 Results</span><div class="pag-right"><span>Show:</span><select class="cc-input" id="cra-page-size" style="width:86px" onchange="loadCountApprovalView()"><option>10</option><option>25</option><option>50</option></select><button class="pag-btn" disabled>‹</button><button class="pag-btn active">1</button><button class="pag-btn" disabled>›</button></div></div>
@@ -796,8 +806,8 @@
         <div class="card" id="onto-config" style="padding:14px 18px;margin-bottom:0">
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
             <div style="flex:1;min-width:260px">
-              <div style="font-size:13px;font-weight:700;color:#1a1f2e">Ontology AI · live KPI source</div>
-              <div class="scheduler-help" style="margin-top:2px">POSTs <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px">{ontology_base_id, version_id, query}</code> with Bearer auth. Status: <span id="onto-status" style="font-weight:700;color:#9ca3af">not configured</span></div>
+              <div style="font-size:13px;font-weight:700;color:var(--foreground)">Ontology AI · live KPI source</div>
+              <div class="scheduler-help" style="margin-top:2px">POSTs <code style="background:var(--muted);padding:1px 5px;border-radius:3px">{ontology_base_id, version_id, query}</code> with Bearer auth. Status: <span id="onto-status" style="font-weight:700;color:var(--muted-foreground)">not configured</span></div>
             </div>
             <button class="btn btn-secondary" onclick="configureOntology()" style="font-size:12.5px">⚙ Configure URL + token</button>
             <button class="btn btn-primary" onclick="loadRobotKpisFromOntology()" id="onto-refresh-btn" style="font-size:12.5px">↻ Refresh KPIs</button>
@@ -818,16 +828,16 @@
             <div class="cc-field" style="margin:0"><label class="cc-label">Yard</label><input class="cc-input" id="robot-scan-yard" value="yard-25"/></div>
             <div class="cc-field" style="margin:0"><label class="cc-label">Zone</label><input class="cc-input" id="robot-scan-zone" value="Bay1"/></div>
           </div>
-          <div id="robot-inventory-status" style="font-size:12px;color:#6b7280;margin-bottom:10px">Click Load Scan to fetch robot count inventory.</div>
+          <div id="robot-inventory-status" style="font-size:12px;color:var(--muted-foreground);margin-bottom:10px">Click Load Scan to fetch robot count inventory.</div>
           <div id="robot-inventory-summary" class="kpi-grid" style="display:none;margin-top:10px"></div>
-          <div id="robot-inventory-table" style="margin-top:12px;max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;display:none"></div>
+          <div id="robot-inventory-table" style="margin-top:12px;max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:8px;display:none"></div>
         </div>
 
         <div class="kpi-grid" style="margin-top:15px">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div><div><div class="kpi-lbl">Fleet Size</div><div class="kpi-val" id="rk-fleet">12</div><div class="kpi-chg neutral" id="rk-fleet-sub">2 retired, 1 inbound</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Active Now</div><div class="kpi-val" id="rk-active">8</div><div class="kpi-chg up" id="rk-active-sub">66.7% utilization</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="kpi-lbl">Charging / Idle</div><div class="kpi-val" id="rk-charging">3</div><div class="kpi-chg neutral" id="rk-charging-sub">Avg 78% battery</div></div></div>
-          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg></div><div><div class="kpi-lbl">Out of Service</div><div class="kpi-val" id="rk-down">1</div><div class="kpi-chg down" id="rk-down-sub">R-04 · drive fault</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div><div><div class="kpi-lbl">Fleet Size</div><div class="kpi-val" id="rk-fleet">12</div><div class="kpi-chg neutral" id="rk-fleet-sub">2 retired, 1 inbound</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Active Now</div><div class="kpi-val" id="rk-active">8</div><div class="kpi-chg up" id="rk-active-sub">66.7% utilization</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="kpi-lbl">Charging / Idle</div><div class="kpi-val" id="rk-charging">3</div><div class="kpi-chg neutral" id="rk-charging-sub">Avg 78% battery</div></div></div>
+          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg></div><div><div class="kpi-lbl">Out of Service</div><div class="kpi-val" id="rk-down">1</div><div class="kpi-chg down" id="rk-down-sub">R-04 · drive fault</div></div></div>
         </div>
 
         <div class="charts-row">
@@ -842,11 +852,11 @@
             <div class="card-hdr">
               <div class="card-ttl">Fleet Status</div>
             </div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#10b981"></span>Active</span><div class="legend-right"><span class="legend-n">8</span><span class="legend-p">(66.7%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#f97316"></span>Charging</span><div class="legend-right"><span class="legend-n">2</span><span class="legend-p">(16.7%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#9ca3af"></span>Idle</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:#ef4444"></span>Out of Service</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
-            <div style="margin-top:14px;padding-top:14px;border-top:1px solid #f3f4f6;font-size:12px;color:#6b7280">Total picks today: <strong style="color:#1a1f2e">14,820</strong> · Avg uptime: <strong style="color:#10b981">94.2%</strong></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span>Active</span><div class="legend-right"><span class="legend-n">8</span><span class="legend-p">(66.7%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span>Charging</span><div class="legend-right"><span class="legend-n">2</span><span class="legend-p">(16.7%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--muted-foreground)"></span>Idle</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span>Out of Service</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--muted);font-size:12px;color:var(--muted-foreground)">Total picks today: <strong style="color:var(--foreground)">14,820</strong> · Avg uptime: <strong style="color:var(--chart-3)">94.2%</strong></div>
           </div>
         </div>
 
@@ -942,7 +952,7 @@
             <button class="btn btn-primary" onclick="abcSyncFromWms()">Sync from WMS</button>
             <button class="btn btn-secondary" onclick="abcRunAnalysis()">Run Analysis</button>
             <button class="btn btn-secondary" onclick="abcRefreshAll()">Refresh Results</button>
-            <span id="abc-status" style="font-size:12px;color:#6b7280"></span>
+            <span id="abc-status" style="font-size:12px;color:var(--muted-foreground)"></span>
           </div>
         </div>
 
@@ -960,7 +970,7 @@
             <div><div class="card-ttl">ABC Item Analysis</div><div class="scheduler-help">Searchable latest calculation results for the selected facility and customer.</div></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="cc-input" id="abc-search" placeholder="Search SKU" oninput="abcRenderItems()" style="width:180px"/><select class="cc-input" id="abc-filter-class" onchange="abcRenderItems()" style="width:120px"><option value="">All ABC</option><option>A</option><option>B</option><option>C</option></select></div>
           </div>
-          <div style="overflow:auto"><table class="data-table" style="min-width:1150px"><thead><tr><th>SKU</th><th>ABC</th><th>Trend</th><th>Outbound Units</th><th>Pick Lines</th><th>Inbound Units</th><th>Cube Velocity</th><th>Slotting Score</th><th>Recommended Storage</th><th>Priority</th><th>Status</th></tr></thead><tbody id="abc-items-body"><tr><td colspan="11" style="text-align:center;padding:28px;color:#9ca3af">Select a customer and run or refresh analysis.</td></tr></tbody></table></div>
+          <div style="overflow:auto"><table class="data-table" style="min-width:1150px"><thead><tr><th>SKU</th><th>ABC</th><th>Trend</th><th>Outbound Units</th><th>Pick Lines</th><th>Inbound Units</th><th>Cube Velocity</th><th>Slotting Score</th><th>Recommended Storage</th><th>Priority</th><th>Status</th></tr></thead><tbody id="abc-items-body"><tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted-foreground)">Select a customer and run or refresh analysis.</td></tr></tbody></table></div>
         </div>
 
         <div class="card" style="margin-bottom:16px">
@@ -968,7 +978,7 @@
             <div><div class="card-ttl">Re-Slotting Workbench</div><div class="scheduler-help">Approve, reject, or assign recommendations. Approved recommendations can be converted into Re-Slot Inventory tasks in a later integration phase.</div></div>
             <button class="btn btn-secondary" onclick="abcExportRecommendations()" style="font-size:12px">Export CSV</button>
           </div>
-          <div style="overflow:auto"><table class="data-table" style="min-width:1150px"><thead><tr><th>SKU</th><th>Current</th><th>Recommended</th><th>Reason</th><th>Priority</th><th>Approval</th><th>Assigned</th><th>Actions</th></tr></thead><tbody id="abc-recs-body"><tr><td colspan="8" style="text-align:center;padding:28px;color:#9ca3af">No recommendations loaded.</td></tr></tbody></table></div>
+          <div style="overflow:auto"><table class="data-table" style="min-width:1150px"><thead><tr><th>SKU</th><th>Current</th><th>Recommended</th><th>Reason</th><th>Priority</th><th>Approval</th><th>Assigned</th><th>Actions</th></tr></thead><tbody id="abc-recs-body"><tr><td colspan="8" style="text-align:center;padding:28px;color:var(--muted-foreground)">No recommendations loaded.</td></tr></tbody></table></div>
         </div>
 
         <div class="card" style="margin-bottom:16px">
@@ -1001,21 +1011,21 @@
       <!-- ════ VIEW: REPORTS ════ -->
       <div class="view" id="view-reports">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-          <div style="width:38px;height:38px;border-radius:8px;background:#F3EEFF;display:flex;align-items:center;justify-content:center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5F2E98" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <div style="width:38px;height:38px;border-radius:8px;background:color-mix(in srgb,var(--primary) 10%,var(--card));display:flex;align-items:center;justify-content:center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </div>
           <div>
-            <div style="font-size:16px;font-weight:700;color:#1f2937">Cycle Count Daily Report</div>
-            <div style="font-size:12px;color:#6b7280" id="rpt-subtitle">Today's cycle count metrics — <span id="rpt-fac-label"></span></div>
+            <div style="font-size:16px;font-weight:700;color:var(--foreground)">Cycle Count Daily Report</div>
+            <div style="font-size:12px;color:var(--muted-foreground)" id="rpt-subtitle">Today's cycle count metrics — <span id="rpt-fac-label"></span></div>
           </div>
         </div>
 
         <!-- KPIs -->
         <div class="kpi-grid" style="margin-bottom:16px" id="rpt-kpis">
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><polyline points="21 4 21 10 15 10"/></svg></div><div><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="rpt-kpi-sched">—</div><div class="kpi-chg neutral">today</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val" id="rpt-kpi-done">—</div><div class="kpi-chg neutral">with results</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Open / In Progress</div><div class="kpi-val" id="rpt-kpi-open">—</div><div class="kpi-chg neutral">active</div></div></div>
-          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="kpi-lbl">Exceptions</div><div class="kpi-val" id="rpt-kpi-exc">—</div><div class="kpi-chg neutral">empty/invalid/cancelled</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><polyline points="21 4 21 10 15 10"/></svg></div><div><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="rpt-kpi-sched">—</div><div class="kpi-chg neutral">today</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed</div><div class="kpi-val" id="rpt-kpi-done">—</div><div class="kpi-chg neutral">with results</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Open / In Progress</div><div class="kpi-val" id="rpt-kpi-open">—</div><div class="kpi-chg neutral">active</div></div></div>
+          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="kpi-lbl">Exceptions</div><div class="kpi-val" id="rpt-kpi-exc">—</div><div class="kpi-chg neutral">empty/invalid/cancelled</div></div></div>
         </div>
 
         <!-- Actions -->
@@ -1026,24 +1036,24 @@
 
         <!-- Detail Table -->
         <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6">
-            <span style="font-size:13px;font-weight:600;color:#374151" id="rpt-table-title">Cycle Count Tickets — Today</span>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted)">
+            <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="rpt-table-title">Cycle Count Tickets — Today</span>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Ticket</th><th>Customer</th><th>Type</th><th>Method</th><th>Locations</th><th>Status</th><th>Results</th><th>Scheduled</th></tr></thead>
-              <tbody id="rpt-tbody"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Click "Generate Report" to load today's cycle count data.</td></tr></tbody>
+              <tbody id="rpt-tbody"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">Click "Generate Report" to load today's cycle count data.</td></tr></tbody>
             </table>
           </div>
         </div>
 
         <!-- Daily Email Automation -->
-        <div class="card" style="padding:20px;border-left:4px solid #753BBD">
-          <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:4px">Daily Email Automation</div>
-          <div style="font-size:11px;color:#6b7280;margin-bottom:12px">Configure daily cycle count report delivery. Daily email delivery requires backend/assistant scheduled automation; this page stores recipients and report preferences.</div>
+        <div class="card" style="padding:20px;border-left:4px solid var(--primary)">
+          <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:4px">Daily Email Automation</div>
+          <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:12px">Configure daily cycle count report delivery. Daily email delivery requires backend/assistant scheduled automation; this page stores recipients and report preferences.</div>
           <div class="set-row"><div><div class="lbl">Enabled</div><div class="desc">Activate daily report email</div></div><div class="toggle" id="rpt-email-toggle" onclick="this.classList.toggle('on'); rptSaveEmailConfig()"></div></div>
-          <div class="set-row"><div><div class="lbl">Send Time</div><div class="desc">Based on warehouse local timezone</div></div><span style="font-size:13px;color:#374151;font-weight:600">7:00 AM warehouse local time (America/Los_Angeles)</span></div>
-          <div class="set-row"><div><div class="lbl">Facility Scope</div></div><span style="font-size:12px;color:#374151" id="rpt-email-facility">Current: <span id="rpt-email-fac-name"></span></span></div>
+          <div class="set-row"><div><div class="lbl">Send Time</div><div class="desc">Based on warehouse local timezone</div></div><span style="font-size:13px;color:var(--foreground);font-weight:600">7:00 AM warehouse local time (America/Los_Angeles)</span></div>
+          <div class="set-row"><div><div class="lbl">Facility Scope</div></div><span style="font-size:12px;color:var(--foreground)" id="rpt-email-facility">Current: <span id="rpt-email-fac-name"></span></span></div>
           <div style="margin-top:12px">
             <label class="cc-label">Recipient Emails</label>
             <div style="display:flex;gap:8px;align-items:start">
@@ -1059,8 +1069,8 @@
         <div class="card" style="margin-top:20px;padding:20px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
             <div>
-              <div style="font-size:15px;font-weight:700;color:#1f2937">Inventory Month-End Comparison</div>
-              <div style="font-size:12px;color:#6b7280" id="eom-subtitle">Compare total ILP by customer between two month-end dates</div>
+              <div style="font-size:15px;font-weight:700;color:var(--foreground)">Inventory Month-End Comparison</div>
+              <div style="font-size:12px;color:var(--muted-foreground)" id="eom-subtitle">Compare total ILP by customer between two month-end dates</div>
             </div>
             <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
               <div class="cc-field" style="margin:0"><label class="cc-label">Date A (prior month-end)</label><input type="date" class="cc-input" id="eom-date-a" style="font-size:11px"/></div>
@@ -1070,26 +1080,26 @@
             </div>
           </div>
           <div id="eom-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-            <div style="padding:10px;background:#f9fafb;border-radius:8px;text-align:center"><div style="font-solor:#6b7280">Date A Total ILP</div><div style="font-size:18px;font-weight:700;color:#1f2937" id="eom-total-a">—</div></div>
-            <div style="padding:10px;background:#f9fafb;border-radius:8px;text-align:center"><div style="font-size:11px;color:#6b7280">Date B Total ILP</div><div style="font-size:18px;font-weight:700;color:#1f2937" id="eom-total-b">—</div></div>
-            <div style="padding:10px;background:#f9fafb;border-radius:8px;text-align:center"><div style="font-size:11px;color:#6b7280">Variance</div><div style="font-size:18px;font-weight:700" id="eom-variance">—</div></div>
-            <div style="padding:10px;background:#f9fafb;border-radius:8px;text-align:center"><div style="font-size:11px;color:#6b7280">Variance %</div><div style="font-size:18px;font-weight:700" id="eom-variance-pct">—</div></div>
+            <div style="padding:10px;background:var(--accent);border-radius:8px;text-align:center"><div style="font-solor:var(--muted-foreground)">Date A Total ILP</div><div style="font-size:18px;font-weight:700;color:var(--foreground)" id="eom-total-a">—</div></div>
+            <div style="padding:10px;background:var(--accent);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--muted-foreground)">Date B Total ILP</div><div style="font-size:18px;font-weight:700;color:var(--foreground)" id="eom-total-b">—</div></div>
+            <div style="padding:10px;background:var(--accent);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--muted-foreground)">Variance</div><div style="font-size:18px;font-weight:700" id="eom-variance">—</div></div>
+            <div style="padding:10px;background:var(--accent);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--muted-foreground)">Variance %</div><div style="font-size:18px;font-weight:700" id="eom-variance-pct">—</div></div>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Customer</th><th>Date A ILP</th><th>Date B ILP</th><th>Variance</th><th>Variance %</th></tr></thead>
-              <tbody id="eom-tbody"><tr><td colspan="5" style="text-align:center;padding:32px;color:#9ca3af">Select dates and click Compare to generate month-end inventory comparison.</td></tr></tbody>
+              <tbody id="eom-tbody"><tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted-foreground)">Select dates and click Compare to generate month-end inventory comparison.</td></tr></tbody>
             </table>
           </div>
-          <div style="font-size:10px;color:#9ca3af;margin-top:8px" id="eom-note"></div>
+          <div style="font-size:10px;color:var(--muted-foreground);margin-top:8px" id="eom-note"></div>
         </div>
       </div>
       <div class="view" id="view-alerts">
         <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div><div><div class="kpi-lbl">Critical Alerts</div><div class="kpi-val">3</div><div class="kpi-chg down">Action required</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div><div><div class="kpi-lbl">Warnings</div><div class="kpi-val">12</div><div class="kpi-chg neutral">Low stock / variances</div></div></div>
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg></div><div><div class="kpi-lbl">Info</div><div class="kpi-val">28</div><div class="kpi-chg neutral">PO acks, sync events</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Resolved Today</div><div class="kpi-val">17</div><div class="kpi-chg up">▲ vs 11 yesterday</div></div></div>
+          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div><div><div class="kpi-lbl">Critical Alerts</div><div class="kpi-val">3</div><div class="kpi-chg down">Action required</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></div><div><div class="kpi-lbl">Warnings</div><div class="kpi-val">12</div><div class="kpi-chg neutral">Low stock / variances</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg></div><div><div class="kpi-lbl">Info</div><div class="kpi-val">28</div><div class="kpi-chg neutral">PO acks, sync events</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Resolved Today</div><div class="kpi-val">17</div><div class="kpi-chg up">▲ vs 11 yesterday</div></div></div>
         </div>
 
         <div class="card">
@@ -1112,31 +1122,31 @@
       <div class="view" id="view-settings">
         <div style="max-width:900px;margin:0 auto">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-            <div style="width:38px;height:38px;border-radius:8px;background:#F3F4F6;display:flex;align-items:center;justify-content:center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <div style="width:38px;height:38px;border-radius:8px;background:var(--muted);display:flex;align-items:center;justify-content:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--foreground)" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </div>
             <div>
-              <div style="font-size:16px;font-weight:700;color:#1f2937">Admin Settings</div>
-              <div style="font-size:12px;color:#6b7280">Dashboard preferences and security configuration</div>
+              <div style="font-size:16px;font-weight:700;color:var(--foreground)">Admin Settings</div>
+              <div style="font-size:12px;color:var(--muted-foreground)">Dashboard preferences and security configuration</div>
             </div>
           </div>
 
           <!-- General Dashboard -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">General Dashboard</div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">General Dashboard</div>
             <div class="set-row"><div><div class="lbl">Default Facility</div><div class="desc">Used on page load when no saved preference exists</div></div><select class="cc-input" id="adm-default-facility" style="width:220px;font-size:12px" onchange="admSave()"></select></div>
-            <div class="set-row"><div><div class="lbl">Timezone Display</div><div class="desc">All dates/times displayed in this timezone</div></div><span style="font-size:13px;color:#374151;font-weight:600">America/Los_Angeles</span></div>
-            <div class="set-row"><div><div class="lbl">Last Data Sync</div><div class="desc">Most recent successful WMS API connection</div></div><span style="font-size:12px;color:#6b7280" id="adm-last-sync">—</span></div>
+            <div class="set-row"><div><div class="lbl">Timezone Display</div><div class="desc">All dates/times displayed in this timezone</div></div><span style="font-size:13px;color:var(--foreground);font-weight:600">America/Los_Angeles</span></div>
+            <div class="set-row"><div><div class="lbl">Last Data Sync</div><div class="desc">Most recent successful WMS API connection</div></div><span style="font-size:12px;color:var(--muted-foreground)" id="adm-last-sync">—</span></div>
           </div>
 
           <!-- Security & Action Passwords -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:4px">Security &amp; Action Password (Per Facility)</div>
-            <div style="font-size:11px;color:#6b7280;margin-bottom:12px">Action password is per-facility. It protects Location Tag edits, VLG Management edits, and Replenishment task creation. Stored locally in this browser. For security, user-entered passwords are not shown. Owner can reveal/reset the facility password.</div>
-            <div class="set-row"><div><div class="lbl">Current Facility</div></div><span style="font-size:12px;color:#753BBD;font-weight:600" id="adm-pw-facility-label">—</span></div>
-            <div class="set-row"><div><div class="lbl">Facility Password</div></div><span style="font-size:12px;color:#6b7280;cursor:pointer" id="adm-pw-reveal" onclick="admRevealPassword()" title="Click to reveal for 3 seconds">•••••••• (click to reveal)</span></div>
-            <div style="margin-top:12px;padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
-              <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Change Facility Action Password</div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:4px">Security &amp; Action Password (Per Facility)</div>
+            <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:12px">Action password is per-facility. It protects Location Tag edits, VLG Management edits, and Replenishment task creation. Stored locally in this browser. For security, user-entered passwords are not shown. Owner can reveal/reset the facility password.</div>
+            <div class="set-row"><div><div class="lbl">Current Facility</div></div><span style="font-size:12px;color:var(--primary);font-weight:600" id="adm-pw-facility-label">—</span></div>
+            <div class="set-row"><div><div class="lbl">Facility Password</div></div><span style="font-size:12px;color:var(--muted-foreground);cursor:pointer" id="adm-pw-reveal" onclick="admRevealPassword()" title="Click to reveal for 3 seconds">•••••••• (click to reveal)</span></div>
+            <div style="margin-top:12px;padding:12px;background:var(--accent);border-radius:8px;border:1px solid var(--border)">
+              <div style="font-size:12px;font-weight:600;color:var(--foreground);margin-bottom:8px">Change Facility Action Password</div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
                 <div class="cc-field" style="margin:0"><label class="cc-label">Current Password</label><input type="password" class="cc-input" id="adm-pw-current" placeholder="Enter current"/></div>
                 <div class="cc-field" style="margin:0"><label class="cc-label">New Password</label><input type="password" class="cc-input" id="adm-pw-new" placeholder="Enter new"/></div>
@@ -1148,67 +1158,67 @@
 
           <!-- User Access -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:4px">User Access (Per Facility)</div>
-            <div style="font-size:11px;color:#6b7280;margin-bottom:12px">Grant individual users access to protected actions at the current facility. Owner (bescobar) always has access. This is a dashboard-local access policy stored in this browser.</div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:4px">User Access (Per Facility)</div>
+            <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:12px">Grant individual users access to protected actions at the current facility. Owner (bescobar) always has access. This is a dashboard-local access policy stored in this browser.</div>
             <div id="adm-user-access-list" style="margin-bottom:12px"></div>
-            <div style="padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">
-              <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:8px">Add User Access</div>
+            <div style="padding:12px;background:var(--accent);border-radius:8px;border:1px solid var(--border)">
+              <div style="font-size:12px;font-weight:600;color:var(--foreground);margin-bottom:8px">Add User Access</div>
               <div style="display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end">
                 <div class="cc-field" style="margin:0"><label class="cc-label">Username (IAM)</label><input class="cc-input" id="adm-add-username" placeholder="e.g. jsmith"/></div>
                 <div class="cc-field" style="margin:0"><label class="cc-label">User Action Password</label><input type="password" class="cc-input" id="adm-add-user-password" placeholder="Password for this user"/></div>
                 <div style="display:flex;gap:8px;align-items:center;font-size:11px;padding-bottom:4px">
-                  <label><input type="checkbox" id="adm-mod-ltag" checked style="accent-color:#753BBD"/> Location Tag</label>
-                  <label><input type="checkbox" id="adm-mod-vlg" checked style="accent-color:#753BBD"/> VLG</label>
-                  <label><input type="checkbox" id="adm-mod-replen" checked style="accent-color:#753BBD"/> Replen Create</label>
+                  <label><input type="checkbox" id="adm-mod-ltag" checked style="accent-color:var(--primary)"/> Location Tag</label>
+                  <label><input type="checkbox" id="adm-mod-vlg" checked style="accent-color:var(--primary)"/> VLG</label>
+                  <label><input type="checkbox" id="adm-mod-replen" checked style="accent-color:var(--primary)"/> Replen Create</label>
                 </div>
                 <button class="btn btn-primary" onclick="admAddUser()" style="font-size:12px;padding:6px 14px;height:36px">Add User</button>
               </div>
-              <div style="font-size:10px;color:#9ca3af;margin-top:6px">Each user can have a separate action password. Passwords are stored locally in this browser and are never displayed.</div>
+              <div style="font-size:10px;color:var(--muted-foreground);margin-top:6px">Each user can have a separate action password. Passwords are stored locally in this browser and are never displayed.</div>
             </div>
           </div>
 
           <!-- Facility Access -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Facility Access</div>
-            <div class="set-row"><div><div class="lbl">Available Warehouses</div><div class="desc">Facilities from static list + IAM JWT permissions</div></div><span style="font-size:13px;font-weight:600;color:#753BBD" id="adm-fac-count">—</span></div>
-            <div style="max-height:150px;overflow-y:auto;margin-top:8px;padding:8px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;font-size:11px;color:#374151" id="adm-fac-list"></div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">Facility Access</div>
+            <div class="set-row"><div><div class="lbl">Available Warehouses</div><div class="desc">Facilities from static list + IAM JWT permissions</div></div><span style="font-size:13px;font-weight:600;color:var(--primary)" id="adm-fac-count">—</span></div>
+            <div style="max-height:150px;overflow-y:auto;margin-top:8px;padding:8px;background:var(--accent);border-radius:6px;border:1px solid var(--border);font-size:11px;color:var(--foreground)" id="adm-fac-list"></div>
           </div>
 
           <!-- Cycle Count Settings -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Cycle Count Guardrails</div>
-            <div style="font-size:11px;color:#6b7280;margin-bottom:10px">These are enforced operational guardrails and cannot be disabled from the dashboard.</div>
-            <div class="set-row"><div><div class="lbl">Schedule date</div><div class="desc">Tasks are created for the selected start date/time</div></div><span style="font-size:11px;color:#059669;font-weight:600">Flexible ✓</span></div>
-            <div class="set-row"><div><div class="lbl">One ticket + one task per schedule/day</div><div class="desc">Prevents duplicate tickets for the same customer/day</div></div><span style="font-size:11px;color:#059669;font-weight:600">Enforced ✓</span></div>
-            <div class="set-row"><div><div class="lbl">Require RF locations on BY_LOCATION tickets</div><div class="desc">Tasks must have valid locationId for RF scan</div></div><span style="font-size:11px;color:#059669;font-weight:600">Enforced ✓</span></div>
-            <div class="set-row"><div><div class="lbl">Completed requires count results</div><div class="desc">Zero-result completed tickets allow regeneration</div></div><span style="font-size:11px;color:#059669;font-weight:600">Enforced ✓</span></div>
-            <div class="set-row"><div><div class="lbl">Prior-day active tickets do not block today</div><div class="desc">Yesterday's open tasks shown as warning only</div></div><span style="font-size:11px;color:#059669;font-weight:600">Enforced ✓</span></div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">Cycle Count Guardrails</div>
+            <div style="font-size:11px;color:var(--muted-foreground);margin-bottom:10px">These are enforced operational guardrails and cannot be disabled from the dashboard.</div>
+            <div class="set-row"><div><div class="lbl">Schedule date</div><div class="desc">Tasks are created for the selected start date/time</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Flexible ✓</span></div>
+            <div class="set-row"><div><div class="lbl">One ticket + one task per schedule/day</div><div class="desc">Prevents duplicate tickets for the same customer/day</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Enforced ✓</span></div>
+            <div class="set-row"><div><div class="lbl">Require RF locations on BY_LOCATION tickets</div><div class="desc">Tasks must have valid locationId for RF scan</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Enforced ✓</span></div>
+            <div class="set-row"><div><div class="lbl">Completed requires count results</div><div class="desc">Zero-result completed tickets allow regeneration</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Enforced ✓</span></div>
+            <div class="set-row"><div><div class="lbl">Prior-day active tickets do not block today</div><div class="desc">Yesterday's open tasks shown as warning only</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Enforced ✓</span></div>
           </div>
 
           <!-- Replenishment Settings -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Replenishment Suggestions</div>
-            <div class="set-row"><div><div class="lbl">Default autonomous mode</div><div class="desc">Mode selected when page opens</div></div><span style="font-size:12px;color:#374151">Read-only suggestions</span></div>
-            <div class="set-row"><div><div class="lbl">Require password before task creation</div><div class="desc">Action password required for Suggest+confirm, Auto-create modes</div></div><span style="font-size:11px;color:#059669;font-weight:600">Enforced ✓</span></div>
-            <div class="set-row"><div><div class="lbl">Auto + dispatch mode</div><div class="desc">High-risk autonomous dispatch</div></div><span style="font-size:11px;color:#dc2626;font-weight:600">Locked — requires operations approval</span></div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">Replenishment Suggestions</div>
+            <div class="set-row"><div><div class="lbl">Default autonomous mode</div><div class="desc">Mode selected when page opens</div></div><span style="font-size:12px;color:var(--foreground)">Read-only suggestions</span></div>
+            <div class="set-row"><div><div class="lbl">Require password before task creation</div><div class="desc">Action password required for Suggest+confirm, Auto-create modes</div></div><span style="font-size:11px;color:var(--chart-3);font-weight:600">Enforced ✓</span></div>
+            <div class="set-row"><div><div class="lbl">Auto + dispatch mode</div><div class="desc">High-risk autonomous dispatch</div></div><span style="font-size:11px;color:var(--destructive);font-weight:600">Locked — requires operations approval</span></div>
           </div>
 
           <!-- Calendar PI Settings -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Calendar PI</div>
-            <div class="set-row"><div><div class="lbl">Storage</div><div class="desc">Physical inventory dates are saved locally in this browser</div></div><span style="font-size:12px;color:#6b7280">localStorage (per facility)</span></div>
-            <div class="set-row"><div><div class="lbl">Default confirmation status</div><div class="desc">Applied to new physical inventory dates</div></div><span style="font-size:12px;color:#374151">Pending</span></div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">Calendar PI</div>
+            <div class="set-row"><div><div class="lbl">Storage</div><div class="desc">Physical inventory dates are saved locally in this browser</div></div><span style="font-size:12px;color:var(--muted-foreground)">localStorage (per facility)</span></div>
+            <div class="set-row"><div><div class="lbl">Default confirmation status</div><div class="desc">Applied to new physical inventory dates</div></div><span style="font-size:12px;color:var(--foreground)">Pending</span></div>
           </div>
 
           <!-- Export/Import/Reset -->
           <div class="card" style="margin-bottom:16px;padding:20px">
-            <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:12px">Data Management</div>
+            <div style="font-size:14px;font-weight:700;color:var(--foreground);margin-bottom:12px">Data Management</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-secondary" onclick="admExportSettings()" style="font-size:12px;padding:6px 14px">Export Settings JSON</button>
               <label class="btn btn-secondary" style="font-size:12px;padding:6px 14px;cursor:pointer">Import Settings<input type="file" accept=".json" onchange="admImportSettings(event)" style="display:none"/></label>
-              <button class="btn btn-secondary" onclick="admResetSettings()" style="font-size:12px;padding:6px 14px;color:#dc2626;border-color:#fecaca">Reset All Settings</button>
+              <button class="btn btn-secondary" onclick="admResetSettings()" style="font-size:12px;padding:6px 14px;color:var(--destructive);border-color:color-mix(in srgb,var(--destructive) 32%,var(--border))">Reset All Settings</button>
             </div>
-            <div style="font-size:11px;color:#9ca3af;margin-top:8px">Export does not include the action password for security. Import will not overwrite your current password.</div>
+            <div style="font-size:11px;color:var(--muted-foreground);margin-top:8px">Export does not include the action password for security. Import will not overwrite your current password.</div>
           </div>
         </div>
       </div>
@@ -1217,15 +1227,15 @@
       <div class="view" id="view-consolidation">
         <!-- KPI Summary -->
         <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg></div><div><div class="kpi-lbl">Pending</div><div class="kpi-val" id="consol-kpi-pending">—</div><div class="kpi-chg neutral">awaiting action</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="consol-kpi-progress">—</div><div class="kpi-chg neutral">active moves</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed Today</div><div class="kpi-val" id="consol-kpi-done">—</div><div class="kpi-chg neutral">consolidations closed</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Tasks</div><div class="kpi-val" id="consol-kpi-total">—</div><div class="kpi-chg neutral">all consolidation</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg></div><div><div class="kpi-lbl">Pending</div><div class="kpi-val" id="consol-kpi-pending">—</div><div class="kpi-chg neutral">awaiting action</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="consol-kpi-progress">—</div><div class="kpi-chg neutral">active moves</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Completed Today</div><div class="kpi-val" id="consol-kpi-done">—</div><div class="kpi-chg neutral">consolidations closed</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Tasks</div><div class="kpi-val" id="consol-kpi-total">—</div><div class="kpi-chg neutral">all consolidation</div></div></div>
         </div>
 
         <!-- BULK / Rack Tabs -->
         <div class="card" style="padding:0;overflow:visible">
-          <div style="display:flex;align-items:center;border-bottom:1px solid #e5e7eb;padding:0 16px;gap:0">
+          <div style="display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 16px;gap:0">
             <button id="consol-tab-bulk" class="consol-tab active" onclick="consolSwitchTab('bulk')">BULK</button>
             <button id="consol-tab-rack" class="consol-tab" onclick="consolSwitchTab('rack')">Rack</button>
             <div style="flex:1"></div>
@@ -1233,7 +1243,7 @@
           </div>
 
           <!-- Filters row -->
-          <div style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #f3f4f6">
+          <div style="padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--muted)">
             <input id="consol-filter-search" type="text" class="cc-input" placeholder="Search by batch, customer, location..." style="width:220px;font-size:12px;padding:6px 10px;margin:0" oninput="consolApplyClientFilter()"/>
             <select id="consol-filter-status" class="cc-input" style="width:140px;font-size:12px;padding:6px 10px;margin:0" onchange="consolRefresh()">
               <option value="">All Statuses</option>
@@ -1249,7 +1259,7 @@
               <option value="BY_DEPARTMENT">By Department</option>
               <option value="BY_CUSTOMER">By Customer</option>
             </select>
-            <span id="consol-result-count" style="font-size:11px;color:#9ca3af;margin-left:auto"></span>
+            <span id="consol-result-count" style="font-size:11px;color:var(--muted-foreground);margin-left:auto"></span>
           </div>
 
           <!-- BULK Panel -->
@@ -1257,8 +1267,8 @@
             <table class="tbl" style="margin:0">
               <thead><tr><th>Task ID</th><th>Batch</th><th>Customer</th><th>Type</th><th>Destination</th><th>Items</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Updated</th></tr></thead>
               <tbody id="consol-bulk-body">
-                <tr><td colspan="10" style="text-align:center;padding:40px;color:#9ca3af">
-                  <div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div>
+                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted-foreground)">
+                  <div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div>
                   Loading BULK consolidation tasks...
                 </td></tr>
               </tbody>
@@ -1270,8 +1280,8 @@
             <table class="tbl" style="margin:0">
               <thead><tr><th>Task ID</th><th>Batch</th><th>Customer</th><th>Type</th><th>Destination</th><th>Items</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Updated</th></tr></thead>
               <tbody id="consol-rack-body">
-                <tr><td colspan="10" style="text-align:center;padding:40px;color:#9ca3af">
-                  <div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+                <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted-foreground)">
+                  <div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
                   Loading Rack consolidation tasks...
                 </td></tr>
               </tbody>
@@ -1279,8 +1289,8 @@
           </div>
 
           <!-- Pagination -->
-          <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f3f4f6">
-            <span id="consol-page-info" style="font-size:11px;color:#9ca3af">Page 1</span>
+          <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--muted)">
+            <span id="consol-page-info" style="font-size:11px;color:var(--muted-foreground)">Page 1</span>
             <div style="display:flex;gap:6px">
               <button class="btn btn-secondary" id="consol-prev-btn" onclick="consolPagePrev()" disabled style="font-size:11px;padding:4px 10px">← Prev</button>
               <button class="btn btn-secondary" id="consol-next-btn" onclick="consolPageNext()" style="font-size:11px;padding:4px 10px">Next →</button>
@@ -1305,8 +1315,8 @@
         </div>
 
         <!-- Sticky selection bar -->
-        <div id="consol-selection-bar" style="display:none;position:sticky;bottom:0;padding:12px 20px;background:linear-gradient(to right,#F7F2FF,#fff);border:1.5px solid #E8DAFF;border-radius:10px;margin-top:12px;align-items:center;justify-content:space-between;box-shadow:0 -2px 12px rgba(117,59,189,.08)">
-          <span id="consol-sel-count" style="font-size:13px;font-weight:600;color:#5F2E98">0 items selected</span>
+        <div id="consol-selection-bar" style="display:none;position:sticky;bottom:0;padding:12px 20px;background:linear-gradient(to right,color-mix(in srgb,var(--primary) 10%,var(--card)),var(--card));border:1.5px solid color-mix(in srgb,var(--primary) 30%,var(--border));border-radius:10px;margin-top:12px;align-items:center;justify-content:space-between;box-shadow:0 -2px 12px color-mix(in srgb,var(--primary) 8%,transparent)">
+          <span id="consol-sel-count" style="font-size:13px;font-weight:600;color:var(--primary)">0 items selected</span>
           <button class="btn btn-primary" onclick="consolWfOpen()" style="font-size:12px;padding:8px 18px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M12 5v14M5 12h14"/></svg>
             Plan Consolidation
@@ -1318,10 +1328,10 @@
       <!-- ════ VIEW: REPLENISH ════ -->
       <div class="view" id="view-replenish">
         <div class="kpi-grid">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div><div><div class="kpi-lbl">Recent Tasks</div><div class="kpi-val" id="repl-kpi-pending">—</div><div class="kpi-chg neutral">last 7 days</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Collected</div><div class="kpi-val" id="repl-kpi-progress">—</div><div class="kpi-chg neutral">awaiting drop</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Dropped</div><div class="kpi-val" id="repl-kpi-done">—</div><div class="kpi-chg neutral">completed moves</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Records</div><div class="kpi-val" id="repl-kpi-total">—</div><div class="kpi-chg neutral">all history</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div><div><div class="kpi-lbl">Recent Tasks</div><div class="kpi-val" id="repl-kpi-pending">—</div><div class="kpi-chg neutral">last 7 days</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div><div class="kpi-lbl">Collected</div><div class="kpi-val" id="repl-kpi-progress">—</div><div class="kpi-chg neutral">awaiting drop</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Dropped</div><div class="kpi-val" id="repl-kpi-done">—</div><div class="kpi-chg neutral">completed moves</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div><div class="kpi-lbl">Total Records</div><div class="kpi-val" id="repl-kpi-total">—</div><div class="kpi-chg neutral">all history</div></div></div>
         </div>
 
         <div class="card">
@@ -1332,7 +1342,7 @@
             </div>
             <span class="card-link" onclick="loadReplenishView()">↻ Refresh</span>
           </div>
-          <div style="padding:12px 16px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #f3f4f6;padding-bottom:12px">
+          <div style="padding:12px 16px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--muted);padding-bottom:12px">
             <input id="repl-filter-search" type="text" class="cc-input" placeholder="Search item, customer, location..." style="width:220px;font-size:12px;padding:6px 10px;margin:0" oninput="replApplyFilter()"/>
             <select id="repl-filter-status" class="cc-input" style="width:130px;font-size:12px;padding:6px 10px;margin:0" onchange="loadReplenishView()">
               <option value="">All Statuses</option>
@@ -1346,18 +1356,18 @@
               <option value="14">Last 14 days</option>
               <option value="30">Last 30 days</option>
             </select>
-            <span id="repl-result-count" style="font-size:11px;color:#9ca3af;margin-left:auto"></span>
+            <span id="repl-result-count" style="font-size:11px;color:var(--muted-foreground);margin-left:auto"></span>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0">
               <thead><tr><th>Task</th><th>Item / SKU</th><th>Customer</th><th>From (Reserve)</th><th>To (Pick)</th><th>Qty</th><th>Status</th><th>Operator</th><th>Time</th></tr></thead>
               <tbody id="repl-table-body">
-                <tr><td colspan="9" style="text-align:center;padding:40px;color:#9ca3af"><span class="spinner"></span> Loading replenishment data…</td></tr>
+                <tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted-foreground)"><span class="spinner"></span> Loading replenishment data…</td></tr>
               </tbody>
             </table>
           </div>
-          <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f3f4f6">
-            <span id="repl-page-info" style="font-size:11px;color:#9ca3af">Page 1</span>
+          <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--muted)">
+            <span id="repl-page-info" style="font-size:11px;color:var(--muted-foreground)">Page 1</span>
             <div style="display:flex;gap:6px">
               <button class="btn btn-secondary" id="repl-prev-btn" onclick="replPagePrev()" disabled style="font-size:11px;padding:4px 10px">← Prev</button>
               <button class="btn btn-secondary" id="repl-next-btn" onclick="replPageNext()" style="font-size:11px;padding:4px 10px">Next →</button>
@@ -1379,11 +1389,11 @@
       <div class="view" id="view-replenSuggest">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
-            <div id="rs-avatar" style="width:38px;height:38px;border-radius:8px;background:#F3EEFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#5F2E98">ALL</div>
+            <div id="rs-avatar" style="width:38px;height:38px;border-radius:8px;background:color-mix(in srgb,var(--primary) 10%,var(--card));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--primary)">ALL</div>
             <div>
-              <div style="font-size:15px;font-weight:700;color:#1f2937">Next-Day Replenishment Suggestions</div>
-              <div style="font-size:12px;color:#6b7280" id="rs-date-label">Loading…</div>
-              <div style="font-size:11px;color:#5F2E98;font-weight:600;margin-top:2px" id="rs-customer-badge">All Customers</div>
+              <div style="font-size:15px;font-weight:700;color:var(--foreground)">Next-Day Replenishment Suggestions</div>
+              <div style="font-size:12px;color:var(--muted-foreground)" id="rs-date-label">Loading…</div>
+              <div style="font-size:11px;color:var(--primary);font-weight:600;margin-top:2px" id="rs-customer-badge">All Customers</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -1396,52 +1406,52 @@
           </div>
         </div>
         <div class="kpi-grid" id="rs-kpis" style="margin-bottom:16px">
-          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg></div><div><div class="kpi-lbl">Order Plans</div><div class="kpi-val" id="rs-kpi-plans">—</div><div class="kpi-chg neutral">next-day demand</div></div></div>
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div><div><div class="kpi-lbl">Items Need Replen</div><div class="kpi-val" id="rs-kpi-items">—</div><div class="kpi-chg neutral">shortage lines</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Already Covered</div><div class="kpi-val" id="rs-kpi-covered">—</div><div class="kpi-chg neutral">open replen tasks</div></div></div>
-          <div class="kpi"><div class="kpi-ico orange"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="kpi-lbl">Action Needed</div><div class="kpi-val" id="rs-kpi-action">—</div><div class="kpi-chg neutral">gaps to fill</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg></div><div><div class="kpi-lbl">Order Plans</div><div class="kpi-val" id="rs-kpi-plans">—</div><div class="kpi-chg neutral">next-day demand</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-5)" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div><div><div class="kpi-lbl">Items Need Replen</div><div class="kpi-val" id="rs-kpi-items">—</div><div class="kpi-chg neutral">shortage lines</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Already Covered</div><div class="kpi-val" id="rs-kpi-covered">—</div><div class="kpi-chg neutral">open replen tasks</div></div></div>
+          <div class="kpi"><div class="kpi-ico orange"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-4)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="kpi-lbl">Action Needed</div><div class="kpi-val" id="rs-kpi-action">—</div><div class="kpi-chg neutral">gaps to fill</div></div></div>
         </div>
 
         <!-- Autonomous Functions Panel -->
-        <div class="card" style="margin-bottom:16px;padding:16px;border-left:4px solid #753BBD">
+        <div class="card" style="margin-bottom:16px;padding:16px;border-left:4px solid var(--primary)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
             <div style="display:flex;align-items:center;gap:8px">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#753BBD" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-              <span style="font-size:13px;font-weight:700;color:#1f2937">Task Creation Mode</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span style="font-size:13px;font-weight:700;color:var(--foreground)">Task Creation Mode</span>
             </div>
-            <span style="font-size:11px;color:#fff;background:#753BBD;padding:2px 8px;border-radius:4px" id="rs-auto-mode-label">Mode: Suggest + confirm</span>
+            <span style="font-size:11px;color:var(--primary-foreground);background:var(--primary);padding:2px 8px;border-radius:4px" id="rs-auto-mode-label">Mode: Suggest + confirm</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;font-size:12px">
-            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid #753BBD;cursor:pointer;background:#F7F2FF">
-              <input type="radio" name="rs-auto-mode" value="suggest-confirm" checked onchange="rsOnModeChange()" style="accent-color:#753BBD"/> Suggest + confirm</label>
-            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;background:#f9fafb">
-              <input type="radio" name="rs-auto-mode" value="auto-create" onchange="rsOnModeChange()" style="accent-color:#753BBD"/> Auto-create unassigned</label>
-            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;background:#f9fafb">
-              <input type="radio" name="rs-auto-mode" value="auto-assign" onchange="rsOnModeChange()" style="accent-color:#753BBD"/> Auto-create + assign</label>
-            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid #e5e7eb;cursor:pointer;background:#f9fafb">
-              <input type="radio" name="rs-auto-mode" value="readonly" onchange="rsOnModeChange()" style="accent-color:#753BBD"/> View only (no action)</label>
-            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid #fecaca;cursor:not-allowed;background:#fef2f2;color:#9ca3af">
-              <input type="radio" name="rs-auto-mode" value="auto-dispatch" disabled style="accent-color:#9ca3af"/> Auto + dispatch <span style="font-size:10px;background:#FEE2E2;color:#991B1B;padding:0 4px;border-radius:3px;margin-left:2px">Locked</span></label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--primary);cursor:pointer;background:color-mix(in srgb,var(--primary) 10%,var(--card))">
+              <input type="radio" name="rs-auto-mode" value="suggest-confirm" checked onchange="rsOnModeChange()" style="accent-color:var(--primary)"/> Suggest + confirm</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:var(--accent)">
+              <input type="radio" name="rs-auto-mode" value="auto-create" onchange="rsOnModeChange()" style="accent-color:var(--primary)"/> Auto-create unassigned</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:var(--accent)">
+              <input type="radio" name="rs-auto-mode" value="auto-assign" onchange="rsOnModeChange()" style="accent-color:var(--primary)"/> Auto-create + assign</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);cursor:pointer;background:var(--accent)">
+              <input type="radio" name="rs-auto-mode" value="readonly" onchange="rsOnModeChange()" style="accent-color:var(--primary)"/> View only (no action)</label>
+            <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:6px;border:1px solid color-mix(in srgb,var(--destructive) 32%,var(--border));cursor:not-allowed;background:color-mix(in srgb,var(--destructive) 12%,var(--card));color:var(--muted-foreground)">
+              <input type="radio" name="rs-auto-mode" value="auto-dispatch" disabled style="accent-color:var(--muted-foreground)"/> Auto + dispatch <span style="font-size:10px;background:color-mix(in srgb,var(--destructive) 18%,var(--card));color:var(--foreground);padding:0 4px;border-radius:3px;margin-left:2px">Locked</span></label>
           </div>
           <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap" id="rs-action-bar">
             <button class="btn btn-primary" id="rs-create-btn" onclick="rsShowConfirmation()" style="font-size:12px;padding:6px 14px">Create Selected Tasks</button>
-            <span style="font-size:11px;color:#6b7280" id="rs-selection-count"></span>
+            <span style="font-size:11px;color:var(--muted-foreground)" id="rs-selection-count"></span>
           </div>
-          <div id="rs-confirm-panel" style="display:none;margin-top:12px;padding:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px"></div>
+          <div id="rs-confirm-panel" style="display:none;margin-top:12px;padding:14px;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border));border-radius:8px"></div>
         </div>
 
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
             <div style="display:flex;align-items:center;gap:12px">
-              <span style="font-size:13px;font-weight:600;color:#374151" id="rs-result-count">Suggestions</span>
-              <label style="font-size:12px;color:#6b7280;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rs-consolidated-toggle" checked onchange="rsRender()" style="accent-color:#753BBD"/> Consolidated view</label>
+              <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="rs-result-count">Suggestions</span>
+              <label style="font-size:12px;color:var(--muted-foreground);display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="rs-consolidated-toggle" checked onchange="rsRender()" style="accent-color:var(--primary)"/> Consolidated view</label>
             </div>
             <input class="cc-input" id="rs-search" placeholder="Filter by customer, item, location…" style="width:220px;font-size:12px;padding:5px 10px" oninput="rsFilterTable()"/>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th style="width:32px" id="rs-select-col"></th><th>Customer</th><th>Order Plan</th><th>Item</th><th>Qty</th><th>UOM</th><th>Pick Type</th><th>From Location</th><th>To Location</th><th>Assignee</th><th>Task Status</th><th>Recommendation</th><th>Note</th></tr></thead>
-              <tbody id="rs-tbody"><tr><td colspan="13" style="text-align:center;padding:40px;color:#9ca3af">Click "Refresh Suggestions" to load next-day replenishment demand.</td></tr></tbody>
+              <tbody id="rs-tbody"><tr><td colspan="13" style="text-align:center;padding:40px;color:var(--muted-foreground)">Click "Refresh Suggestions" to load next-day replenishment demand.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1471,11 +1481,11 @@
               <table class="tbl" id="vlg-table">
                 <thead><tr><th>Name</th><th>Customer</th><th>Air Rob Location</th><th>Group Type</th><th>Tag</th><th>Action</th></tr></thead>
                 <tbody id="vlg-table-body">
-                  <tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+                  <tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted-foreground)">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
-            <div id="vlg-paging" style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:13px;color:#6b7280"></div>
+            <div id="vlg-paging" style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:13px;color:var(--muted-foreground)"></div>
           </div>
         </div>
 
@@ -1521,19 +1531,19 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px 24px;margin-bottom:20px">
               <div style="display:flex;align-items:center;gap:10px">
                 <div class="toggle" id="vlg-edit-tgl-mixitem" onclick="this.classList.toggle('on')"></div>
-                <span style="font-size:13px;color:#374151">Disallow To Mix Item On Same Location</span>
+                <span style="font-size:13px;color:var(--foreground)">Disallow To Mix Item On Same Location</span>
               </div>
               <div style="display:flex;align-items:center;gap:10px">
                 <div class="toggle" id="vlg-edit-tgl-skipoccupied" onclick="this.classList.toggle('on')"></div>
-                <span style="font-size:13px;color:#374151">Skip Occupied Location On Put Away</span>
+                <span style="font-size:13px;color:var(--foreground)">Skip Occupied Location On Put Away</span>
               </div>
               <div style="display:flex;align-items:center;gap:10px">
                 <div class="toggle" id="vlg-edit-tgl-depleted" onclick="this.classList.toggle('on')"></div>
-                <span style="font-size:13px;color:#374151">Enable Depleted Location</span>
+                <span style="font-size:13px;color:var(--foreground)">Enable Depleted Location</span>
               </div>
               <div style="display:flex;align-items:center;gap:10px">
                 <div class="toggle" id="vlg-edit-tgl-mixlot" onclick="this.classList.toggle('on')"></div>
-                <span style="font-size:13px;color:#374151">Disallow To Mix Lotno On Same Location</span>
+                <span style="font-size:13px;color:var(--foreground)">Disallow To Mix Lotno On Same Location</span>
               </div>
             </div>
 
@@ -1545,20 +1555,20 @@
               </div>
               <div class="cc-field" style="margin:0">
                 <label class="cc-label">Staging VLG Connection</label>
-                <input class="cc-input" type="text" id="vlg-edit-staging" readonly placeholder="—" style="background:#f9fafb"/>
+                <input class="cc-input" type="text" id="vlg-edit-staging" readonly placeholder="—" style="background:var(--accent)"/>
               </div>
               <div class="cc-field" style="margin:0">
                 <label class="cc-label"><span class="req">*</span> Location Tags</label>
-                <div id="vlg-edit-tags-chips" style="min-height:38px;border:1.5px solid #e5e7eb;border-radius:9px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;background:white">
-                  <span style="color:#9ca3af;font-size:12px">Loading…</span>
+                <div id="vlg-edit-tags-chips" style="min-height:38px;border:1.5px solid var(--border);border-radius:9px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;background:var(--card)">
+                  <span style="color:var(--muted-foreground);font-size:12px">Loading…</span>
                 </div>
               </div>
             </div>
 
             <!-- Arrangement Section -->
-            <div style="border-top:1px solid #e5e7eb;padding-top:20px;margin-bottom:18px">
+            <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-                <div style="font-size:15px;font-weight:700;color:#111827">Arrangement</div>
+                <div style="font-size:15px;font-weight:700;color:var(--foreground)">Arrangement</div>
               </div>
               <div class="cc-field" style="margin:0 0 16px;max-width:260px">
                 <label class="cc-label"><span class="req">*</span> Arrangement Level</label>
@@ -1574,7 +1584,7 @@
             </div>
 
             <!-- Action buttons -->
-            <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid #e5e7eb">
+            <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border)">
               <button class="btn btn-secondary" onclick="vlgCloseEdit()">Cancel</button>
               <button class="btn btn-primary" id="vlg-save-btn" onclick="vlgSave()">Update</button>
             </div>
@@ -1591,7 +1601,7 @@
               </div>
               <button class="btn btn-secondary" onclick="vlgCloseHistory()" style="font-size:13px">← Back to List</button>
             </div>
-            <div id="vlg-history-body" style="padding:24px 0;text-align:center;color:#9ca3af">Loading…</div>
+            <div id="vlg-history-body" style="padding:24px 0;text-align:center;color:var(--muted-foreground)">Loading…</div>
           </div>
         </div>
       </div>
@@ -1600,12 +1610,12 @@
       <div class="view" id="view-countCalendar">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:38px;height:38px;border-radius:8px;background:#EDE9FE;display:flex;align-items:center;justify-content:center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B21B6" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <div style="width:38px;height:38px;border-radius:8px;background:color-mix(in srgb,var(--primary) 12%,var(--card));display:flex;align-items:center;justify-content:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </div>
             <div>
-              <div style="font-size:15px;font-weight:700;color:#1f2937">Count Schedule Calendar</div>
-              <div style="font-size:12px;color:#6b7280" id="ccal-subtitle">Confirmed Cycle Count &amp; Physical Count schedules</div>
+              <div style="font-size:15px;font-weight:700;color:var(--foreground)">Count Schedule Calendar</div>
+              <div style="font-size:12px;color:var(--muted-foreground)" id="ccal-subtitle">Confirmed Cycle Count &amp; Physical Count schedules</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -1626,13 +1636,13 @@
           <div id="ccal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px"></div>
         </div>
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:13px;font-weight:600;color:#374151" id="ccal-list-title">Schedules this month</span>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="ccal-list-title">Schedules this month</span>
           </div>
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Customer</th><th>Method</th><th>Locations</th><th>Ticket</th><th>Task Status</th><th>Evidence</th><th>Notes</th></tr></thead>
-              <tbody id="ccal-tbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">Click Refresh to load count schedules.</td></tr></tbody>
+              <tbody id="ccal-tbody"><tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted-foreground)">Click Refresh to load count schedules.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1642,12 +1652,12 @@
       <div class="view" id="view-locTagReq">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:38px;height:38px;border-radius:8px;background:#EDE9FE;display:flex;align-items:center;justify-content:center">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B21B6" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            <div style="width:38px;height:38px;border-radius:8px;background:color-mix(in srgb,var(--primary) 12%,var(--card));display:flex;align-items:center;justify-content:center">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             </div>
             <div>
-              <div style="font-size:15px;font-weight:700;color:#1f2937">Location Tag Update Requests</div>
-              <div style="font-size:12px;color:#6b7280">Select a live WMS location, then choose requested changes from dropdowns. Manager approval required.</div>
+              <div style="font-size:15px;font-weight:700;color:var(--foreground)">Location Tag Update Requests</div>
+              <div style="font-size:12px;color:var(--muted-foreground)">Select a live WMS location, then choose requested changes from dropdowns. Manager approval required.</div>
             </div>
           </div>
           <div style="display:flex;gap:8px">
@@ -1656,8 +1666,8 @@
         </div>
         <div id="ltr-form" style="display:none"></div>
         <div class="card" style="padding:0;overflow:hidden">
-          <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between">
-            <span style="font-size:13px;font-weight:600;color:#374151" id="ltr-list-title">Requests</span>
+          <div style="padding:12px 16px;border-bottom:1px solid var(--muted);display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:600;color:var(--foreground)" id="ltr-list-title">Requests</span>
             <select class="cc-input" id="ltr-filter" style="font-size:11px;padding:4px 8px;width:160px" onchange="ltrRenderList()">
               <option value="">All statuses</option>
               <option value="PENDING_APPROVAL">Pending Approval</option>
@@ -1670,7 +1680,7 @@
           <div style="overflow-x:auto">
             <table class="tbl" style="margin:0;font-size:12px">
               <thead><tr><th>Location</th><th>Location Tag</th><th>Changes</th><th>Status</th><th>Requester</th><th>Date</th><th>Actions</th></tr></thead>
-              <tbody id="ltr-tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af">No requests yet. Click "+ New Request" to submit a location update.</td></tr></tbody>
+              <tbody id="ltr-tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No requests yet. Click "+ New Request" to submit a location update.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1698,11 +1708,11 @@
               <table class="tbl" id="ltag-table">
                 <thead><tr><th>Tag</th><th>Note</th><th>Location Count</th><th>Action</th></tr></thead>
                 <tbody id="ltag-table-body">
-                  <tr><td colspan="4" style="text-align:center;padding:40px;color:#9ca3af">Loading…</td></tr>
+                  <tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted-foreground)">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
-            <div id="ltag-paging" style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:13px;color:#6b7280"></div>
+            <div id="ltag-paging" style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:13px;color:var(--muted-foreground)"></div>
           </div>
         </div>
 
@@ -1738,14 +1748,14 @@
                 <input class="cc-input" type="text" id="ltag-edit-loc-search" placeholder="Search For Location Name" style="width:220px;height:34px;font-size:13px"/>
                 <button class="btn btn-secondary" onclick="ltagFilterEditLocs()" style="height:34px;font-size:12px">Search</button>
                 <button class="btn btn-primary" id="ltag-add-loc-btn" onclick="ltagAddLocationPrompt()" style="height:34px;font-size:12px">Add Location</button>
-                <button class="btn btn-secondary" id="ltag-batch-del-btn" onclick="ltagBatchDeleteLocs()" style="height:34px;font-size:12px;color:#dc2626;border-color:#fca5a5">Batch Delete</button>
+                <button class="btn btn-secondary" id="ltag-batch-del-btn" onclick="ltagBatchDeleteLocs()" style="height:34px;font-size:12px;color:var(--destructive);border-color:color-mix(in srgb,var(--destructive) 38%,var(--border))">Batch Delete</button>
               </div>
             </div>
             <div style="overflow-x:auto">
               <table class="tbl">
                 <thead><tr><th style="width:36px"><input type="checkbox" id="ltag-edit-check-all" onchange="ltagToggleAllLocs(this.checked)"/></th><th>Name</th><th>Location Type</th><th>Support Pick Type</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody id="ltag-edit-locs-body">
-                  <tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Loading locations…</td></tr>
+                  <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading locations…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1767,14 +1777,14 @@
         </button>
       </div>
       <div class="modal-body">
-        <div style="display:flex;gap:26px;align-items:center;border-bottom:3px solid #e5e7eb;margin-bottom:22px">
-          <div style="padding:0 0 12px;color:#6b7280;font-weight:700;font-size:15px">Task Lines</div>
-          <div style="padding:0 0 12px;color:#1f2937;font-weight:800;font-size:16px;border-bottom:4px solid #753BBD;margin-bottom:-3px">Count Result</div>
+        <div style="display:flex;gap:26px;align-items:center;border-bottom:3px solid var(--border);margin-bottom:22px">
+          <div style="padding:0 0 12px;color:var(--muted-foreground);font-weight:700;font-size:15px">Task Lines</div>
+          <div style="padding:0 0 12px;color:var(--foreground);font-weight:800;font-size:16px;border-bottom:4px solid var(--primary);margin-bottom:-3px">Count Result</div>
         </div>
         <div class="results-wrap" style="border-radius:0">
           <table class="tbl" id="count-results-table">
             <thead><tr><th>Location</th><th>Item</th><th>UOM</th><th>Base Qty</th><th>System UOM</th><th>System UOM Qty</th><th>Item Diff Base Qty</th><th>Status</th></tr></thead>
-            <tbody id="count-results-body"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Select a ticket to load count results…</td></tr></tbody>
+            <tbody id="count-results-body"><tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">Select a ticket to load count results…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1785,8 +1795,8 @@
     <div class="modal">
       <div class="modal-hdr">
         <h2>Select Locations</h2>
-        <span style="font-size:11px;color:#6b7280;margin-left:12px" id="loc-facility-label"></span>
-        <div id="loc-filter-note" style="display:none;font-size:11px;color:#d97706;margin-left:12px"></div>
+        <span style="font-size:11px;color:var(--muted-foreground);margin-left:12px" id="loc-facility-label"></span>
+        <div id="loc-filter-note" style="display:none;font-size:11px;color:var(--chart-4);margin-left:12px"></div>
         <button class="modal-x" onclick="closeLocationModal()" aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -1878,19 +1888,19 @@
 <script src="/assets/js/dashboard-modules.js"></script>
 
 <!-- AI Assistant Widget -->
-<div id="ai-assist-btn" onclick="aiToggle()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#753BBD;box-shadow:0 4px 16px rgba(117,59,189,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:9998;transition:transform .2s" onmouseenter="this.style.transform='scale(1.08)'" onmouseleave="this.style.transform='scale(1)'">
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+<div id="ai-assist-btn" onclick="aiToggle()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--primary);box-shadow:0 4px 16px color-mix(in srgb,var(--primary) 35%,transparent);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:9998;transition:transform .2s" onmouseenter="this.style.transform='scale(1.08)'" onmouseleave="this.style.transform='scale(1)'">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
 </div>
-<div id="ai-assist-panel" style="display:none;position:fixed;bottom:90px;right:24px;width:380px;max-height:520px;border-radius:16px;background:white;box-shadow:0 12px 48px rgba(0,0,0,.15);z-index:9999;display:none;flex-direction:column;overflow:hidden;border:1px solid #e5e7eb">
-  <div style="padding:14px 18px;background:#753BBD;color:white;display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:700;font-size:14px">AI Assistant</span></div>
+<div id="ai-assist-panel" style="display:none;position:fixed;bottom:90px;right:24px;width:380px;max-height:520px;border-radius:16px;background:var(--card);box-shadow:0 12px 48px color-mix(in srgb,var(--foreground) 15%,transparent);z-index:9999;display:none;flex-direction:column;overflow:hidden;border:1px solid var(--border)">
+  <div style="padding:14px 18px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:700;font-size:14px">AI Assistant</span></div>
     <div style="display:flex;gap:8px">
       <span onclick="aiClear()" style="cursor:pointer;font-size:11px;opacity:.8" title="Clear chat">Clear</span>
       <span onclick="aiToggle()" style="cursor:pointer;font-size:16px;line-height:1" title="Close">×</span>
     </div>
   </div>
   <div id="ai-messages" style="flex:1;overflow-y:auto;padding:14px;min-height:280px;max-height:360px"></div>
-  <div style="padding:10px 14px;border-top:1px solid #f3f4f6">
+  <div style="padding:10px 14px;border-top:1px solid var(--muted)">
     <div id="ai-suggestions" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
     <div style="display:flex;gap:6px">
       <input id="ai-input" class="cc-input" placeholder="Ask about this dashboard…" style="flex:1;font-size:13px;padding:8px 12px" onkeyup="if(event.key==='Enter')aiSend()"/>
@@ -1900,5 +1910,6 @@
 </div>
 
 <script src="/assets/js/assistant.js"></script>
+<script>ItemTheme.bind();</script>
 </body>
 </html>

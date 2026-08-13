@@ -162,8 +162,8 @@ function setLiveStatus(ok) {
     // Cowork artifact iframe CSP blocks fetch to unis.item.com, so we
     // serve from the real Wise snapshot baked into the artifact.
     pill.className = 'live-pill';
-    pill.style.cssText = 'background:#F7F2FF;border-color:#D8C4FF;color:#5F2E98';
-    pill.innerHTML = '<span class="ldot" style="background:#753BBD"></span>Cached · Real Wise snapshot · 2026-05-27';
+    pill.style.cssText = 'background:color-mix(in srgb,var(--primary) 10%,var(--card));border-color:color-mix(in srgb,var(--primary) 35%,var(--border));color:var(--primary)';
+    pill.innerHTML = '<span class="ldot" style="background:var(--primary)"></span>Cached · Real Wise snapshot · 2026-05-27';
   }
 }
 
@@ -426,18 +426,18 @@ function renderWiseScheduleTable(list) {
   if (results) results.textContent = list.length + ' Result' + (list.length === 1 ? '' : 's');
   if (!tbody) return;
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="padding:26px;text-align:center;color:#6b7280;font-weight:600">No Data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted-foreground);font-weight:600">No Data</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(s => {
     const start = s.startTime ? new Date(s.startTime).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—';
     const end = s.endTime ? new Date(s.endTime).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}) : '—';
     return '<tr>' +
-      '<td style="padding:14px 16px;border-top:1px solid #e5e7eb">' + esc(s.name || '(unnamed)') + '</td>' +
-      '<td style="padding:14px 16px;border-top:1px solid #e5e7eb">' + esc(s.recurrenceType || 'NONE') + '</td>' +
-      '<td style="padding:14px 16px;border-top:1px solid #e5e7eb">' + esc(start) + '</td>' +
-      '<td style="padding:14px 16px;border-top:1px solid #e5e7eb">' + esc(end) + '</td>' +
-      '<td style="padding:14px 16px;border-top:1px solid #e5e7eb">' +
+      '<td style="padding:14px 16px;border-top:1px solid var(--border)">' + esc(s.name || '(unnamed)') + '</td>' +
+      '<td style="padding:14px 16px;border-top:1px solid var(--border)">' + esc(s.recurrenceType || 'NONE') + '</td>' +
+      '<td style="padding:14px 16px;border-top:1px solid var(--border)">' + esc(start) + '</td>' +
+      '<td style="padding:14px 16px;border-top:1px solid var(--border)">' + esc(end) + '</td>' +
+      '<td style="padding:14px 16px;border-top:1px solid var(--border)">' +
       '<button class="btn btn-secondary" style="padding:6px 10px;margin-right:6px" onclick="editWiseSchedule(\'' + esc(String(s.id || s.scheduleId || '')) + '\')">Edit</button>' +
       '<button class="btn btn-secondary" style="padding:6px 10px" onclick="deleteWiseSchedule(\'' + esc(String(s.id || s.scheduleId || '')) + '\')">Del</button>' +
       '</td>' +
@@ -490,12 +490,12 @@ function setScheduleMode(mode) {
   });
   // Segmented button visual state
   if (btnE) {
-    btnE.style.background = useExisting ? '#753BBD' : 'white';
-    btnE.style.color      = useExisting ? 'white'   : '#6b7280';
+    btnE.style.background = useExisting ? 'var(--primary)' : 'var(--card)';
+    btnE.style.color      = useExisting ? 'var(--primary-foreground)' : 'var(--muted-foreground)';
   }
   if (btnN) {
-    btnN.style.background = useExisting ? 'white'   : '#753BBD';
-    btnN.style.color      = useExisting ? '#6b7280' : 'white';
+    btnN.style.background = useExisting ? 'var(--card)'   : 'var(--primary)';
+    btnN.style.color      = useExisting ? 'var(--muted-foreground)' : 'var(--primary-foreground)';
   }
   // Stash the chosen mode for submit
   CC.scheduleMode = mode;
@@ -596,9 +596,9 @@ function onExistingScheduleChange() {
   summary.style.display = 'block';
   summary.innerHTML =
     '<strong>' + (s.name || s.id) + '</strong> · ' + (s.recurrenceType || '—') +
-    '<br><span style="color:#753BBD">' + trim(s.startTime).replace('T',' ') +
-    '</span> → <span style="color:#753BBD">' + trim(s.endTime).replace('T',' ') + '</span>' +
-    '<br><span style="font-size:11.5px;color:#753BBD">Created by ' + (s.createdBy || '—') +
+    '<br><span style="color:var(--primary)">' + trim(s.startTime).replace('T',' ') +
+    '</span> → <span style="color:var(--primary)">' + trim(s.endTime).replace('T',' ') + '</span>' +
+    '<br><span style="font-size:11.5px;color:var(--primary)">Created by ' + (s.createdBy || '—') +
     ' · ID ' + s.id + '</span>';
 
   // Stash the selected schedule id for submitCycleCount to reference
@@ -874,7 +874,7 @@ async function searchLocations() {
       }
       body.ids = itemLocationIds;
     } catch (e) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="color:#dc2626">' + esc(e && e.message ? e.message : 'Could not search item inventory locations.') + '</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="color:var(--destructive)">' + esc(e && e.message ? e.message : 'Could not search item inventory locations.') + '</td></tr>';
       return;
     }
   }
@@ -907,7 +907,7 @@ async function searchLocations() {
     const noteEl = document.getElementById('loc-filter-note');
     if (noteEl) { noteEl.textContent = 'Showing current inventory locations for item ' + itemFilter + '. Location detail enrichment was unavailable.'; noteEl.style.display = ''; }
   } else if (data && (data._needsAuth || /unauthor/i.test(String(data.msg || data.message || '')))) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="color:#dc2626">Session expired or unauthorized for WMS location search. Please sign in again and retry.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="10" style="color:var(--destructive)">Session expired or unauthorized for WMS location search. Please sign in again and retry.</td></tr>';
     showLoadProgress(false);
     return;
   }
@@ -1049,10 +1049,10 @@ async function previewCustomerLocationCount(customerOrgId) {
     const realTotal = meta_cust ? meta_cust.count : cachedRows;
     if (realTotal > 0) {
       let note = '<strong>' + realTotal.toLocaleString() + '</strong> USABLE location' + (realTotal===1?'':'s') + ' at <strong>' + esc(FACILITY_NAME) + '</strong>';
-      if (cachedRows < realTotal) note += ' · <span style="color:#f59e0b">first ' + cachedRows.toLocaleString() + ' cached</span>';
+      if (cachedRows < realTotal) note += ' · <span style="color:var(--chart-4)">first ' + cachedRows.toLocaleString() + ' cached</span>';
       meta.innerHTML = note;
     } else {
-      meta.innerHTML = '<span style="color:#9ca3af">No cached locations for this customer at ' + esc(FACILITY_NAME) + '. Use Add Count Line to search live WMS locations.</span>';
+      meta.innerHTML = '<span style="color:var(--muted-foreground)">No cached locations for this customer at ' + esc(FACILITY_NAME) + '. Use Add Count Line to search live WMS locations.</span>';
     }
   } else {
     meta.innerHTML = '<strong>' + total.toLocaleString() + '</strong> location' + (total===1?'':'s') + ' assigned at <strong>' + esc(FACILITY_NAME) + '</strong>';
@@ -1231,9 +1231,9 @@ function renderLocResults() {
     if (f('loc-level'))     activeFilters.push(`Level = ${f('loc-level')}`);
     if (f('loc-slot'))      activeFilters.push(`Slot = ${f('loc-slot')}`);
     if (activeFilters.length) {
-      const list = activeFilters.map(s => '<code style="background:#fef3c7;padding:1px 6px;border-radius:4px;color:#92400e;font-size:12px">'+esc(s)+'</code>').join(' &nbsp;');
+      const list = activeFilters.map(s => '<code style="background:color-mix(in srgb,var(--chart-4) 16%,var(--card));padding:1px 6px;border-radius:4px;color:var(--foreground);font-size:12px">'+esc(s)+'</code>').join(' &nbsp;');
       tbody.innerHTML = `<tr class="empty-row"><td colspan="10" style="padding:32px 16px;text-align:center">
-        <div style="color:#374151;font-weight:600;margin-bottom:8px">No locations match the active filters</div>
+        <div style="color:var(--foreground);font-weight:600;margin-bottom:8px">No locations match the active filters</div>
         <div style="margin-bottom:14px;line-height:1.7">${list}</div>
         <button class="btn btn-secondary" style="font-size:12px" onclick="clickResetFilters()">Clear filters & re-search</button>
       </td></tr>`;
@@ -1378,9 +1378,9 @@ function renderCountLines() {
   for (const [cid, lines] of groups) {
     const custName = (lookup[cid] && lookup[cid].name) || cid;
     html += `<div style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;border-bottom:1.5px solid #e5e7eb;margin-bottom:8px">
-        <span style="background:#F7F2FF;color:#5F2E98;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:.04em;text-transform:uppercase">${esc(custName)}</span>
-        <span style="font-size:12px;color:#6b7280">${lines.length.toLocaleString()} location${lines.length===1?'':'s'}</span>
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0 8px;border-bottom:1.5px solid var(--border);margin-bottom:8px">
+        <span style="background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:.04em;text-transform:uppercase">${esc(custName)}</span>
+        <span style="font-size:12px;color:var(--muted-foreground)">${lines.length.toLocaleString()} location${lines.length===1?'':'s'}</span>
         <button class="btn btn-danger-ghost" style="margin-left:auto" onclick="removeCustomerFromTask('${escapeAttr(cid)}')">Remove all</button>
       </div>
       <table class="tbl">
@@ -1898,8 +1898,8 @@ function renderTaskGroupCard(g, custLookup) {
 
   // Header
   const scheduleChip = isGroup
-    ? '<span style="background:#F7F2FF;color:#5F2E98;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.04em;margin-left:6px">SCHEDULE ' + esc(tasks[0].scheduleId) + '</span>'
-    : (tasks[0].ticketId ? '<span style="font-size:10.5px;color:#6b7280;font-weight:600;background:#f3f4f6;padding:2px 6px;border-radius:4px;margin-left:6px">' + esc(tasks[0].ticketId) + '</span>' : '');
+    ? '<span style="background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.04em;margin-left:6px">SCHEDULE ' + esc(tasks[0].scheduleId) + '</span>'
+    : (tasks[0].ticketId ? '<span style="font-size:10.5px;color:var(--muted-foreground);font-weight:600;background:var(--muted);padding:2px 6px;border-radius:4px;margin-left:6px">' + esc(tasks[0].ticketId) + '</span>' : '');
 
   // Solo single-task path uses the existing card style
   if (!isGroup) {
@@ -2005,7 +2005,7 @@ function renderSoloTaskCard(t, custLookup) {
     : /CANCEL/i.test(displayStatus) ? 'cancelled'
     : /PROGRESS|IN_/i.test(displayStatus) ? 'in-progress'
     : editing ? 'editing' : '';
-  const ticketTag = t.ticketId ? '<span style="font-size:10.5px;color:#6b7280;font-weight:600;background:#f3f4f6;padding:2px 6px;border-radius:4px;margin-left:6px">' + esc(t.ticketId) + '</span>' : '';
+  const ticketTag = t.ticketId ? '<span style="font-size:10.5px;color:var(--muted-foreground);font-weight:600;background:var(--muted);padding:2px 6px;border-radius:4px;margin-left:6px">' + esc(t.ticketId) + '</span>' : '';
   return `<div class="task-card${editing?' editing':''}">
     <div class="task-card-hdr">
       <div style="flex:1;min-width:0">
@@ -2036,7 +2036,7 @@ function renderInlineCountForm(t) {
     '<option value="' + escapeAttr(l.locationId || l.name) + '">' + esc(l.name) + '</option>'
   ).join('');
   return `<div class="cnt-submit-form" id="cnt-form-${escapeAttr(t.id)}">
-    <div style="font-size:11.5px;font-weight:700;color:#374151;margin-bottom:6px">Submit a count result · ticket ${esc(t.ticketId||'')}</div>
+    <div style="font-size:11.5px;font-weight:700;color:var(--foreground);margin-bottom:6px">Submit a count result · ticket ${esc(t.ticketId||'')}</div>
     <div class="cnt-submit-grid">
       <div class="cf"><label>Location</label>
         <select id="cnt-loc-${escapeAttr(t.id)}">${lineOpts}<option value="__OTHER__">— other (type ID) —</option></select>
@@ -2386,7 +2386,7 @@ async function fetchCountResultsByTicketIds(ticketIds) {
 // KPI cards and the Recent Cycle Counts table.
 async function loadCycleCountView() {
   const body = document.getElementById('cc-recent-body');
-  if (body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9ca3af">Loading from Wise…</td></tr>';
+  if (body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading from Wise…</td></tr>';
 
   // Pull 50 most recent tickets at this facility, plus a "totalCount" we can use as a KPI
   const url = WMS_BASE + '/api/cyclecount-app/cycle-count/count-ticket/search-by-paging';
@@ -2400,7 +2400,7 @@ async function loadCycleCountView() {
   });
   if (reqFacility !== FACILITY_ID) return;
   if (!resp || resp.success === false) {
-    if (body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#ef4444">Could not reach Wise. ' +
+    if (body) body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--destructive)">Could not reach Wise. ' +
       (resp && resp.msg ? esc(resp.msg) : '') + '</td></tr>';
     return;
   }
@@ -2468,7 +2468,7 @@ async function loadCycleCountView() {
   if (meta) meta.textContent = 'Live from Wise · ' + filterBits.join(' · ') + ' · ' + new Date().toLocaleTimeString();
 
   if (rows.length === 0) {
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9ca3af">No cycle counts match the selected filters at ' + esc(FACILITY_NAME) + '.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted-foreground)">No cycle counts match the selected filters at ' + esc(FACILITY_NAME) + '.</td></tr>';
     return;
   }
   const resultStatsByTicket = await fetchCountResultsByTicketIds(rows.map(r => r.id).filter(Boolean));
@@ -2486,11 +2486,11 @@ async function loadCycleCountView() {
     const locNames = lines.map(l => l.locationName || l.locationCode || l.name || l.locationId || '').filter(Boolean);
     let locsCell;
     if (locNames.length === 0) {
-      locsCell = '<span style="color:#9ca3af;font-style:italic">No locations on ticket</span>';
+      locsCell = '<span style="color:var(--muted-foreground);font-style:italic">No locations on ticket</span>';
     } else if (locNames.length <= 2) {
       locsCell = locNames.map(n => '<span style="font-family:monospace;font-size:11px">' + esc(n) + '</span>').join(', ');
     } else {
-      locsCell = '<span style="font-family:monospace;font-size:11px">' + esc(locNames[0]) + '</span>, <span style="font-family:monospace;font-size:11px">' + esc(locNames[1]) + '</span> <span style="color:#6b7280;font-size:11px">+' + (locNames.length - 2) + ' more</span>';
+      locsCell = '<span style="font-family:monospace;font-size:11px">' + esc(locNames[0]) + '</span>, <span style="font-family:monospace;font-size:11px">' + esc(locNames[1]) + '</span> <span style="color:var(--muted-foreground);font-size:11px">+' + (locNames.length - 2) + ' more</span>';
     }
     const resultStats = resultStatsByTicket[r.id] || {total:0, diff:0, pending:0, closed:0};
     const resultTxt = resultStats.total
@@ -2506,13 +2506,13 @@ async function loadCycleCountView() {
     const hasResults = resultStats.total > 0;
     if (isCancelled) {
       badge = 'over';
-      statusDisplay = hasResults ? status : '<span title="Cancelled with no count results submitted">' + esc(status) + '</span> <span style="font-size:10px;color:#dc2626;font-weight:400">· no count</span>';
+      statusDisplay = hasResults ? status : '<span title="Cancelled with no count results submitted">' + esc(status) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count</span>';
     } else if (isClosed && !hasResults) {
       badge = 'over';
-      statusDisplay = '<span title="Closed without count results — review Close/Report Empty/Force Close history">' + esc(status) + '</span> <span style="font-size:10px;color:#dc2626;font-weight:400">· no count results</span>';
+      statusDisplay = '<span title="Closed without count results — review Close/Report Empty/Force Close history">' + esc(status) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count results</span>';
     } else if (isClosed && hasResults) {
       badge = 'done';
-      statusDisplay = esc(status) + ' <span style="font-size:10px;color:#059669;font-weight:400">· counted</span>';
+      statusDisplay = esc(status) + ' <span style="font-size:10px;color:var(--chart-3);font-weight:400">· counted</span>';
     } else if (/NEW|OPEN|PENDING|READY/i.test(status)) {
       badge = 'pend';
       statusDisplay = esc(status);
@@ -2527,9 +2527,9 @@ async function loadCycleCountView() {
     // Diagnostic guidance for suspicious tasks
     let diagNote = '';
     if (isClosed && !hasResults) {
-      diagNote = '<div style="font-size:10px;color:#92400E;margin-top:2px" title="This task was closed without count entries. Review history and recreate if counting is still required.">⚠ Closed without count</div>';
+      diagNote = '<div style="font-size:10px;color:var(--chart-4);margin-top:2px" title="This task was closed without count entries. Review history and recreate if counting is still required.">⚠ Closed without count</div>';
     } else if (isCancelled && !hasResults) {
-      diagNote = '<div style="font-size:10px;color:#6b7280;margin-top:2px">Cancelled — no count submitted</div>';
+      diagNote = '<div style="font-size:10px;color:var(--muted-foreground);margin-top:2px">Cancelled — no count submitted</div>';
     }
 
     return '<tr>' +
@@ -2556,7 +2556,7 @@ async function openCountResultsModal(ticketId) {
   const title = document.getElementById('count-results-title');
   const body = document.getElementById('count-results-body');
   if (title) title.textContent = 'Count Results · ' + ticketId;
-  if (body) body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">Loading count results…</td></tr>';
+  if (body) body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading count results…</td></tr>';
   if (m) m.classList.add('open');
   const req = {currentPage:1,pageSize:500,searchCount:true,ticketIds:[ticketId],facilityId:FACILITY_ID,warehouseId:FACILITY_ID,sortingFields:[{field:'createdTime',orderBy:'DESC'}]};
   // Use the BAM detail endpoint first so Tacoma and other facilities show the
@@ -2576,13 +2576,13 @@ async function openCountResultsModal(ticketId) {
   }
   if (!body) return;
   if (!resp || resp.success === false) {
-    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#ef4444">Could not load count results.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--destructive)">Could not load count results.</td></tr>';
     return;
   }
   const payload = resp.data || resp;
   const list = payload.list || payload.records || payload.results || payload.items || [];
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">No count results have been submitted for this ticket yet.</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">No count results have been submitted for this ticket yet.</td></tr>';
     return;
   }
   body.innerHTML = list.map(r => {
@@ -2679,7 +2679,7 @@ function craDisplayLocation(row) {
   const raw = String(row.locationId || row.systemLocationId || row.locationName || '').trim();
   const loc = row._location || null;
   const name = (loc && (loc.name || loc.locationName)) || row.locationName || raw || '—';
-  if (raw && name && raw !== name) return '<div style="font-weight:600;color:#1f2937">' + esc(name) + '</div><div style="font-size:10px;color:#9ca3af">ID ' + esc(raw) + '</div>';
+  if (raw && name && raw !== name) return '<div style="font-weight:600;color:var(--foreground)">' + esc(name) + '</div><div style="font-size:10px;color:var(--muted-foreground)">ID ' + esc(raw) + '</div>';
   return esc(name || '—');
 }
 function craDisplayItem(row) {
@@ -2688,9 +2688,9 @@ function craDisplayItem(row) {
   const code = (item && (item.code || item.itemCode || item.itemNo || item.name)) || row.itemCode || row.itemName || raw || '—';
   const desc = item && (item.description || item.shortDescription || item.desc || item.itemDescription || '');
   const uom = item && (item.uom || item.unit || item.baseUom || '');
-  let html = '<div style="font-weight:600;color:#1f2937">' + esc(code) + '</div>';
-  if (desc) html += '<div style="font-size:10px;color:#6b7280;max-width:220px;white-space:normal;line-height:1.25">' + esc(desc) + (uom ? ' · ' + esc(uom) : '') + '</div>';
-  if (raw && raw !== code) html += '<div style="font-size:10px;color:#9ca3af">' + esc(raw) + '</div>';
+  let html = '<div style="font-weight:600;color:var(--foreground)">' + esc(code) + '</div>';
+  if (desc) html += '<div style="font-size:10px;color:var(--muted-foreground);max-width:220px;white-space:normal;line-height:1.25">' + esc(desc) + (uom ? ' · ' + esc(uom) : '') + '</div>';
+  if (raw && raw !== code) html += '<div style="font-size:10px;color:var(--muted-foreground)">' + esc(raw) + '</div>';
   return html;
 }
 function craLocationText(row) {
@@ -2708,7 +2708,7 @@ function craItemText(row) {
 
 async function loadCountApprovalView() {
   const body = document.getElementById('cra-body');
-  if (body) body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:#9ca3af">Loading count results…</td></tr>';
+  if (body) body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading count results…</td></tr>';
   const f = approvalFilters();
   const req = {currentPage:1,pageSize:Math.max(f.pageSize,100),searchCount:true,sortingFields:[{field:'createdTime',orderBy:'DESC'}]};
   if (f.ticketId) req.ticketIds = [f.ticketId];
@@ -2722,16 +2722,16 @@ async function loadCountApprovalView() {
   if (f.to) req.createdTimeTo = f.to + 'T23:59:59';
   const resp = await safeFetch(API_COUNT_RESULTS,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(req)});
   if (!body) return;
-  if (!resp || resp.success === false) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:#ef4444">Could not load count results.</td></tr>'; return; }
+  if (!resp || resp.success === false) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--destructive)">Could not load count results.</td></tr>'; return; }
   const payload = resp.data || resp;
   let rows = payload.list || payload.records || payload.results || payload.items || [];
   if (f.status && f.status !== 'ALL') rows = rows.filter(r => String(r.status||'').toUpperCase() === f.status);
   if (f.type) rows = rows.filter(r => String(r.type||'').toUpperCase() === f.type);
   const shown = rows.slice(0, f.pageSize);
   document.getElementById('cra-results-count').textContent = rows.length + ' Results';
-  if (!shown.length) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:#9ca3af">No Data</td></tr>'; COUNT_APPROVAL_ROWS = []; return; }
+  if (!shown.length) { body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--muted-foreground)">No Data</td></tr>'; COUNT_APPROVAL_ROWS = []; return; }
 
-  body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:24px;color:#9ca3af">Loading location and item details…</td></tr>';
+  body.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:24px;color:var(--muted-foreground)">Loading location and item details…</td></tr>';
   const locationIds = craUnique(shown.flatMap(r => [r.locationId, r.systemLocationId]));
   const itemIds = craUnique(shown.map(r => r.itemId || r.itemCode || r.itemName));
   const [locationMap, itemMap] = await Promise.all([craFetchLocationMap(locationIds), craFetchItemMap(itemIds)]);
@@ -2836,9 +2836,9 @@ async function loadRobotWarehouseInventory() {
     const rows = (data.list || []).slice(0, 200);
     if (tableEl) {
       tableEl.style.display = '';
-      tableEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f9fafb"><th style="padding:8px;text-align:left">Location</th><th style="padding:8px;text-align:left">Occupied</th><th style="padding:8px;text-align:left">LP</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:left">Status</th><th style="padding:8px;text-align:left">Update</th></tr></thead><tbody>' +
-        rows.map(r => '<tr style="border-top:1px solid #f3f4f6"><td style="padding:7px;font-family:monospace">' + esc(r.location_ip_format || '—') + '</td><td style="padding:7px">' + (Number(r.is_occupied) === 1 ? '<span class="badge ok">Yes</span>' : '<span class="badge idle">No</span>') + '</td><td style="padding:7px">' + esc(r.lp_id || '—') + '</td><td style="padding:7px;text-align:right">' + esc(r.qty == null ? '—' : String(r.qty)) + '</td><td style="padding:7px">' + esc(r.status || '—') + '</td><td style="padding:7px">' + esc(r.wise_update_time || r.update_time || '—') + '</td></tr>').join('') +
-        '</tbody></table>' + ((data.list || []).length > 200 ? '<div style="padding:8px;color:#6b7280;font-size:11px">Showing first 200 records.</div>' : '');
+      tableEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--accent)"><th style="padding:8px;text-align:left">Location</th><th style="padding:8px;text-align:left">Occupied</th><th style="padding:8px;text-align:left">LP</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:left">Status</th><th style="padding:8px;text-align:left">Update</th></tr></thead><tbody>' +
+        rows.map(r => '<tr style="border-top:1px solid var(--muted)"><td style="padding:7px;font-family:monospace">' + esc(r.location_ip_format || '—') + '</td><td style="padding:7px">' + (Number(r.is_occupied) === 1 ? '<span class="badge ok">Yes</span>' : '<span class="badge idle">No</span>') + '</td><td style="padding:7px">' + esc(r.lp_id || '—') + '</td><td style="padding:7px;text-align:right">' + esc(r.qty == null ? '—' : String(r.qty)) + '</td><td style="padding:7px">' + esc(r.status || '—') + '</td><td style="padding:7px">' + esc(r.wise_update_time || r.update_time || '—') + '</td></tr>').join('') +
+        '</tbody></table>' + ((data.list || []).length > 200 ? '<div style="padding:8px;color:var(--muted-foreground);font-size:11px">Showing first 200 records.</div>' : '');
     }
   } catch(e) {
     if (status) status.textContent = 'Robot count data could not be loaded. Confirm integration settings or try again.';
@@ -2873,10 +2873,10 @@ function refreshOntologyStatus() {
   const c = ontoConfig();
   if (c.url && c.token) {
     el.textContent = 'configured · ' + c.url.replace(/^https?:\/\//,'').slice(0,40);
-    el.style.color = '#059669';
+    el.style.color = 'var(--chart-3)';
   } else {
     el.textContent = 'not configured — click Configure to paste URL + token';
-    el.style.color = '#9ca3af';
+    el.style.color = 'var(--muted-foreground)';
   }
 }
 
@@ -3205,8 +3205,8 @@ function ccCheckScheduleDateInline() {
   const selectedDate = new Date(sd.value + (sd.value.length <= 10 ? 'T12:00:00' : ''));
   const selectedLabel = selectedDate.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
   warn.style.display = '';
-  warn.style.color = '#059669';
-  warn.style.background = '#ECFDF5';
+  warn.style.color = 'var(--chart-3)';
+  warn.style.background = 'color-mix(in srgb,var(--chart-3) 14%,var(--card))';
   warn.innerHTML = '✓ Scheduled for <strong>' + selectedLabel + '</strong>';
 }
 
@@ -3786,7 +3786,7 @@ const VLG_PAGE_SIZE = 20;
 async function loadVlgData(page) {
   if (page) VLG_PAGE = page;
   const body = document.getElementById('vlg-table-body');
-  if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Loading from Wise…</td></tr>';
+  if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading from Wise…</td></tr>';
 
   // Populate customer filter if empty
   const custSel = document.getElementById('vlg-filter-customer');
@@ -3823,11 +3823,11 @@ async function loadVlgData(page) {
   });
 
   if (!resp || resp._needsAuth) {
-    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#ef4444">Authentication required. Please sign in to view VLG data.</td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--destructive)">Authentication required. Please sign in to view VLG data.</td></tr>';
     return;
   }
   if (!resp.success && resp.success !== undefined) {
-    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#ef4444">Could not load virtual location groups.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--destructive)">Could not load virtual location groups.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
     return;
   }
 
@@ -3846,9 +3846,9 @@ async function loadVlgData(page) {
 
   if (!body) return;
   if (list.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#9ca3af">' +
-      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7v10"/><path d="M16 7v10"/><path d="M2 12h20"/></svg></div>' +
-      '<strong style="color:#6b7280">No virtual location groups found</strong><br>' +
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7v10"/><path d="M16 7v10"/><path d="M2 12h20"/></svg></div>' +
+      '<strong style="color:var(--muted-foreground)">No virtual location groups found</strong><br>' +
       '<span style="font-size:12px">Try adjusting your filters or check that groups exist for this facility.</span></td></tr>';
   } else {
     const custLookup = {};
@@ -3875,9 +3875,9 @@ async function loadVlgData(page) {
         '<td>' + esc(gType) + '</td>' +
         '<td>' + esc(tag) + '</td>' +
         '<td>' +
-          '<span style="color:#753BBD;font-size:12px;cursor:pointer;font-weight:600;margin-right:8px" onclick="vlgOpenEdit(\'' + escAttr(rid) + '\')">Edit</span>' +
-          '<span style="color:#6b7280;font-size:12px;cursor:pointer;font-weight:600;margin-right:8px" onclick="vlgOpenHistory(\'' + escAttr(rid) + '\',\'' + escAttr(name) + '\')">History</span>' +
-          '<span style="color:#dc2626;font-size:12px;cursor:pointer;font-weight:600" onclick="vlgDeleteGroup(\'' + escAttr(rid) + '\',\'' + escAttr(name) + '\')">Delete</span>' +
+          '<span style="color:var(--primary);font-size:12px;cursor:pointer;font-weight:600;margin-right:8px" onclick="vlgOpenEdit(\'' + escAttr(rid) + '\')">Edit</span>' +
+          '<span style="color:var(--muted-foreground);font-size:12px;cursor:pointer;font-weight:600;margin-right:8px" onclick="vlgOpenHistory(\'' + escAttr(rid) + '\',\'' + escAttr(name) + '\')">History</span>' +
+          '<span style="color:var(--destructive);font-size:12px;cursor:pointer;font-weight:600" onclick="vlgDeleteGroup(\'' + escAttr(rid) + '\',\'' + escAttr(name) + '\')">Delete</span>' +
         '</td>' +
         '</tr>';
     }).join('');
@@ -3916,7 +3916,7 @@ function vlgOpenEdit(vlgId) {
   document.getElementById('vlg-edit-picktype').value = '';
   document.getElementById('vlg-edit-maxpallet').value = '';
   document.getElementById('vlg-edit-staging').value = '';
-  document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:#9ca3af;font-size:12px">Loading…</span>';
+  document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:var(--muted-foreground);font-size:12px">Loading…</span>';
   document.getElementById('vlg-edit-arrangement').value = 'CUSTOMER';
   document.getElementById('vlg-edit-allocations-host').innerHTML = '';
   ['vlg-edit-tgl-mixitem','vlg-edit-tgl-skipoccupied','vlg-edit-tgl-depleted','vlg-edit-tgl-mixlot'].forEach(id => {
@@ -3937,11 +3937,11 @@ async function vlgFetchDetail(vlgId) {
     headers: {'Accept': 'application/json'},
   });
   if (!resp || resp._needsAuth) {
-    document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:#ef4444;font-size:12px">Authentication required. Please sign in.</span>';
+    document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:var(--destructive);font-size:12px">Authentication required. Please sign in.</span>';
     return;
   }
   if (!resp.success && resp.success !== undefined) {
-    document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:#ef4444;font-size:12px">Could not load VLG details.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</span>';
+    document.getElementById('vlg-edit-tags-chips').innerHTML = '<span style="color:var(--destructive);font-size:12px">Could not load VLG details.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</span>';
     return;
   }
   const v = resp.data || resp;
@@ -3970,11 +3970,11 @@ async function vlgFetchDetail(vlgId) {
   const tagIds = v.tagIds || [];
   const chipsHost = document.getElementById('vlg-edit-tags-chips');
   if (tagIds.length === 0) {
-    chipsHost.innerHTML = '<span style="color:#9ca3af;font-size:12px">No tags assigned</span>';
+    chipsHost.innerHTML = '<span style="color:var(--muted-foreground);font-size:12px">No tags assigned</span>';
   } else {
     // Attempt to resolve tag names from virtual-tag search
     chipsHost.innerHTML = tagIds.map(tid =>
-      '<span style="display:inline-flex;align-items:center;gap:4px;background:#F7F2FF;color:#5F2E98;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px">Tag #' + esc(String(tid)) + '</span>'
+      '<span style="display:inline-flex;align-items:center;gap:4px;background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px">Tag #' + esc(String(tid)) + '</span>'
     ).join(' ');
     // Fire-and-forget name resolution — ontology-verified: POST /api/wms/location/virtual-tag/search-by-paging
     safeFetch(WMS_BASE + '/api/wms/location/virtual-tag/search-by-paging', {
@@ -3990,7 +3990,7 @@ async function vlgFetchDetail(vlgId) {
       tagList.forEach(t => { if (t.id != null) tagMap[t.id] = t.name || ('Tag #' + t.id); });
       chipsHost.innerHTML = tagIds.map(tid => {
         const label = tagMap[tid] || ('Tag #' + tid);
-        return '<span style="display:inline-flex;align-items:center;gap:4px;background:#F7F2FF;color:#5F2E98;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px">' + esc(label) + '</span>';
+        return '<span style="display:inline-flex;align-items:center;gap:4px;background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px">' + esc(label) + '</span>';
       }).join(' ');
     }).catch(() => {});
   }
@@ -4005,21 +4005,21 @@ function vlgRenderAllocations(allocations) {
   (FACILITY_CUSTOMERS[FACILITY_ID] || []).forEach(c => { custLookup[c.id] = c.name; });
 
   if (!allocations || allocations.length === 0) {
-    host.innerHTML = '<div style="color:#9ca3af;font-size:13px;padding:12px 0">No arrangements configured.</div>';
+    host.innerHTML = '<div style="color:var(--muted-foreground);font-size:13px;padding:12px 0">No arrangements configured.</div>';
     return;
   }
   host.innerHTML = allocations.map((a, i) => {
     const custName = custLookup[a.customerId] || a.customerId || '—';
     const from = a.timeRangeFrom || '—';
     const to = a.timeRangeTo || '—';
-    return '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:10px;background:#f9fafb">' +
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;background:var(--accent)">' +
       '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;align-items:end">' +
-        '<div class="cc-field" style="margin:0"><label class="cc-label">Time Range From</label><input class="cc-input" value="' + esc(from) + '" readonly style="background:#fff;font-size:12px"/></div>' +
-        '<div class="cc-field" style="margin:0"><label class="cc-label">Time Range To</label><input class="cc-input" value="' + esc(to) + '" readonly style="background:#fff;font-size:12px"/></div>' +
-        '<div class="cc-field" style="margin:0"><label class="cc-label">Category</label><input class="cc-input" value="' + esc(a.category || '—') + '" readonly style="background:#fff;font-size:12px"/></div>' +
-        '<div class="cc-field" style="margin:0"><label class="cc-label">Customer</label><input class="cc-input" value="' + esc(custName) + '" readonly style="background:#fff;font-size:12px"/></div>' +
-        '<div class="cc-field" style="margin:0"><label class="cc-label">Percentage</label><input class="cc-input" value="' + (a.percentage != null ? a.percentage + '%' : '—') + '" readonly style="background:#fff;font-size:12px"/></div>' +
-        '<div style="display:flex;align-items:end;padding-bottom:2px"><button class="btn btn-secondary" onclick="vlgRemoveAllocation(' + i + ')" style="font-size:11px;padding:5px 10px;color:#dc2626;border-color:#fca5a5">Remove</button></div>' +
+        '<div class="cc-field" style="margin:0"><label class="cc-label">Time Range From</label><input class="cc-input" value="' + esc(from) + '" readonly style="background:var(--card);font-size:12px"/></div>' +
+        '<div class="cc-field" style="margin:0"><label class="cc-label">Time Range To</label><input class="cc-input" value="' + esc(to) + '" readonly style="background:var(--card);font-size:12px"/></div>' +
+        '<div class="cc-field" style="margin:0"><label class="cc-label">Category</label><input class="cc-input" value="' + esc(a.category || '—') + '" readonly style="background:var(--card);font-size:12px"/></div>' +
+        '<div class="cc-field" style="margin:0"><label class="cc-label">Customer</label><input class="cc-input" value="' + esc(custName) + '" readonly style="background:var(--card);font-size:12px"/></div>' +
+        '<div class="cc-field" style="margin:0"><label class="cc-label">Percentage</label><input class="cc-input" value="' + (a.percentage != null ? a.percentage + '%' : '—') + '" readonly style="background:var(--card);font-size:12px"/></div>' +
+        '<div style="display:flex;align-items:end;padding-bottom:2px"><button class="btn btn-secondary" onclick="vlgRemoveAllocation(' + i + ')" style="font-size:11px;padding:5px 10px;color:var(--destructive);border-color:color-mix(in srgb,var(--destructive) 38%,var(--border))">Remove</button></div>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -4095,9 +4095,9 @@ function vlgOpenHistory(vlgId, vlgName) {
   // No verified history/audit endpoint exists in the ontology for VLGs.
   document.getElementById('vlg-history-body').innerHTML =
     '<div style="padding:40px 0;text-align:center">' +
-    '<div style="margin-bottom:10px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
-    '<strong style="color:#6b7280">History is not available in this dashboard yet</strong><br>' +
-    '<span style="font-size:12px;color:#9ca3af">VLG audit trail requires a history endpoint that is not currently exposed by the WMS API.</span>' +
+    '<div style="margin-bottom:10px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+    '<strong style="color:var(--muted-foreground)">History is not available in this dashboard yet</strong><br>' +
+    '<span style="font-size:12px;color:var(--muted-foreground)">VLG audit trail requires a history endpoint that is not currently exposed by the WMS API.</span>' +
     '</div>';
 }
 
@@ -4128,7 +4128,7 @@ const LTAG_PAGE_SIZE = 20;
 async function loadLocationTagData(page) {
   if (page) LTAG_PAGE = page;
   const body = document.getElementById('ltag-table-body');
-  if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:#9ca3af">Loading from Wise…</td></tr>';
+  if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading from Wise…</td></tr>';
 
   const filterTag = (document.getElementById('ltag-filter-tag') || {}).value || '';
   const filterLoc = (document.getElementById('ltag-filter-location') || {}).value || '';
@@ -4148,14 +4148,14 @@ async function loadLocationTagData(page) {
   if (!resp || resp._needsAuth) {
     if (!resp && WISE_TOKEN) {
       // Network/CORS error but session token exists — not an auth issue
-      if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:#d97706">Unable to reach the WMS service. Your session is active but the server may be temporarily unavailable. Try refreshing in a moment.</td></tr>';
+      if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--chart-4)">Unable to reach the WMS service. Your session is active but the server may be temporarily unavailable. Try refreshing in a moment.</td></tr>';
     } else {
-      if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:#ef4444">Authentication required. Please sign in to view location tags.</td></tr>';
+      if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--destructive)">Authentication required. Please sign in to view location tags.</td></tr>';
     }
     return;
   }
   if (!resp.success && resp.success !== undefined) {
-    if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:#ef4444">Could not load location tags.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--destructive)">Could not load location tags.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
     return;
   }
 
@@ -4175,9 +4175,9 @@ async function loadLocationTagData(page) {
 
   if (!body) return;
   if (list.length === 0) {
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:#9ca3af">' +
-      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>' +
-      '<strong style="color:#6b7280">No location tags found</strong><br>' +
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>' +
+      '<strong style="color:var(--muted-foreground)">No location tags found</strong><br>' +
       '<span style="font-size:12px">Try adjusting your filters or check that tags exist for this facility.</span></td></tr>';
   } else {
     body.innerHTML = list.map(r => {
@@ -4190,9 +4190,9 @@ async function loadLocationTagData(page) {
         '<td>' + esc(note) + '</td>' +
         '<td>' + locCount.toLocaleString() + '</td>' +
         '<td>' +
-          '<span style="color:#753BBD;font-size:12px;cursor:pointer;font-weight:600" onclick="ltagOpenEdit(' + rid + ')">Edit</span>' +
-          ' <span style="color:#9ca3af;margin:0 4px">|</span> ' +
-          '<span style="color:#dc2626;font-size:12px;cursor:pointer;font-weight:600" onclick="ltagDeleteTag(' + rid + ')">Delete</span>' +
+          '<span style="color:var(--primary);font-size:12px;cursor:pointer;font-weight:600" onclick="ltagOpenEdit(' + rid + ')">Edit</span>' +
+          ' <span style="color:var(--muted-foreground);margin:0 4px">|</span> ' +
+          '<span style="color:var(--destructive);font-size:12px;cursor:pointer;font-weight:600" onclick="ltagDeleteTag(' + rid + ')">Delete</span>' +
         '</td>' +
         '</tr>';
     }).join('');
@@ -4301,7 +4301,7 @@ function ltagOpenEdit(tagId) {
   LTAG_EDIT_SELECTED = new Set();
   document.getElementById('ltag-list-panel').style.display = 'none';
   document.getElementById('ltag-edit-panel').style.display = '';
-  document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Loading tag details…</td></tr>';
+  document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading tag details…</td></tr>';
   document.getElementById('ltag-edit-name').value = '';
   document.getElementById('ltag-edit-desc').value = '';
   document.getElementById('ltag-edit-loc-search').value = '';
@@ -4314,11 +4314,11 @@ async function ltagFetchTagDetail(tagId) {
     headers: {'Accept': 'application/json'},
   });
   if (!resp || resp._needsAuth) {
-    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#ef4444">Authentication required.</td></tr>';
+    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--destructive)">Authentication required.</td></tr>';
     return;
   }
   if (!resp.success && resp.success !== undefined) {
-    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#ef4444">Could not load tag details.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
+    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--destructive)">Could not load tag details.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
     return;
   }
   const tag = resp.data || resp;
@@ -4335,7 +4335,7 @@ async function ltagFetchTagDetail(tagId) {
     ltagRenderEditLocs();
   } else if (tag.locationIds && tag.locationIds.length > 0) {
     // Fetch location details by IDs using the verified wms-location search endpoint
-    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">Loading ' + tag.locationIds.length + ' location(s)…</td></tr>';
+    document.getElementById('ltag-edit-locs-body').innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted-foreground)">Loading ' + tag.locationIds.length + ' location(s)…</td></tr>';
     const locResp = await safeFetch(API.locSearch, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -4368,7 +4368,7 @@ function ltagRenderEditLocs(filter) {
     locs = locs.filter(l => (l.name || '').toLowerCase().includes(q));
   }
   if (locs.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9ca3af">' +
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted-foreground)">' +
       (LTAG_EDIT_LOCS.length === 0 ? 'No locations assigned to this tag.' : 'No locations match the search.') + '</td></tr>';
     return;
   }
@@ -4381,7 +4381,7 @@ function ltagRenderEditLocs(filter) {
       '<td>' + esc(l.type || '—') + '</td>' +
       '<td>' + esc(l.supportPickType || '—') + '</td>' +
       '<td><span class="badge ' + (l.status === 'USABLE' ? 'ok' : (l.status === 'DISABLED' ? 'err' : 'idle')) + '">' + esc(l.status || '—') + '</span></td>' +
-      '<td><span style="color:#dc2626;font-size:12px;cursor:pointer;font-weight:600" onclick="ltagRemoveLoc(\'' + escAttr(locId) + '\')">Delete</span></td>' +
+      '<td><span style="color:var(--destructive);font-size:12px;cursor:pointer;font-weight:600" onclick="ltagRemoveLoc(\'' + escAttr(locId) + '\')">Delete</span></td>' +
       '</tr>';
   }).join('');
 }
@@ -4537,16 +4537,16 @@ function rsUpdateCustomerBadge() {
   const val = sel.value;
   if (!val) {
     avatar.textContent = 'ALL';
-    avatar.style.background = '#F3EEFF';
-    avatar.style.color = '#5F2E98';
+    avatar.style.background = 'color-mix(in srgb,var(--primary) 10%,var(--card))';
+    avatar.style.color = 'var(--primary)';
     badge.textContent = 'All Customers';
   } else {
     const opt = sel.options[sel.selectedIndex];
     const name = opt ? opt.textContent : val;
     const initials = name.split(/[\s,]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
     avatar.textContent = initials || '?';
-    avatar.style.background = '#EDE9FE';
-    avatar.style.color = '#5B21B6';
+    avatar.style.background = 'color-mix(in srgb,var(--primary) 12%,var(--card))';
+    avatar.style.color = 'var(--primary)';
     badge.textContent = name;
   }
 }
@@ -4564,14 +4564,14 @@ async function rsRefresh() {
   const tbody = document.getElementById('rs-tbody');
   const selectedCustomer = (document.getElementById('rs-customer-select') || {}).value || '';
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9ca3af"><span class="spinner"></span> Searching next-day order plans…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted-foreground)"><span class="spinner"></span> Searching next-day order plans…</td></tr>';
 
   RS_DATA = [];
   RS_OPEN_TASKS = [];
   RS_REPLEN_SETUP = {};
 
   if (!WISE_TOKEN) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#ef4444">Please sign in to load replenishment suggestions.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--destructive)">Please sign in to load replenishment suggestions.</td></tr>';
     if (btn) { btn.disabled = false; btn.textContent = 'Refresh Suggestions'; }
     return;
   }
@@ -4623,14 +4623,14 @@ async function rsRefresh() {
   }
 
   if (!planResp && !WISE_TOKEN) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#ef4444">Unable to reach the order plan service. Check your connection and try again.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--destructive)">Unable to reach the order plan service. Check your connection and try again.</td></tr>';
     if (btn) { btn.disabled = false; btn.textContent = 'Refresh Suggestions'; }
     return;
   }
 
   // Step 2: For each plan, get items needing replenishment
   if (plans.length > 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9ca3af"><span class="spinner"></span> Checking replenishment needs for ' + plans.length + ' plan(s)…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted-foreground)"><span class="spinner"></span> Checking replenishment needs for ' + plans.length + ' plan(s)…</td></tr>';
 
     const itemFetches = plans.slice(0, 15).map(async (plan) => {
       const resp = await safeFetch(WMS_BASE + '/api/wms-bam/outbound/order-plan/items-need-replenishment', {
@@ -4781,9 +4781,9 @@ function rsRender() {
   document.getElementById('rs-kpi-action').textContent = actionCount || '0';
 
   if (displayRows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:#9ca3af">' +
-      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>' +
-      '<strong style="color:#6b7280">No replenishment gaps found</strong><br>' +
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>' +
+      '<strong style="color:var(--muted-foreground)">No replenishment gaps found</strong><br>' +
       '<span style="font-size:12px">Pick locations appear ready for next-day demand.</span></td></tr>';
     document.getElementById('rs-result-count').textContent = 'No suggestions';
     return;
@@ -4794,25 +4794,25 @@ function rsRender() {
   tbody.innerHTML = displayRows.map(s => {
     const mode = rsGetMode();
     const rowKey = rsRowKey(s);
-    const statusCls = s.taskStatus === 'Covered' ? 'style="color:#059669;font-weight:600"' :
-                      s.taskStatus === 'Partial' ? 'style="color:#d97706;font-weight:600"' :
-                      'style="color:#dc2626;font-weight:600"';
-    const recStyle = s.taskStatus === 'Covered' ? 'color:#6b7280' : (s.eligible ? 'color:#059669;font-weight:600' : 'color:#1f2937;font-weight:600');
-    const ruleTag = s.shippingRule ? '<span style="display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:#EDE9FE;color:#5B21B6;margin-left:4px">' + esc(s.shippingRule) + '</span>' : '';
-    const fromLoc = s.fromLocation ? esc(s.fromLocation) : '<span style="color:#9ca3af;font-style:italic">Not configured</span>';
-    const toLoc = s.toLocation ? esc(s.toLocation) : '<span style="color:#9ca3af;font-style:italic">Not configured</span>';
-    const planCell = s.planDetail ? '<span title="' + esc(s.planDetail) + '" style="cursor:help;border-bottom:1px dotted #9ca3af">' + esc(s.planLabel) + '</span>' : esc(s.planLabel);
-    const noteCell = s.note ? '<span style="color:#b45309;font-size:11px" title="' + esc(s.note) + '">' + esc(String(s.note).slice(0, 40)) + (s.note.length > 40 ? '…' : '') + '</span>' : '<span style="color:#d1d5db">—</span>';
-    const assigneeCell = s.assignee ? '<span style="font-size:11px;color:#374151">' + esc(String(s.assignee).slice(0, 20)) + '</span>' : '<span style="color:#9ca3af;font-style:italic;font-size:11px">Not assigned</span>';
-    const checkCell = mode !== 'readonly' ? '<td><input type="checkbox" data-key="' + escAttr(rowKey) + '" onchange="rsToggleRow(\'' + escAttr(rowKey) + '\',this.checked)" ' + (RS_SELECTED.has(rowKey) ? 'checked' : '') + ' style="accent-color:#753BBD"/></td>' : '<td></td>';
+    const statusCls = s.taskStatus === 'Covered' ? 'style="color:var(--chart-3);font-weight:600"' :
+                      s.taskStatus === 'Partial' ? 'style="color:var(--chart-4);font-weight:600"' :
+                      'style="color:var(--destructive);font-weight:600"';
+    const recStyle = s.taskStatus === 'Covered' ? 'color:var(--muted-foreground)' : (s.eligible ? 'color:var(--chart-3);font-weight:600' : 'color:var(--foreground);font-weight:600');
+    const ruleTag = s.shippingRule ? '<span style="display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;background:color-mix(in srgb,var(--primary) 12%,var(--card));color:var(--primary);margin-left:4px">' + esc(s.shippingRule) + '</span>' : '';
+    const fromLoc = s.fromLocation ? esc(s.fromLocation) : '<span style="color:var(--muted-foreground);font-style:italic">Not configured</span>';
+    const toLoc = s.toLocation ? esc(s.toLocation) : '<span style="color:var(--muted-foreground);font-style:italic">Not configured</span>';
+    const planCell = s.planDetail ? '<span title="' + esc(s.planDetail) + '" style="cursor:help;border-bottom:1px dotted var(--muted-foreground)">' + esc(s.planLabel) + '</span>' : esc(s.planLabel);
+    const noteCell = s.note ? '<span style="color:var(--chart-4);font-size:11px" title="' + esc(s.note) + '">' + esc(String(s.note).slice(0, 40)) + (s.note.length > 40 ? '…' : '') + '</span>' : '<span style="color:var(--input)">—</span>';
+    const assigneeCell = s.assignee ? '<span style="font-size:11px;color:var(--foreground)">' + esc(String(s.assignee).slice(0, 20)) + '</span>' : '<span style="color:var(--muted-foreground);font-style:italic;font-size:11px">Not assigned</span>';
+    const checkCell = mode !== 'readonly' ? '<td><input type="checkbox" data-key="' + escAttr(rowKey) + '" onchange="rsToggleRow(\'' + escAttr(rowKey) + '\',this.checked)" ' + (RS_SELECTED.has(rowKey) ? 'checked' : '') + ' style="accent-color:var(--primary)"/></td>' : '<td></td>';
     return '<tr>' +
       checkCell +
       '<td style="font-size:12px">' + esc(String(s.customerName).slice(0, 25)) + '</td>' +
-      '<td style="font-family:monospace;font-size:11px;color:#753BBD">' + planCell + '</td>' +
+      '<td style="font-family:monospace;font-size:11px;color:var(--primary)">' + planCell + '</td>' +
       '<td title="' + esc(s.itemId) + '">' + esc(String(s.itemName).slice(0, 30)) + ruleTag + '</td>' +
       '<td style="font-weight:600">' + esc(String(s.qty)) + '</td>' +
-      '<td style="font-size:11px;color:#6b7280">' + esc(s.uom) + '</td>' +
-      '<td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#374151">' + esc(s.pickType) + '</span></td>' +
+      '<td style="font-size:11px;color:var(--muted-foreground)">' + esc(s.uom) + '</td>' +
+      '<td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--muted);color:var(--foreground)">' + esc(s.pickType) + '</span></td>' +
       '<td style="font-family:monospace;font-size:11px">' + fromLoc + '</td>' +
       '<td style="font-family:monospace;font-size:11px">' + toLoc + '</td>' +
       '<td style="font-size:11px">' + assigneeCell + '</td>' +
@@ -4832,7 +4832,7 @@ function rsFilterTable() {
     return hay.includes(q);
   });
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:#9ca3af">No suggestions match "' + esc(q) + '"</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--muted-foreground)">No suggestions match "' + esc(q) + '"</td></tr>';
     return;
   }
   const backup = RS_DATA;
@@ -4937,8 +4937,8 @@ function rsOnModeChange() {
   const labels = {'suggest-confirm':'Suggest + confirm','auto-create':'Auto-create unassigned','auto-assign':'Auto-create + assign','readonly':'View only'};
   const lbl = document.getElementById('rs-auto-mode-label');
   lbl.textContent = 'Mode: ' + (labels[mode] || mode);
-  lbl.style.background = mode === 'readonly' ? '#f3f4f6' : '#753BBD';
-  lbl.style.color = mode === 'readonly' ? '#6b7280' : '#fff';
+  lbl.style.background = mode === 'readonly' ? 'var(--muted)' : 'var(--primary)';
+  lbl.style.color = mode === 'readonly' ? 'var(--muted-foreground)' : 'var(--primary-foreground)';
   const btn = document.getElementById('rs-create-btn');
   if (btn) btn.style.display = mode === 'readonly' ? 'none' : '';
   RS_SELECTED.clear();
@@ -4989,25 +4989,25 @@ function rsShowConfirmation() {
     else eligible.push(row);
   });
 
-  let html = '<div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:10px">Confirm Task Creation</div>';
+  let html = '<div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:10px">Confirm Task Creation</div>';
   if (eligible.length > 0) {
-    html += '<div style="font-size:12px;color:#065f46;margin-bottom:8px"><strong>' + eligible.length + '</strong> eligible row(s) will create replenishment task(s):</div>';
-    html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:10px"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Customer</th><th style="padding:4px 6px;text-align:left">Item</th><th style="padding:4px 6px;text-align:left">Qty</th><th style="padding:4px 6px;text-align:left">To Location</th><th style="padding:4px 6px;text-align:left">Assignee</th></tr></thead><tbody>';
+    html += '<div style="font-size:12px;color:var(--chart-3);margin-bottom:8px"><strong>' + eligible.length + '</strong> eligible row(s) will create replenishment task(s):</div>';
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:10px"><thead><tr style="background:var(--accent)"><th style="padding:4px 6px;text-align:left">Customer</th><th style="padding:4px 6px;text-align:left">Item</th><th style="padding:4px 6px;text-align:left">Qty</th><th style="padding:4px 6px;text-align:left">To Location</th><th style="padding:4px 6px;text-align:left">Assignee</th></tr></thead><tbody>';
     eligible.forEach(r => {
       html += '<tr><td style="padding:3px 6px">' + esc(String(r.customerName).slice(0,20)) + '</td><td style="padding:3px 6px">' + esc(String(r.itemName).slice(0,25)) + '</td><td style="padding:3px 6px;font-weight:600">' + r.qty + ' ' + esc(r.uom) + '</td><td style="padding:3px 6px;font-family:monospace;font-size:10px">' + esc(r.toLocation || r.toLocationId || '—') + '</td><td style="padding:3px 6px">' + esc(r.suggestedAssignee || r.defaultAssignee || '—') + '</td></tr>';
     });
     html += '</tbody></table>';
   }
   if (blocked.length > 0) {
-    html += '<div style="font-size:12px;color:#991b1b;margin-bottom:6px"><strong>' + blocked.length + '</strong> row(s) blocked:</div>';
+    html += '<div style="font-size:12px;color:var(--destructive);margin-bottom:6px"><strong>' + blocked.length + '</strong> row(s) blocked:</div>';
     blocked.forEach(b => {
-      html += '<div style="font-size:11px;color:#6b7280;margin-bottom:3px">• ' + esc(String(b.row.itemName).slice(0,25)) + ' — <span style="color:#dc2626">' + esc(b.reasons.join('; ')) + '</span></div>';
+      html += '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:3px">• ' + esc(String(b.row.itemName).slice(0,25)) + ' — <span style="color:var(--destructive)">' + esc(b.reasons.join('; ')) + '</span></div>';
     });
   }
   if (eligible.length > 0) {
     html += '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" onclick="rsExecuteCreate()" style="font-size:12px;padding:6px 14px">Confirm &amp; Create ' + eligible.length + ' Task(s)</button><button class="btn btn-secondary" onclick="document.getElementById(\'rs-confirm-panel\').style.display=\'none\'" style="font-size:12px;padding:6px 14px">Cancel</button></div>';
   } else {
-    html += '<div style="margin-top:8px;font-size:12px;color:#6b7280">No eligible rows to create. Resolve blockers above.</div>';
+    html += '<div style="margin-top:8px;font-size:12px;color:var(--muted-foreground)">No eligible rows to create. Resolve blockers above.</div>';
   }
   panel.innerHTML = html;
   panel.style.display = '';
@@ -5041,7 +5041,7 @@ async function rsExecuteCreate() {
 
   if (eligible.length === 0) { alert('No eligible rows passed final guardrail check.'); return; }
 
-  panel.innerHTML = '<div style="padding:12px;text-align:center;color:#6b7280"><span class="spinner"></span> Creating ' + eligible.length + ' replenishment task(s)…</div>';
+  panel.innerHTML = '<div style="padding:12px;text-align:center;color:var(--muted-foreground)"><span class="spinner"></span> Creating ' + eligible.length + ' replenishment task(s)…</div>';
 
   let successes = 0, failures = [];
   for (const row of eligible) {
@@ -5081,11 +5081,11 @@ async function rsExecuteCreate() {
 
   let html = '';
   if (successes > 0) {
-    html += '<div style="padding:10px 14px;background:#ECFDF5;border-radius:6px;border:1px solid #A7F3D0;margin-bottom:8px"><strong style="color:#047857">' + successes + ' replenishment task(s) created successfully.</strong></div>';
+    html += '<div style="padding:10px 14px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-3) 30%,var(--border));margin-bottom:8px"><strong style="color:var(--chart-3)">' + successes + ' replenishment task(s) created successfully.</strong></div>';
   }
   if (failures.length > 0) {
-    html += '<div style="padding:10px 14px;background:#FEF2F2;border-radius:6px;border:1px solid #FECACA;margin-bottom:8px"><strong style="color:#B91C1C">' + failures.length + ' task(s) could not be created:</strong>';
-    failures.forEach(f => { html += '<div style="font-size:11px;color:#991B1B;margin-top:4px">• ' + esc(f.item) + ': ' + esc(f.msg) + '</div>'; });
+    html += '<div style="padding:10px 14px;background:color-mix(in srgb,var(--destructive) 12%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--destructive) 32%,var(--border));margin-bottom:8px"><strong style="color:var(--destructive)">' + failures.length + ' task(s) could not be created:</strong>';
+    failures.forEach(f => { html += '<div style="font-size:11px;color:var(--destructive);margin-top:4px">• ' + esc(f.item) + ': ' + esc(f.msg) + '</div>'; });
     html += '</div>';
   }
   html += '<div style="margin-top:8px"><button class="btn btn-primary" onclick="document.getElementById(\'rs-confirm-panel\').style.display=\'none\'; RS_SELECTED.clear(); rsRefresh();" style="font-size:12px;padding:6px 14px">Done — Refresh Suggestions</button></div>';
@@ -5133,7 +5133,7 @@ async function ccalRefresh() {
   const label = document.getElementById('ccal-month-label');
   if (label) label.textContent = CCAL_MONTH.toLocaleDateString('en-US', {month:'long', year:'numeric'});
   const tbody = document.getElementById('ccal-tbody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af"><span class="spinner"></span> Loading from WMS…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Loading from WMS…</td></tr>';
 
   const year = CCAL_MONTH.getFullYear();
   const month = CCAL_MONTH.getMonth();
@@ -5143,7 +5143,7 @@ async function ccalRefresh() {
   CCAL_RESULT_STATS = {};
 
   if (!WISE_TOKEN) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#ef4444">Please sign in to load count schedules.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in to load count schedules.</td></tr>';
     ccalRender();
     return;
   }
@@ -5333,33 +5333,33 @@ function ccalRender() {
   if (listTitle) listTitle.textContent = wmsCount + ' WMS ticket(s)' + (localCount > 0 ? ' + ' + localCount + ' local plan(s)' : '') + ' in ' + CCAL_MONTH.toLocaleDateString('en-US', {month:'long', year:'numeric'});
 
   if (events.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9ca3af">No count schedules found for this month.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted-foreground)">No count schedules found for this month.</td></tr>';
     return;
   }
 
   tbody.innerHTML = events.map(e => {
     const dateFmt = e.date.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
-    const dateNote = e.dateSource === 'createdTime' ? ' <span style="font-size:9px;color:#9ca3af">(created date)</span>' : '';
-    const typeLabel = e.type === 'PHYSICAL_COUNT' ? '<span style="color:#dc2626;font-weight:600">Physical</span>' :
-                      e.type === 'CYCLE_COUNT' ? '<span style="color:#5B21B6;font-weight:600">Cycle</span>' :
-                      '<span style="color:#6b7280;font-weight:600">Unclassified</span>';
-    const stateCls = /with Results/.test(e.state) ? 'color:#059669' :
-                     /Cancelled/.test(e.state) ? 'color:#9ca3af;text-decoration:line-through' :
-                     /Counting|Task Created/.test(e.state) ? 'color:#d97706' :
-                     /Local only/.test(e.state) ? 'color:#2563eb;font-style:italic' :
-                     /Empty.*Invalid/.test(e.state) ? 'color:#dc2626' : 'color:#374151';
-    const evidenceBadge = /Empty.*Invalid/.test(e.state) ? '<span style="color:#dc2626;font-size:10px;font-weight:600">Empty/Invalid</span>' :
-                          /with Results/.test(e.state) ? '<span style="color:#059669;font-size:10px">' + e.resultCount + ' result(s)</span>' :
-                          e.source === 'local' ? '<span style="color:#9ca3af;font-size:10px">N/A</span>' : '—';
-    const sourceTag = e.source === 'local' ? ' <span style="font-size:9px;background:#DBEAFE;color:#1e40af;padding:1px 4px;border-radius:3px">Local</span>' : '';
+    const dateNote = e.dateSource === 'createdTime' ? ' <span style="font-size:9px;color:var(--muted-foreground)">(created date)</span>' : '';
+    const typeLabel = e.type === 'PHYSICAL_COUNT' ? '<span style="color:var(--destructive);font-weight:600">Physical</span>' :
+                      e.type === 'CYCLE_COUNT' ? '<span style="color:var(--primary);font-weight:600">Cycle</span>' :
+                      '<span style="color:var(--muted-foreground);font-weight:600">Unclassified</span>';
+    const stateCls = /with Results/.test(e.state) ? 'color:var(--chart-3)' :
+                     /Cancelled/.test(e.state) ? 'color:var(--muted-foreground);text-decoration:line-through' :
+                     /Counting|Task Created/.test(e.state) ? 'color:var(--chart-4)' :
+                     /Local only/.test(e.state) ? 'color:var(--chart-5);font-style:italic' :
+                     /Empty.*Invalid/.test(e.state) ? 'color:var(--destructive)' : 'color:var(--foreground)';
+    const evidenceBadge = /Empty.*Invalid/.test(e.state) ? '<span style="color:var(--destructive);font-size:10px;font-weight:600">Empty/Invalid</span>' :
+                          /with Results/.test(e.state) ? '<span style="color:var(--chart-3);font-size:10px">' + e.resultCount + ' result(s)</span>' :
+                          e.source === 'local' ? '<span style="color:var(--muted-foreground);font-size:10px">N/A</span>' : '—';
+    const sourceTag = e.source === 'local' ? ' <span style="font-size:9px;background:color-mix(in srgb,var(--chart-5) 18%,var(--card));color:var(--chart-5);padding:1px 4px;border-radius:3px">Local</span>' : '';
     return '<tr>' +
       '<td style="font-size:12px;white-space:nowrap">' + esc(dateFmt) + dateNote + '</td>' +
       '<td>' + typeLabel + sourceTag + '</td>' +
       '<td style="font-size:11px">' + esc(e.category) + '</td>' +
       '<td style="font-size:12px">' + esc(String(e.customer).slice(0, 22)) + '</td>' +
       '<td style="font-size:11px">' + esc(e.method) + '</td>' +
-      '<td>' + (e.locs > 0 ? e.locs + ' loc' + (e.locs > 1 ? 's' : '') : '<span style="color:#9ca3af">—</span>') + '</td>' +
-      '<td style="font-family:monospace;font-size:11px;color:#753BBD">' + (e.ticketId ? esc(e.ticketId) : '<span style="color:#9ca3af">—</span>') + '</td>' +
+      '<td>' + (e.locs > 0 ? e.locs + ' loc' + (e.locs > 1 ? 's' : '') : '<span style="color:var(--muted-foreground)">—</span>') + '</td>' +
+      '<td style="font-family:monospace;font-size:11px;color:var(--primary)">' + (e.ticketId ? esc(e.ticketId) : '<span style="color:var(--muted-foreground)">—</span>') + '</td>' +
       '<td style="font-size:11px;' + stateCls + '">' + esc(e.state) + '</td>' +
       '<td>' + evidenceBadge + '</td>' +
       '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.notes || '—') + '</td>' +
@@ -5380,21 +5380,21 @@ function ccalRenderGrid(events) {
   const byDate = {};
   events.forEach(e => { if (!byDate[e.dateStr]) byDate[e.dateStr] = []; byDate[e.dateStr].push(e); });
 
-  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => '<div style="text-align:center;font-weight:600;color:#6b7280;padding:4px">' + d + '</div>').join('');
+  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => '<div style="text-align:center;font-weight:600;color:var(--muted-foreground);padding:4px">' + d + '</div>').join('');
   for (let i = 0; i < firstDay; i++) html += '<div style="padding:4px"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const isToday = ds === todayStr;
     const dayEvents = byDate[ds] || [];
-    const bg = isToday ? '#F3EEFF' : (dayEvents.length > 0 ? '#f9fafb' : '#fff');
-    const border = isToday ? '2px solid #753BBD' : '1px solid #e5e7eb';
+    const bg = isToday ? 'color-mix(in srgb,var(--primary) 10%,var(--card))' : (dayEvents.length > 0 ? 'var(--accent)' : 'var(--card)');
+    const border = isToday ? '2px solid var(--primary)' : '1px solid var(--border)';
     let dots = '';
     dayEvents.forEach(e => {
-      const color = e.type === 'PHYSICAL_COUNT' ? '#dc2626' : '#5B21B6';
+      const color = e.type === 'PHYSICAL_COUNT' ? 'var(--destructive)' : 'var(--primary)';
       dots += '<div style="width:6px;height:6px;border-radius:50%;background:' + color + ';display:inline-block;margin:0 1px" title="' + esc(e.state) + '"></div>';
     });
     html += '<div style="padding:4px 6px;min-height:42px;border:' + border + ';border-radius:4px;background:' + bg + '">' +
-      '<div style="font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? '#5B21B6' : '#374151') + '">' + d + '</div>' +
+      '<div style="font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? 'var(--primary)' : 'var(--foreground)') + '">' + d + '</div>' +
       (dots ? '<div style="margin-top:2px">' + dots + '</div>' : '') +
       '</div>';
   }
@@ -5408,7 +5408,7 @@ function ccalShowAddForm() {
   const customers = FACILITY_CUSTOMERS[FACILITY_ID] || [];
   const custOpts = customers.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
   form.style.display = '';
-  form.innerHTML = '<div style="padding:16px"><div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:12px">Add Confirmed Count Schedule</div>' +
+  form.innerHTML = '<div style="padding:16px"><div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:12px">Add Confirmed Count Schedule</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Date</label><input type="date" class="cc-input" id="ccal-add-date" value="' + todayStr + '"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Type</label><select class="cc-input" id="ccal-add-type"><option value="CYCLE_COUNT">Cycle Count</option><option value="PHYSICAL_COUNT">Physical Count</option></select></div>' +
@@ -5481,7 +5481,7 @@ async function picalRefresh() {
   const label = document.getElementById('pical-month-label');
   if (label) label.textContent = PICAL_MONTH.toLocaleDateString('en-US', {month:'long', year:'numeric'});
   const tbody = document.getElementById('pical-tbody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af"><span class="spinner"></span> Loading physical inventory data…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Loading physical inventory data…</td></tr>';
 
   const year = PICAL_MONTH.getFullYear();
   const month = PICAL_MONTH.getMonth();
@@ -5602,48 +5602,48 @@ function picalRender() {
   if (listTitle) listTitle.textContent = (wmsCount + localCount) + ' physical inventory date(s)' + (localCount > 0 ? ' (' + localCount + ' local)' : '') + ' — ' + PICAL_MONTH.toLocaleDateString('en-US', {month:'long', year:'numeric'});
 
   if (events.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#9ca3af">' +
-      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>' +
-      '<strong style="color:#6b7280">No physical inventory dates this month</strong><br>' +
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>' +
+      '<strong style="color:var(--muted-foreground)">No physical inventory dates this month</strong><br>' +
       '<span style="font-size:12px">Click "+ Add Physical Inventory Date" to schedule one.</span></td></tr>';
     return;
   }
 
   tbody.innerHTML = events.map(e => {
     const dateFmt = e.date.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
-    const dateNote = e.dateSource === 'createdTime' ? ' <span style="font-size:9px;color:#9ca3af">(created date)</span>' : '';
+    const dateNote = e.dateSource === 'createdTime' ? ' <span style="font-size:9px;color:var(--muted-foreground)">(created date)</span>' : '';
     const confStatus = e.confirmation || 'Pending';
-    const confCls = confStatus === 'Confirmed' ? 'color:#059669;font-weight:600' :
-                    confStatus === 'Canceled' ? 'color:#9ca3af;text-decoration:line-through' :
-                    confStatus === 'Re-scheduled' ? 'color:#d97706;font-weight:600' : 'color:#2563eb';
-    const stateCls = /Completed/.test(e.state) && !/Empty/.test(e.state) ? 'color:#059669' :
-                     /Canceled|Cancelled/.test(e.state) ? 'color:#9ca3af;text-decoration:line-through' :
-                     /Counting/.test(e.state) ? 'color:#d97706' :
-                     /Local only/.test(e.state) ? 'color:#2563eb;font-style:italic' :
-                     /Empty.*Invalid/.test(e.state) ? 'color:#dc2626' : 'color:#374151';
-    const sourceTag = e.source === 'local' ? ' <span style="font-size:9px;background:#DBEAFE;color:#1e40af;padding:1px 4px;border-radius:3px">Local</span>' : '';
+    const confCls = confStatus === 'Confirmed' ? 'color:var(--chart-3);font-weight:600' :
+                    confStatus === 'Canceled' ? 'color:var(--muted-foreground);text-decoration:line-through' :
+                    confStatus === 'Re-scheduled' ? 'color:var(--chart-4);font-weight:600' : 'color:var(--chart-5)';
+    const stateCls = /Completed/.test(e.state) && !/Empty/.test(e.state) ? 'color:var(--chart-3)' :
+                     /Canceled|Cancelled/.test(e.state) ? 'color:var(--muted-foreground);text-decoration:line-through' :
+                     /Counting/.test(e.state) ? 'color:var(--chart-4)' :
+                     /Local only/.test(e.state) ? 'color:var(--chart-5);font-style:italic' :
+                     /Empty.*Invalid/.test(e.state) ? 'color:var(--destructive)' : 'color:var(--foreground)';
+    const sourceTag = e.source === 'local' ? ' <span style="font-size:9px;background:color-mix(in srgb,var(--chart-5) 18%,var(--card));color:var(--chart-5);padding:1px 4px;border-radius:3px">Local</span>' : '';
     let actionsCell;
     if (e.source === 'local' && e._localId) {
       // Ticket status inline
       let ticketBadge = '';
       if (e.ticketId || e.ticketNumber) {
-        ticketBadge = '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#ECFDF5;color:#059669;font-weight:600;margin-right:6px">Ticket: ' + esc(e.ticketNumber || e.ticketId) + '</span>';
+        ticketBadge = '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));color:var(--chart-3);font-weight:600;margin-right:6px">Ticket: ' + esc(e.ticketNumber || e.ticketId) + '</span>';
       } else if (e.ticketStatus && /fail/i.test(e.ticketStatus)) {
         const reason = String(e.ticketStatus).replace(/^Failed:\s*/i,'').slice(0,60) || 'See diagnostics';
-        ticketBadge = '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:#FEF2F2;color:#dc2626;margin-right:4px;cursor:help" title="' + escAttr(e.ticketStatus) + '">Failed</span>' +
-          '<span style="font-size:9px;color:#6b7280;margin-right:6px">' + esc(reason) + '</span>';
+        ticketBadge = '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:color-mix(in srgb,var(--destructive) 12%,var(--card));color:var(--destructive);margin-right:4px;cursor:help" title="' + escAttr(e.ticketStatus) + '">Failed</span>' +
+          '<span style="font-size:9px;color:var(--muted-foreground);margin-right:6px">' + esc(reason) + '</span>';
       }
       actionsCell = ticketBadge +
-        '<span style="color:#753BBD;cursor:pointer;font-size:11px;font-weight:600;margin-right:8px" onclick="picalEditLocal(\'' + escAttr(e._localId) + '\')">Edit</span>' +
-        '<span style="color:#dc2626;cursor:pointer;font-size:11px;font-weight:600" onclick="picalDeleteLocal(\'' + escAttr(e._localId) + '\')">Delete</span>';
+        '<span style="color:var(--primary);cursor:pointer;font-size:11px;font-weight:600;margin-right:8px" onclick="picalEditLocal(\'' + escAttr(e._localId) + '\')">Edit</span>' +
+        '<span style="color:var(--destructive);cursor:pointer;font-size:11px;font-weight:600" onclick="picalDeleteLocal(\'' + escAttr(e._localId) + '\')">Delete</span>';
     } else {
-      actionsCell = '<span style="color:#9ca3af;font-size:11px">—</span>';
+      actionsCell = '<span style="color:var(--muted-foreground);font-size:11px">—</span>';
     }
     return '<tr>' +
       '<td style="font-size:12px;white-space:nowrap">' + esc(dateFmt) + dateNote + '</td>' +
       '<td style="font-size:12px">' + esc(String(e.customer).slice(0, 22)) + sourceTag + '</td>' +
       '<td style="font-size:11px;' + confCls + '">' + esc(confStatus) + '</td>' +
-      '<td style="font-size:11px">' + (e.quoteAmount ? '$' + esc(e.quoteAmount) : '<span style="color:#9ca3af">—</span>') + '</td>' +
+      '<td style="font-size:11px">' + (e.quoteAmount ? '$' + esc(e.quoteAmount) : '<span style="color:var(--muted-foreground)">—</span>') + '</td>' +
       '<td style="font-size:11px;' + stateCls + '">' + esc(e.state) + '</td>' +
       '<td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.notes || '—') + '</td>' +
       '<td style="white-space:nowrap">' + actionsCell + '</td>' +
@@ -5662,18 +5662,18 @@ function picalRenderGrid(events) {
   const byDate = {};
   events.forEach(e => { if (!byDate[e.dateStr]) byDate[e.dateStr] = []; byDate[e.dateStr].push(e); });
 
-  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => '<div style="text-align:center;font-weight:600;color:#6b7280;padding:4px">' + d + '</div>').join('');
+  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => '<div style="text-align:center;font-weight:600;color:var(--muted-foreground);padding:4px">' + d + '</div>').join('');
   for (let i = 0; i < firstDay; i++) html += '<div style="padding:4px"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
     const isToday = ds === todayStr;
     const dayEvents = byDate[ds] || [];
-    const bg = isToday ? '#FEF2F2' : (dayEvents.length > 0 ? '#fef2f2' : '#fff');
-    const border = isToday ? '2px solid #dc2626' : '1px solid #e5e7eb';
+    const bg = isToday ? 'color-mix(in srgb,var(--destructive) 12%,var(--card))' : (dayEvents.length > 0 ? 'color-mix(in srgb,var(--destructive) 12%,var(--card))' : 'var(--card)');
+    const border = isToday ? '2px solid var(--destructive)' : '1px solid var(--border)';
     let dots = '';
-    dayEvents.forEach(() => { dots += '<div style="width:6px;height:6px;border-radius:50%;background:#dc2626;display:inline-block;margin:0 1px"></div>'; });
+    dayEvents.forEach(() => { dots += '<div style="width:6px;height:6px;border-radius:50%;background:var(--destructive);display:inline-block;margin:0 1px"></div>'; });
     html += '<div style="padding:4px 6px;min-height:42px;border:' + border + ';border-radius:4px;background:' + bg + '">' +
-      '<div style="font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? '#dc2626' : '#374151') + '">' + d + '</div>' +
+      '<div style="font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? 'var(--destructive)' : 'var(--foreground)') + '">' + d + '</div>' +
       (dots ? '<div style="margin-top:2px">' + dots + '</div>' : '') + '</div>';
   }
   grid.innerHTML = html;
@@ -5686,8 +5686,8 @@ function picalShowAddForm() {
   const customers = FACILITY_CUSTOMERS[FACILITY_ID] || [];
   const custOpts = customers.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
   form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #dc2626"><div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:12px">Add Physical Inventory Date</div>' +
-    '<div style="font-size:11px;color:#6b7280;margin-bottom:10px">This saves a planned physical inventory date. Optionally create a setup ticket in UNIS Ticket System.</div>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--destructive)"><div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:12px">Add Physical Inventory Date</div>' +
+    '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:10px">This saves a planned physical inventory date. Optionally create a setup ticket in UNIS Ticket System.</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Date</label><input type="date" class="cc-input" id="pical-add-date" value="' + todayStr + '"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Customer</label><select class="cc-input" id="pical-add-customer"><option value="">All / Facility-wide</option>' + custOpts + '</select></div>' +
@@ -5696,8 +5696,8 @@ function picalShowAddForm() {
     '<div class="cc-field" style="margin:0"><label class="cc-label">Notes</label><input class="cc-input" id="pical-add-notes" placeholder="Description or reference"/></div>' +
     '</div>' +
     // Freeze/Cutoff Fields
-    '<div style="margin-top:12px;padding:10px 12px;background:#FEF9C3;border-radius:6px;border:1px solid #FDE68A">' +
-    '<div style="font-size:12px;font-weight:600;color:#92400E;margin-bottom:8px">Inventory Freeze / Cutoff</div>' +
+    '<div style="margin-top:12px;padding:10px 12px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))">' +
+    '<div style="font-size:12px;font-weight:600;color:var(--chart-4);margin-bottom:8px">Inventory Freeze / Cutoff</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Freeze Begins</label><input class="cc-input" id="pical-add-freeze-start" placeholder="Confirm time - typically evening before count date"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Freeze Ends</label><input class="cc-input" id="pical-add-freeze-end" value="Upon completion and sign-off of physical count"/></div>' +
@@ -5705,8 +5705,8 @@ function picalShowAddForm() {
     '<div class="cc-field" style="margin:6px 0 0"><label class="cc-label">Freeze / Cutoff Instructions</label><input class="cc-input" id="pical-add-freeze-instructions" value="No movement in/out of count areas during freeze"/></div>' +
     '</div>' +
     // Ticket Setup Section
-    '<div style="margin-top:16px;padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">' +
-    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;margin-bottom:8px"><input type="checkbox" id="pical-add-create-ticket" onchange="picalToggleTicketFields(\'add\')" style="accent-color:#753BBD"/> Create setup ticket in UNIS Ticket System</label>' +
+    '<div style="margin-top:16px;padding:12px;background:var(--accent);border-radius:8px;border:1px solid var(--border)">' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--foreground);cursor:pointer;margin-bottom:8px"><input type="checkbox" id="pical-add-create-ticket" onchange="picalToggleTicketFields(\'add\')" style="accent-color:var(--primary)"/> Create setup ticket in UNIS Ticket System</label>' +
     '<div id="pical-add-ticket-fields" style="display:none">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Department</label><select class="cc-input" id="pical-add-dept" onchange="ticketOnDeptChange(\x27pical-add-dept\x27,\x27pical-add-topic\x27)"><option value="">Loading…</option></select></div>' +
@@ -5718,11 +5718,11 @@ function picalShowAddForm() {
     '<button class="btn btn-secondary" type="button" onclick="picalLoadTeams(\'add\')" style="font-size:11px;padding:5px 10px;height:36px">Load Teams</button>' +
     '</div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Setup Message</label><textarea class="cc-input" id="pical-add-ticket-msg" rows="8" style="resize:vertical;font-size:12px;line-height:1.5" placeholder="Setup instructions or message for the ticket..."></textarea></div>' +
-    '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="btn btn-secondary" type="button" onclick="picalGenerateTemplate(\'add\')" style="font-size:11px;padding:4px 10px">Use Formal PI Email Template</button><span style="font-size:10px;color:#9ca3af">Populates from current form values</span></div>' +
-    '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;margin-top:8px;cursor:pointer"><input type="checkbox" id="pical-add-send-msg" checked style="accent-color:#753BBD"/> Include setup message when creating ticket</label>' +
-    '<div class="cc-field" style="margin:10px 0 0"><label class="cc-label">Attachments</label><input type="file" id="pical-add-files" multiple style="font-size:12px"/><div style="font-size:10px;color:#9ca3af;margin-top:4px">Files will be uploaded to the ticket after creation.</div></div>' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-top:6px"><button class="btn btn-secondary" type="button" onclick="picalGenerateTemplate(\'add\')" style="font-size:11px;padding:4px 10px">Use Formal PI Email Template</button><span style="font-size:10px;color:var(--muted-foreground)">Populates from current form values</span></div>' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);margin-top:8px;cursor:pointer"><input type="checkbox" id="pical-add-send-msg" checked style="accent-color:var(--primary)"/> Include setup message when creating ticket</label>' +
+    '<div class="cc-field" style="margin:10px 0 0"><label class="cc-label">Attachments</label><input type="file" id="pical-add-files" multiple style="font-size:12px"/><div style="font-size:10px;color:var(--muted-foreground);margin-top:4px">Files will be uploaded to the ticket after creation.</div></div>' +
     '</div></div>' +
-    '<div id="pical-ticket-diag" style="display:none;margin-top:12px;padding:10px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;max-height:200px;overflow-y:auto"></div>' +
+    '<div id="pical-ticket-diag" style="display:none;margin-top:12px;padding:10px;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border));border-radius:6px;max-height:200px;overflow-y:auto"></div>' +
     '<div style="margin-top:12px;display:flex;gap:8px">' +
     '<button class="btn btn-primary" onclick="picalSaveNew()" style="font-size:12px;padding:6px 14px">Save Physical Inventory Date</button>' +
     '<button class="btn btn-secondary" onclick="document.getElementById(\'pical-add-form\').style.display=\'none\'" style="font-size:12px;padding:6px 14px">Cancel</button>' +
@@ -5803,13 +5803,13 @@ function picalEditLocal(localId) {
   const customers = FACILITY_CUSTOMERS[FACILITY_ID] || [];
   const custOpts = customers.map(c => '<option value="' + c.id + '"' + (c.id === rec.customerId ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
   const hasTicket = !!(rec.ticketId);
-  const ticketInfo = hasTicket ? '<div style="margin-bottom:10px;padding:8px 12px;background:#ECFDF5;border-radius:6px;border:1px solid #A7F3D0;font-size:11px;color:#065f46"><strong>Linked Ticket:</strong> ' + esc(rec.ticketNumber || rec.ticketId) + (rec.teamName ? ' · Team: ' + esc(rec.teamName) : '') + (rec.attachments ? ' · ' + rec.attachments.uploaded + '/' + rec.attachments.total + ' file(s)' : '') + '</div>' : '';
+  const ticketInfo = hasTicket ? '<div style="margin-bottom:10px;padding:8px 12px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-3) 30%,var(--border));font-size:11px;color:var(--chart-3)"><strong>Linked Ticket:</strong> ' + esc(rec.ticketNumber || rec.ticketId) + (rec.teamName ? ' · Team: ' + esc(rec.teamName) : '') + (rec.attachments ? ' · ' + rec.attachments.uploaded + '/' + rec.attachments.total + ' file(s)' : '') + '</div>' : '';
   const ticketCheckLabel = hasTicket ? 'Ticket already linked — update team/attachments' : 'Create setup ticket in UNIS Ticket System';
   // Auto-populate setup message: use saved ticketMsg, or generate template if ticket linked but no message saved
   const savedMsg = rec.ticketMsg || '';
   const editMsg = savedMsg || (hasTicket ? picalGenerateTemplateText(rec) : '');
   form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #d97706"><div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:12px">Edit Physical Inventory Date</div>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--chart-4)"><div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:12px">Edit Physical Inventory Date</div>' +
     ticketInfo +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Date</label><input type="date" class="cc-input" id="pical-edit-date" value="' + (rec.date || '') + '"/></div>' +
@@ -5819,8 +5819,8 @@ function picalEditLocal(localId) {
     '<div class="cc-field" style="margin:0"><label class="cc-label">Notes</label><input class="cc-input" id="pical-edit-notes" value="' + escAttr(rec.notes || '') + '"/></div>' +
     '</div>' +
     // Ticket Setup Section (same as create)
-    '<div style="margin-top:16px;padding:12px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb">' +
-    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#374151;cursor:pointer;margin-bottom:8px"><input type="checkbox" id="pical-edit-create-ticket" onchange="picalToggleTicketFields(\'edit\')" ' + (hasTicket ? 'checked' : '') + ' style="accent-color:#753BBD"/> ' + esc(ticketCheckLabel) + '</label>' +
+    '<div style="margin-top:16px;padding:12px;background:var(--accent);border-radius:8px;border:1px solid var(--border)">' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--foreground);cursor:pointer;margin-bottom:8px"><input type="checkbox" id="pical-edit-create-ticket" onchange="picalToggleTicketFields(\'edit\')" ' + (hasTicket ? 'checked' : '') + ' style="accent-color:var(--primary)"/> ' + esc(ticketCheckLabel) + '</label>' +
     '<div id="pical-edit-ticket-fields" style="' + (hasTicket ? '' : 'display:none') + '">' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Department</label><select class="cc-input" id="pical-edit-dept" onchange="ticketOnDeptChange(\x27pical-edit-dept\x27,\x27pical-edit-topic\x27)"><option value="">Loading…</option></select></div>' +
@@ -5834,7 +5834,7 @@ function picalEditLocal(localId) {
     '</div>' +
     '<div class=eld" style="margin:6px 0 0"><label class="cc-label">Team (optional)</label><select class="cc-input" id="pical-edit-team" style="font-size:12px"><option value="">No team / manual</option><option value="336699888571584512">UF Buena Park Inventory</option>' + (rec.teamId ? '<option value="' + escAttr(rec.teamId) + '" selected>' + esc(rec.teamName || 'Team ' + rec.teamId) + '</option>' : '') + '</select></div>' +
     '<div class="cc-field" style="margin:6px 0 0"><label class="cc-label">Attachments (optional)</label><input type="file" id="pical-edit-files" multiple style="font-size:12px"/></div>' +
-    '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;margin-top:8px;cursor:pointer"><input type="checkbox" id="pical-edit-send-msg" checked style="accent-color:#753BBD"/> Include setup message</label>' +
+    '<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);margin-top:8px;cursor:pointer"><input type="checkbox" id="pical-edit-send-msg" checked style="accent-color:var(--primary)"/> Include setup message</label>' +
     '</div></div>' +
     '<div style="margin-top:12px;display:flex;gap:8px">' +
     '<button class="btn btn-primary" onclick="picalSaveEdit(\'' + escAttr(localId) + '\')" style="font-size:12px;padding:6px 14px">Save Changes</button>' +
@@ -6013,9 +6013,9 @@ function ticketPopulateDeptSelect(selId, selectedVal) {
   const statusEl = document.getElementById(selId + '-status');
   if (statusEl) {
     if (isFallback) {
-      statusEl.innerHTML = '<span style="color:#d97706">⚠ Using fallback (API unavailable). ' + depts.length + ' dept(s).</span>';
+      statusEl.innerHTML = '<span style="color:var(--chart-4)">⚠ Using fallback (API unavailable). ' + depts.length + ' dept(s).</span>';
     } else {
-      statusEl.innerHTML = '<span style="color:#059669">✓ ' + depts.length + ' department(s) loaded from Ticket API</span>';
+      statusEl.innerHTML = '<span style="color:var(--chart-3)">✓ ' + depts.length + ' department(s) loaded from Ticket API</span>';
     }
   }
 }
@@ -6328,11 +6328,11 @@ function picalShowTicketDiag(diag) {
   const container = document.getElementById('pical-ticket-diag');
   if (!container) { console.log('TICKET DIAG:', JSON.stringify(diag)); return; }
   container.style.display = '';
-  let html = '<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">Ticket Operation Log</div>';
-  html += '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Step</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px;text-align:left">Details</th></tr></thead><tbody>';
+  let html = '<div style="font-size:12px;font-weight:600;color:var(--foreground);margin-bottom:6px">Ticket Operation Log</div>';
+  html += '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--accent)"><th style="padding:4px 6px;text-align:left">Step</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px;text-align:left">Details</th></tr></thead><tbody>';
   diag.forEach(d => {
-    const color = d.status==='success'?'#059669':d.status==='warning'?'#d97706':'#dc2626';
-    html += '<tr style="border-top:1px solid #f3f4f6"><td style="padding:3px 6px">' + esc(d.step) + '</td><td style="padding:3px 6px;color:'+color+';font-weight:600">' + esc(d.status) + '</td><td style="padding:3px 6px;font-size:10px;word-break:break-all">' + esc(d.msg) + '</td></tr>';
+    const color = d.status==='success'?'var(--chart-3)':d.status==='warning'?'var(--chart-4)':'var(--destructive)';
+    html += '<tr style="border-top:1px solid var(--muted)"><td style="padding:3px 6px">' + esc(d.step) + '</td><td style="padding:3px 6px;color:'+color+';font-weight:600">' + esc(d.status) + '</td><td style="padding:3px 6px;font-size:10px;word-break:break-all">' + esc(d.msg) + '</td></tr>';
   });
   html += '</tbody></table><button onclick="navigator.clipboard.writeText(JSON.stringify(window._piDiag)).then(()=>alert(\'Copied\'))" class="btn btn-secondary" style="font-size:10px;padding:3px 8px;margin-top:6px">Copy Diagnostics</button>';
   container.innerHTML = html;
@@ -6396,9 +6396,9 @@ function picalShowTicketSetup(localId) {
   const custName = custLookup[rec.customerId] || rec.customerId || 'All / Facility-wide';
   const facName = FACILITY_NAME || FACILITY_ID;
   form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #753BBD">' +
-    '<div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:4px">Create Support Ticket for Physical Inventory</div>' +
-    '<div style="font-size:11px;color:#6b7280;margin-bottom:12px">Creates a ticket in UNIS Ticket System for this PI date. Team assignment and attachments are optional.</div>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--primary)">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:4px">Create Support Ticket for Physical Inventory</div>' +
+    '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:12px">Creates a ticket in UNIS Ticket System for this PI date. Team assignment and attachments are optional.</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:12px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Title</label><input class="cc-input" id="pitk-title" value="Physical Inventory — ' + escAttr(custName) + ' — ' + escAttr(rec.date) + '"/></div>' +
     '</div>' +
@@ -6407,7 +6407,7 @@ function picalShowTicketSetup(localId) {
     '<textarea class="cc-input" id="pitk-message" rows="8" style="font-size:12px;resize:vertical">' + esc(rec.notes || '') + '</textarea></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Team (optional)</label><div style="display:flex;gap:4px"><select class="cc-input" id="pitk-team" style="flex:1"><option value="">— No team —</option></select><button class="btn btn-secondary" onclick="pitkLoadTeams()" style="font-size:11px;padding:4px 8px">Load Teams</button></div><input class="cc-input" id="pitk-team-manual" placeholder="Or enter Team ID manually" style="margin-top:4px;font-size:11px"/></div>' +
-    '<div class="cc-field" style="margin:0"><label class="cc-label">Attachments (optional)</label><input type="file" id="pitk-files" multiple style="font-size:11px"/><div style="font-size:10px;color:#6b7280;margin-top:2px">Select files to attach after ticket creation</div></div>' +
+    '<div class="cc-field" style="margin:0"><label class="cc-label">Attachments (optional)</label><input type="file" id="pitk-files" multiple style="font-size:11px"/><div style="font-size:10px;color:var(--muted-foreground);margin-top:2px">Select files to attach after ticket creation</div></div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:12px">' +
     '<button class="btn btn-primary" onclick="pitkCreateTicket(\'' + escAttr(localId) + '\')" style="font-size:12px;padding:6px 14px">Create Ticket</button>' +
@@ -6494,7 +6494,7 @@ async function pitkLoadTeams() {
     } else {
       sel.innerHTML = '<option value="">— No team (API unavailable) —</option>';
       const status = document.getElementById('pitk-status');
-      if (status) { status.textContent = 'Could not load teams. You can enter a Team ID manually below.'; status.style.color = '#d97706'; status.style.display = ''; }
+      if (status) { status.textContent = 'Could not load teams. You can enter a Team ID manually below.'; status.style.color = 'var(--chart-4)'; status.style.display = ''; }
     }
   } catch(e) {
     sel.innerHTML = '<option value="">— No team —</option>';
@@ -6512,7 +6512,7 @@ async function pitkCreateTicket(localId) {
   const status = document.getElementById('pitk-status');
 
   if (!title.trim()) { alert('Title is required.'); return; }
-  if (status) { status.textContent = 'Creating ticket…'; status.style.color = '#6b7280'; status.style.display = ''; }
+  if (status) { status.textContent = 'Creating ticket…'; status.style.color = 'var(--muted-foreground)'; status.style.display = ''; }
 
   const payload = {
     title: title,
@@ -6528,7 +6528,7 @@ async function pitkCreateTicket(localId) {
   });
 
   if (!resp || resp._needsAuth) {
-    if (status) { status.textContent = 'Could not create ticket. Authentication may be required for the Ticket System.'; status.style.color = '#ef4444'; status.style.display = ''; }
+    if (status) { status.textContent = 'Could not create ticket. Authentication may be required for the Ticket System.'; status.style.color = 'var(--destructive)'; status.style.display = ''; }
     return;
   }
 
@@ -6537,7 +6537,7 @@ async function pitkCreateTicket(localId) {
   const ticketNumber = ticketData.number || ticketData.ticketNumber || ticketId;
 
   if (!ticketId) {
-    if (status) { status.textContent = 'Ticket creation was not confirmed. Response: ' + (resp.msg || resp.message || 'No ticket ID returned.'); status.style.color = '#ef4444'; status.style.display = ''; }
+    if (status) { status.textContent = 'Ticket creation was not confirmed. Response: ' + (resp.msg || resp.message || 'No ticket ID returned.'); status.style.color = 'var(--destructive)'; status.style.display = ''; }
     return;
   }
 
@@ -6588,7 +6588,7 @@ async function pitkCreateTicket(localId) {
   picalSaveLocal();
   const attachStatus = rec.attachments.length > 0 ? ' Attachments: ' + rec.attachments.filter(a => a.status === 'uploaded').length + ' uploaded, ' + rec.attachments.filter(a => a.status === 'failed').length + ' failed.' : '';
   const teamStatus = rec.teamWarning ? ' ' + rec.teamWarning : (rec.teamName ? ' Team: ' + rec.teamName : '');
-  if (status) { status.textContent = 'Ticket created: ' + ticketNumber + '.' + teamStatus + attachStatus; status.style.color = '#059669'; status.style.display = ''; }
+  if (status) { status.textContent = 'Ticket created: ' + ticketNumber + '.' + teamStatus + attachStatus; status.style.color = 'var(--chart-3)'; status.style.display = ''; }
 
   setTimeout(() => {
     document.getElementById('pical-add-form').style.display = 'none';
@@ -6599,7 +6599,7 @@ async function pitkCreateTicket(localId) {
 function admInitSettings() {
   if (!admIsOwner()) {
     const view = document.getElementById('view-settings');
-    if (view) view.innerHTML = '<div style="text-align:center;padding:60px;color:#ef4444"><strong>Access Denied</strong><br><span style="font-size:13px;color:#6b7280">Admin Settings are only accessible to the dashboard owner. Contact Brayan Escobar.</span></div>';
+    if (view) view.innerHTML = '<div style="text-align:center;padding:60px;color:var(--destructive)"><strong>Access Denied</strong><br><span style="font-size:13px;color:var(--muted-foreground)">Admin Settings are only accessible to the dashboard owner. Contact Brayan Escobar.</span></div>';
     return;
   }
   // Populate facility dropdown
@@ -6620,7 +6620,7 @@ function admInitSettings() {
   const facCount = document.getElementById('adm-fac-count');
   const facList = document.getElementById('adm-fac-list');
   if (facCount) facCount.textContent = FACILITIES.length + ' warehouses';
-  if (facList) facList.innerHTML = FACILITIES.sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(f => '<div style="padding:2px 0">' + esc(f.name) + ' <span style="color:#9ca3af">(' + esc(f.id) + ')</span></div>').join('');
+  if (facList) facList.innerHTML = FACILITIES.sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(f => '<div style="padding:2px 0">' + esc(f.name) + ' <span style="color:var(--muted-foreground)">(' + esc(f.id) + ')</span></div>').join('');
   // Last sync
   const syncEl = document.getElementById('adm-last-sync');
   if (syncEl) {
@@ -6649,13 +6649,13 @@ function admChangePassword() {
   const current = (document.getElementById('adm-pw-current') || {}).value || '';
   const newPw = (document.getElementById('adm-pw-new') || {}).value || '';
   const msg = document.getElementById('adm-pw-msg');
-  if (!current || !newPw) { admShowPwMsg('Please fill in both fields.', '#ef4444'); return; }
-  if (current !== admGetFacilityPassword(FACILITY_ID)) { admShowPwMsg('Current password is incorrect for ' + (FACILITY_NAME || FACILITY_ID) + '.', '#ef4444'); return; }
-  if (newPw.length < 4) { admShowPwMsg('New password must be at least 4 characters.', '#ef4444'); return; }
+  if (!current || !newPw) { admShowPwMsg('Please fill in both fields.', 'var(--destructive)'); return; }
+  if (current !== admGetFacilityPassword(FACILITY_ID)) { admShowPwMsg('Current password is incorrect for ' + (FACILITY_NAME || FACILITY_ID) + '.', 'var(--destructive)'); return; }
+  if (newPw.length < 4) { admShowPwMsg('New password must be at least 4 characters.', 'var(--destructive)'); return; }
   admSetFacilityPassword(FACILITY_ID, newPw);
   document.getElementById('adm-pw-current').value = '';
   document.getElementById('adm-pw-new').value = '';
-  admShowPwMsg('Action password updated for ' + (FACILITY_NAME || FACILITY_ID) + '.', '#059669');
+  admShowPwMsg('Action password updated for ' + (FACILITY_NAME || FACILITY_ID) + '.', 'var(--chart-3)');
 }
 
 function admShowPwMsg(text, color) {
@@ -6748,14 +6748,14 @@ function admRenderUserAccess() {
   const access = admGetUserAccess();
   const facAccess = access.filter(a => a.facility === FACILITY_ID);
   if (facAccess.length === 0) {
-    container.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:8px">No users configured for ' + esc(FACILITY_NAME || FACILITY_ID) + '. Only owner (bescobar) has access.</div>';
+    container.innerHTML = '<div style="color:var(--muted-foreground);font-size:12px;padding:8px">No users configured for ' + esc(FACILITY_NAME || FACILITY_ID) + '. Only owner (bescobar) has access.</div>';
     return;
   }
-  container.innerHTML = '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Username</th><th style="padding:4px 6px;text-align:left">Modules</th><th style="padding:4px 6px;text-align:left">Password</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px">Actions</th></tr></thead><tbody>' +
+  container.innerHTML = '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--accent)"><th style="padding:4px 6px;text-align:left">Username</th><th style="padding:4px 6px;text-align:left">Modules</th><th style="padding:4px 6px;text-align:left">Password</th><th style="padding:4px 6px;text-align:left">Status</th><th style="padding:4px 6px">Actions</th></tr></thead><tbody>' +
     facAccess.map((a, i) => {
       const idx = access.indexOf(a);
       const hasPassword = !!(a.userPassword || a.password);
-      return '<tr style="border-top:1px solid #f3f4f6"><td style="padding:4px 6px">' + esc(a.username) + '</td><td style="padding:4px 6px;font-size:10px">' + esc((a.modules || []).join(', ')) + '</td><td style="padding:4px 6px"><span style="color:' + (hasPassword ? '#059669' : '#d97706') + ';font-weight:600">' + (hasPassword ? 'Custom' : 'Facility') + '</span></td><td style="padding:4px 6px"><span style="color:' + (a.enabled ? '#059669' : '#dc2626') + ';font-weight:600">' + (a.enabled ? 'Enabled' : 'Disabled') + '</span></td><td style="padding:4px 6px;text-align:center"><span style="color:#753BBD;cursor:pointer;margin-right:6px" onclick="admSetUserPassword(' + idx + ')">Set Password</span><span style="color:#753BBD;cursor:pointer;margin-right:6px" onclick="admToggleUser(' + idx + ')">' + (a.enabled ? 'Disable' : 'Enable') + '</span><span style="color:#dc2626;cursor:pointer" onclick="admRemoveUser(' + idx + ')">Remove</span></td></tr>';
+      return '<tr style="border-top:1px solid var(--muted)"><td style="padding:4px 6px">' + esc(a.username) + '</td><td style="padding:4px 6px;font-size:10px">' + esc((a.modules || []).join(', ')) + '</td><td style="padding:4px 6px"><span style="color:' + (hasPassword ? 'var(--chart-3)' : 'var(--chart-4)') + ';font-weight:600">' + (hasPassword ? 'Custom' : 'Facility') + '</span></td><td style="padding:4px 6px"><span style="color:' + (a.enabled ? 'var(--chart-3)' : 'var(--destructive)') + ';font-weight:600">' + (a.enabled ? 'Enabled' : 'Disabled') + '</span></td><td style="padding:4px 6px;text-align:center"><span style="color:var(--primary);cursor:pointer;margin-right:6px" onclick="admSetUserPassword(' + idx + ')">Set Password</span><span style="color:var(--primary);cursor:pointer;margin-right:6px" onclick="admToggleUser(' + idx + ')">' + (a.enabled ? 'Disable' : 'Enable') + '</span><span style="color:var(--destructive);cursor:pointer" onclick="admRemoveUser(' + idx + ')">Remove</span></td></tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -6830,11 +6830,11 @@ function rptInitReport() {
 
 async function rptGenerateReport() {
   const tbody = document.getElementById('rpt-tbody');
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af"><span class="spinner"></span> Loading today\'s cycle count data…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Loading today\'s cycle count data…</td></tr>';
   RPT_DATA = [];
 
   if (!WISE_TOKEN) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#ef4444">Please sign in to generate reports.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in to generate reports.</td></tr>';
     return;
   }
 
@@ -6896,13 +6896,13 @@ async function rptGenerateReport() {
   document.getElementById('rpt-kpi-exc').textContent = exceptions;
 
   if (RPT_DATA.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9ca3af">No cycle count tickets found for today at ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted-foreground)">No cycle count tickets found for today at ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
     return;
   }
 
   tbody.innerHTML = RPT_DATA.map(r => {
-    const stateCls = r.state === 'Completed' ? 'color:#059669;font-weight:600' : /Empty|Invalid/.test(r.state) ? 'color:#dc2626' : /Cancelled/.test(r.state) ? 'color:#9ca3af' : /In Progress/.test(r.state) ? 'color:#d97706' : 'color:#374151';
-    return '<tr><td style="font-family:monospace;font-size:11px;color:#753BBD">' + esc(r.id) + '</td><td>' + esc(r.customer) + '</td><td>' + esc(r.type) + '</td><td>' + esc(r.method) + '</td><td>' + r.locs + '</td><td style="' + stateCls + '">' + esc(r.state) + '</td><td>' + (r.results > 0 ? r.results + ' result(s)' : '—') + '</td><td style="font-size:11px">' + (r.scheduleDate ? new Date(r.scheduleDate).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : '—') + '</td></tr>';
+    const stateCls = r.state === 'Completed' ? 'color:var(--chart-3);font-weight:600' : /Empty|Invalid/.test(r.state) ? 'color:var(--destructive)' : /Cancelled/.test(r.state) ? 'color:var(--muted-foreground)' : /In Progress/.test(r.state) ? 'color:var(--chart-4)' : 'color:var(--foreground)';
+    return '<tr><td style="font-family:monospace;font-size:11px;color:var(--primary)">' + esc(r.id) + '</td><td>' + esc(r.customer) + '</td><td>' + esc(r.type) + '</td><td>' + esc(r.method) + '</td><td>' + r.locs + '</td><td style="' + stateCls + '">' + esc(r.state) + '</td><td>' + (r.results > 0 ? r.results + ' result(s)' : '—') + '</td><td style="font-size:11px">' + (r.scheduleDate ? new Date(r.scheduleDate).toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) : '—') + '</td></tr>';
   }).join('');
 
   document.getElementById('rpt-table-title').textContent = RPT_DATA.length + ' Cycle Count Ticket(s) — ' + nowLA.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric', year:'numeric'});
@@ -6952,21 +6952,21 @@ function rptSaveEmailConfig() {
   const invalid = emails.filter(e => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
   const msg = document.getElementById('rpt-email-msg');
   if (invalid.length > 0) {
-    if (msg) { msg.textContent = 'Invalid email(s): ' + invalid.join(', '); msg.style.color = '#ef4444'; msg.style.display = ''; }
+    if (msg) { msg.textContent = 'Invalid email(s): ' + invalid.join(', '); msg.style.color = 'var(--destructive)'; msg.style.display = ''; }
     return;
   }
   try {
     localStorage.setItem('rpt_email_config_' + FACILITY_ID, JSON.stringify({enabled, emails, updatedAt: new Date().toISOString()}));
   } catch(_) {}
   rptRenderEmailChips(emails);
-  if (msg) { msg.textContent = 'Saved ' + emails.length + ' recipient(s). Daily delivery at 7:00 AM ' + (FACILITY_NAME || 'warehouse') + ' local time.'; msg.style.color = '#059669'; msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 4000); }
+  if (msg) { msg.textContent = 'Saved ' + emails.length + ' recipient(s). Daily delivery at 7:00 AM ' + (FACILITY_NAME || 'warehouse') + ' local time.'; msg.style.color = 'var(--chart-3)'; msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 4000); }
 }
 
 function rptRenderEmailChips(emails) {
   const container = document.getElementById('rpt-email-chips');
   if (!container) return;
-  if (!emails || emails.length === 0) { container.innerHTML = '<span style="font-size:11px;color:#9ca3af">No recipients configured</span>'; return; }
-  container.innerHTML = emails.map(e => '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;background:#EDE9FE;color:#5B21B6;margin:2px">' + esc(e) + '</span>').join('');
+  if (!emails || emails.length === 0) { container.innerHTML = '<span style="font-size:11px;color:var(--muted-foreground)">No recipients configured</span>'; return; }
+  container.innerHTML = emails.map(e => '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;background:color-mix(in srgb,var(--primary) 12%,var(--card));color:var(--primary);margin:2px">' + esc(e) + '</span>').join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7073,35 +7073,35 @@ function ltrRenderList() {
   const title = document.getElementById('ltr-list-title');
   if (title) title.textContent = filtered.length + ' request(s)' + (filter ? ' (' + filter.replace(/_/g,' ').toLowerCase() + ')' : '');
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af">No requests' + (filter ? ' with this status' : ' yet') + '.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No requests' + (filter ? ' with this status' : ' yet') + '.</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map((r, idx) => {
     const realIdx = list.indexOf(r);
-    const statusCls = r.status === 'APPLIED' ? 'color:#059669' : r.status === 'APPLIED_TAG_WARNING' ? 'color:#d97706' : r.status === 'REJECTED' ? 'color:#9ca3af' : /FAIL/.test(r.status) ? 'color:#dc2626' : r.status === 'PENDING_APPROVAL' ? 'color:#d97706' : 'color:#374151';
+    const statusCls = r.status === 'APPLIED' ? 'color:var(--chart-3)' : r.status === 'APPLIED_TAG_WARNING' ? 'color:var(--chart-4)' : r.status === 'REJECTED' ? 'color:var(--muted-foreground)' : /FAIL/.test(r.status) ? 'color:var(--destructive)' : r.status === 'PENDING_APPROVAL' ? 'color:var(--chart-4)' : 'color:var(--foreground)';
     const changeEntries = Object.entries(r.changes || {});
     const changeSummary = changeEntries.length === 0 ? '—' : changeEntries.slice(0, 3).map(([k, v]) => {
       const cur = r.currentValues ? (r.currentValues[k] || '—') : '—';
       const label = k === 'customerIds' ? 'Customer(s)' : k === 'tagName' ? 'Location Tag' : k === 'disallowToMixItemOnSameLocation' ? 'Mix Rule' : k;
       const curDisplay = k === 'customerIds' ? ltrResolveCustomerNames(String(cur)) : String(cur).slice(0,20);
       const newDisplay = k === 'customerIds' ? ltrResolveCustomerNames(String(v)) : String(v).slice(0,20);
-      return '<span style="color:#6b7280">' + esc(label) + ':</span> <span style="text-decoration:line-through;color:#9ca3af">' + esc(curDisplay) + '</span> → <strong style="color:#059669">' + esc(newDisplay) + '</strong>';
-    }).join('<br>') + (changeEntries.length > 3 ? '<br><span style="color:#9ca3af">+' + (changeEntries.length - 3) + ' more</span>' : '');
-    const notifyInfo = r.ticketNumber ? '<span style="font-size:9px;color:#059669;font-weight:600" title="Ticket ' + escAttr(r.ticketNumber) + '">🎫 ' + esc(r.ticketNumber) + '</span>' : r.ticketStatus === 'TICKET_FAILED' ? '<span style="font-size:9px;color:#dc2626" title="' + escAttr(r.ticketMessage || 'Ticket was not created. Open the request to review and resubmit.') + '">Ticket not created</span>' : r.ticketStatus === 'PENDING' ? '<span style="font-size:9px;color:#6b7280">Ticket pending</span>' : '';
+      return '<span style="color:var(--muted-foreground)">' + esc(label) + ':</span> <span style="text-decoration:line-through;color:var(--muted-foreground)">' + esc(curDisplay) + '</span> → <strong style="color:var(--chart-3)">' + esc(newDisplay) + '</strong>';
+    }).join('<br>') + (changeEntries.length > 3 ? '<br><span style="color:var(--muted-foreground)">+' + (changeEntries.length - 3) + ' more</span>' : '');
+    const notifyInfo = r.ticketNumber ? '<span style="font-size:9px;color:var(--chart-3);font-weight:600" title="Ticket ' + escAttr(r.ticketNumber) + '">🎫 ' + esc(r.ticketNumber) + '</span>' : r.ticketStatus === 'TICKET_FAILED' ? '<span style="font-size:9px;color:var(--destructive)" title="' + escAttr(r.ticketMessage || 'Ticket was not created. Open the request to review and resubmit.') + '">Ticket not created</span>' : r.ticketStatus === 'PENDING' ? '<span style="font-size:9px;color:var(--muted-foreground)">Ticket pending</span>' : '';
     const isApplied = r.status === 'APPLIED';
     const isEditable = !isApplied;
     let actions = '';
     if (r.status === 'PENDING_APPROVAL') {
-      actions = '<span style="color:#059669;cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrApprove('+realIdx+')">Approve</span>';
-      if (admIsOwner()) actions += '<span style="color:#dc2626;cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrReject('+realIdx+')">Reject</span>';
+      actions = '<span style="color:var(--chart-3);cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrApprove('+realIdx+')">Approve</span>';
+      if (admIsOwner()) actions += '<span style="color:var(--destructive);cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrReject('+realIdx+')">Reject</span>';
     }
     if (r.status === 'APPROVED_BUT_FAILED' || r.status === 'APPLIED_TAG_WARNING') {
-      actions += '<span style="color:#d97706;cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrRetryApply('+realIdx+')">Retry Apply</span>';
+      actions += '<span style="color:var(--chart-4);cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrRetryApply('+realIdx+')">Retry Apply</span>';
     }
-    actions += '<span style="color:#753BBD;cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrViewDetail('+realIdx+')">View</span>';
+    actions += '<span style="color:var(--primary);cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrViewDetail('+realIdx+')">View</span>';
     if (isEditable) {
-      actions += '<span style="color:#2563eb;cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrEditRequest('+realIdx+')">Edit</span>';
-      actions += '<span style="color:#dc2626;cursor:pointer;font-size:11px;font-weight:600" onclick="ltrDeleteRequest('+realIdx+')">Delete</span>';
+      actions += '<span style="color:var(--chart-5);cursor:pointer;font-size:11px;font-weight:600;margin-right:6px" onclick="ltrEditRequest('+realIdx+')">Edit</span>';
+      actions += '<span style="color:var(--destructive);cursor:pointer;font-size:11px;font-weight:600" onclick="ltrDeleteRequest('+realIdx+')">Delete</span>';
     }
     return '<tr><td style="font-family:monospace;font-size:11px">' + esc(r.locationName || r.locationId || '—') + '</td>' +
       '<td style="font-size:11px">' + esc(r.changes && r.changes.tagName ? r.changes.tagName : '—') + '</td>' +
@@ -7186,19 +7186,19 @@ function ltrShowNewForm() {
     const custOpts = customers.map(c => '<option value="' + escAttr(c.id) + '">' + esc(c.name) + '</option>').join('');
     window._ltrCustSel = [];
     form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #5B21B6">' +
-    '<div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:4px">New Location Update Request</div>' +
-    '<div style="font-size:11px;color:#2563eb;margin-bottom:12px;padding:6px 10px;background:#EFF6FF;border-radius:4px">Search WMS locations first, select one result, then choose the requested field changes below.</div>' +
-    '<div style="font-size:10px;color:#9ca3af;margin-bottom:10px">Facility: <strong>' + esc(FACILITY_NAME||FACILITY_ID) + '</strong> (' + FACILITY_ID + ')</div>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--primary)">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:4px">New Location Update Request</div>' +
+    '<div style="font-size:11px;color:var(--chart-5);margin-bottom:12px;padding:6px 10px;background:color-mix(in srgb,var(--chart-5) 12%,var(--card));border-radius:4px">Search WMS locations first, select one result, then choose the requested field changes below.</div>' +
+    '<div style="font-size:10px;color:var(--muted-foreground);margin-bottom:10px">Facility: <strong>' + esc(FACILITY_NAME||FACILITY_ID) + '</strong> (' + FACILITY_ID + ')</div>' +
     // ═══ FIND LOCATION FROM WMS ═══
-    '<div style="margin-bottom:16px;padding:12px;background:#FAFAFA;border:1px solid #e5e7eb;border-radius:8px">' +
-    '<div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px">Find Location from WMS</div>' +
+    '<div style="margin-bottom:16px;padding:12px;background:var(--background);border:1px solid var(--border);border-radius:8px">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--foreground);margin-bottom:10px">Find Location from WMS</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">regexName</label><input class="cc-input" id="ltr-s-regexName" style="font-size:11px" placeholder="Pattern"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Name</label><input class="cc-input" id="ltr-s-name" style="font-size:11px" placeholder="Exact name"/></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Location Type</label><select class="cc-input" id="ltr-s-type" style="font-size:11px"><option value="">All</option><option value="LOCATION">LOCATION</option><option value="PICK">PICK</option><option value="STAGING">STAGING</option><option value="DOCK">DOCK</option><option value="AUTOMATED_LOCATION">AUTOMATED_LOCATION</option><option value="ZONE">ZONE</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Support Pick Type</label><select class="cc-input" id="ltr-s-supportPickType" style="font-size:11px"><option value="">All</option><option value="PALLET_PICK">PALLET_PICK</option><option value="CASE_PICK">CASE_PICK</option><option value="PIECE_PICK">PIECE_PICK</option><option value="BULK_PICK">BULK_PICK</option></select></div>' +
-    '<div class="cc-field" style="margin:0"><label class="cc-label">Location Tag</label><select class="cc-input" id="ltr-s-tag" style="font-size:11px"><option value="">All</option></select><button onclick="ltrLoadSearchTags()" style="font-size:9px;padding:1px 4px;margin-top:2px;cursor:pointer;background:#EDE9FE;border:1px solid #d8b4fe;border-radius:3px;color:#5B21B6">Load</button></div>' +
+    '<div class="cc-field" style="margin:0"><label class="cc-label">Location Tag</label><select class="cc-input" id="ltr-s-tag" style="font-size:11px"><option value="">All</option></select><button onclick="ltrLoadSearchTags()" style="font-size:9px;padding:1px 4px;margin-top:2px;cursor:pointer;background:color-mix(in srgb,var(--primary) 12%,var(--card));border:1px solid var(--chart-5);border-radius:3px;color:var(--primary)">Load</button></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Status</label><select class="cc-input" id="ltr-s-status" style="font-size:11px"><option value="">All</option><option value="USABLE" selected>USABLE</option><option value="DISABLED">DISABLED</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Occupancy</label><select class="cc-input" id="ltr-s-spaceStatus" style="font-size:11px"><option value="">All</option><option value="EMPTY">EMPTY</option><option value="OCCUPIED">OCCUPIED</option><option value="FULL">FULL</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Aisle</label><input class="cc-input" id="ltr-s-aisle" style="font-size:11px"/></div>' +
@@ -7211,27 +7211,27 @@ function ltrShowNewForm() {
     // Results
     '<div id="ltr-results" style="display:none;margin-bottom:14px"></div>' +
     // Current values
-    '<div id="ltr-current" style="display:none;margin-bottom:14px;padding:10px;background:#ECFDF5;border-radius:6px;border:1px solid #A7F3D0;font-size:11px"></div>' +
+    '<div id="ltr-current" style="display:none;margin-bottom:14px;padding:10px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-3) 30%,var(--border));font-size:11px"></div>' +
     // ═══ YELLOW REQUEST FIELDS ═══
     '<div id="ltr-fields-wrap" style="display:none">' +
-    '<div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:8px;padding:6px 10px;background:#FEF3C7;border-radius:4px;border:1px solid #FDE68A">Requested Location Changes <span style="font-size:10px;font-weight:400;color:#78350F">— only change fields that need updating</span></div>' +
+    '<div style="font-size:12px;font-weight:700;color:var(--chart-4);margin-bottom:8px;padding:6px 10px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:4px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))">Requested Location Changes <span style="font-size:10px;font-weight:400;color:var(--chart-4)">— only change fields that need updating</span></div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">type</label><select class="cc-input" id="ltr-f-type" style="font-size:11px"><option value="">— No change —</option><option value="LOCATION">LOCATION</option><option value="PICK">PICK</option><option value="STAGING">STAGING</option><option value="DOCK">DOCK</option><option value="AUTOMATED_LOCATION">AUTOMATED_LOCATION</option><option value="ZONE">ZONE</option></select></div>' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">status</label><select class="cc-input" id="ltr-f-status" style="font-size:11px"><option value="">— No change —</option><option value="USABLE">USABLE</option><option value="DISABLED">DISABLED</option></select></div>' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">supportPickType</label><select class="cc-input" id="ltr-f-supportPickType" style="font-size:11px"><option value="">— No change —</option><option value="PALLET_PICK">PALLET_PICK</option><option value="CASE_PICK">CASE_PICK</option><option value="PIECE_PICK">PIECE_PICK</option><option value="BULK_PICK">BULK_PICK</option><option value="NONE">NONE</option></select></div>' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">disallowToMixItemOnSameLocation</label><select class="cc-input" id="ltr-f-disallowToMixItemOnSameLocation" style="font-size:11px"><option value="">— No change —</option><option value="TRUE">TRUE</option><option value="FALSE">FALSE</option></select></div>' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">Customer(s)</label><div style="position:relative"><div id="ltr-cust-trigger" onclick="ltrCustToggle()" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;background:white;min-height:28px"><span id="ltr-cust-ph" style="color:#9ca3af">Select customer(s)…</span></div><div id="ltr-cust-panel" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:white;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);max-height:180px;overflow-y:auto;margin-top:2px"><input id="ltr-cust-search" placeholder="Filter…" style="width:100%;border:none;border-bottom:1px solid #f3f4f6;padding:5px 8px;font-size:11px;outline:none" oninput="ltrCustRender()"/><div id="ltr-cust-opts"></div></div></div><div id="ltr-cust-chips" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px"></div><select id="ltr-f-customerIds" multiple style="display:none"></select></div>' +
-    '<div class="cc-field" style="margin:0;background:#FFFBEB;padding:6px;border-radius:6px;border:1px solid #FDE68A"><label class="cc-label" style="font-weight:700;color:#92400E">tagName</label><select class="cc-input" id="ltr-f-tagName" style="font-size:11px"><option value="">— No change —</option></select><button onclick="ltrLoadTags()" style="font-size:9px;padding:2px 6px;margin-top:4px;cursor:pointer;background:#EDE9FE;border:1px solid #d8b4fe;border-radius:3px;color:#5B21B6">Load Tags</button></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">type</label><select class="cc-input" id="ltr-f-type" style="font-size:11px"><option value="">— No change —</option><option value="LOCATION">LOCATION</option><option value="PICK">PICK</option><option value="STAGING">STAGING</option><option value="DOCK">DOCK</option><option value="AUTOMATED_LOCATION">AUTOMATED_LOCATION</option><option value="ZONE">ZONE</option></select></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">status</label><select class="cc-input" id="ltr-f-status" style="font-size:11px"><option value="">— No change —</option><option value="USABLE">USABLE</option><option value="DISABLED">DISABLED</option></select></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">supportPickType</label><select class="cc-input" id="ltr-f-supportPickType" style="font-size:11px"><option value="">— No change —</option><option value="PALLET_PICK">PALLET_PICK</option><option value="CASE_PICK">CASE_PICK</option><option value="PIECE_PICK">PIECE_PICK</option><option value="BULK_PICK">BULK_PICK</option><option value="NONE">NONE</option></select></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">disallowToMixItemOnSameLocation</label><select class="cc-input" id="ltr-f-disallowToMixItemOnSameLocation" style="font-size:11px"><option value="">— No change —</option><option value="TRUE">TRUE</option><option value="FALSE">FALSE</option></select></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">Customer(s)</label><div style="position:relative"><div id="ltr-cust-trigger" onclick="ltrCustToggle()" style="border:1px solid var(--input);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer;background:var(--card);min-height:28px"><span id="ltr-cust-ph" style="color:var(--muted-foreground)">Select customer(s)…</span></div><div id="ltr-cust-panel" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card);border:1px solid var(--input);border-radius:6px;box-shadow:0 4px 12px color-mix(in srgb,var(--foreground) 10%,transparent);max-height:180px;overflow-y:auto;margin-top:2px"><input id="ltr-cust-search" placeholder="Filter…" style="width:100%;border:none;border-bottom:1px solid var(--muted);padding:5px 8px;font-size:11px;outline:none" oninput="ltrCustRender()"/><div id="ltr-cust-opts"></div></div></div><div id="ltr-cust-chips" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px"></div><select id="ltr-f-customerIds" multiple style="display:none"></select></div>' +
+    '<div class="cc-field" style="margin:0;background:color-mix(in srgb,var(--chart-4) 14%,var(--card));padding:6px;border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border))"><label class="cc-label" style="font-weight:700;color:var(--chart-4)">tagName</label><select class="cc-input" id="ltr-f-tagName" style="font-size:11px"><option value="">— No change —</option></select><button onclick="ltrLoadTags()" style="font-size:9px;padding:2px 6px;margin-top:4px;cursor:pointer;background:color-mix(in srgb,var(--primary) 12%,var(--card));border:1px solid var(--chart-5);border-radius:3px;color:var(--primary)">Load Tags</button></div>' +
     '</div>' +
     // Ticket creation on submit
-    '<div style="margin-top:12px;padding:10px;background:#EFF6FF;border-radius:6px;border:1px solid #BFDBFE">' +
-    '<div style="font-size:11px;font-weight:600;color:#1e40af;margin-bottom:6px">Create Ticket on Submission</div>' +
+    '<div style="margin-top:12px;padding:10px;background:color-mix(in srgb,var(--chart-5) 12%,var(--card));border-radius:6px;border:1px solid color-mix(in srgb,var(--chart-5) 28%,var(--card))">' +
+    '<div style="font-size:11px;font-weight:600;color:var(--chart-5);margin-bottom:6px">Create Ticket on Submission</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Department</label><select class="cc-input" id="ltr-ticket-dept" style="font-size:11px" onchange="ltrTicketDeptChange()"><option value="">Loading…</option></select><div id="ltr-ticket-dept-status" style="font-size:9px;margin-top:2px"></div></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">Topic</label><select class="cc-input" id="ltr-ticket-topic" style="font-size:11px"><option value="">Select department first</option></select></div>' +
     '</div>' +
-    '<div class="cc-field" style="margin:0;margin-bottom:8px"><label class="cc-label">Ticket Queue / Team</label><select class="cc-input" id="ltr-ticket-queue" style="font-size:11px"><option value="">— No team —</option></select><div id="ltr-ticket-queue-status" style="font-size:9px;color:#6b7280;margin-top:2px">Teams load when department is selected</div></div>' +
-    '<div style="font-size:9px;color:#6b7280;margin-bottom:8px;padding:4px 8px;background:#f9fafb;border-radius:4px">Team is assigned after ticket creation if available. If team list is unavailable, the selected label is included in the ticket message for routing.</div>' +
+    '<div class="cc-field" style="margin:0;margin-bottom:8px"><label class="cc-label">Ticket Queue / Team</label><select class="cc-input" id="ltr-ticket-queue" style="font-size:11px"><option value="">— No team —</option></select><div id="ltr-ticket-queue-status" style="font-size:9px;color:var(--muted-foreground);margin-top:2px">Teams load when department is selected</div></div>' +
+    '<div style="font-size:9px;color:var(--muted-foreground);margin-bottom:8px;padding:4px 8px;background:var(--accent);border-radius:4px">Team is assigned after ticket creation if available. If team list is unavailable, the selected label is included in the ticket message for routing.</div>' +
     '<div style="margin-top:14px;display:flex;gap:8px">' +
     '<button class="btn btn-primary" onclick="ltrSubmitRequest()" style="font-size:12px;padding:6px 14px">Submit for Approval</button>' +
     '<button class="btn btn-secondary" onclick="document.getElementById(\'ltr-form\').style.display=\'none\'" style="font-size:12px;padding:6px 14px">Cancel</button></div>' +
@@ -7267,7 +7267,7 @@ async function ltrLoadTeamsForDept(deptId) {
 
   const setNoTeamOnly = (message) => {
     sel.innerHTML = '<option value="">— No team (assign later) —</option>';
-    if (status) status.innerHTML = '<span style="color:#6b7280">' + esc(message) + '</span>';
+    if (status) status.innerHTML = '<span style="color:var(--muted-foreground)">' + esc(message) + '</span>';
   };
   const addTeams = (teams) => {
     teams.forEach(t => {
@@ -7283,7 +7283,7 @@ async function ltrLoadTeamsForDept(deptId) {
     sel.innerHTML = '<option value="">— No team (assign later) —</option>';
     if (known.length > 0) {
       addTeams(known);
-      if (status) status.innerHTML = '<span style="color:#059669">' + known.length + ' team available</span><div style="color:#6b7280;margin-top:2px">Some team options may be limited by your ticket permissions. Showing verified available teams.</div>';
+      if (status) status.innerHTML = '<span style="color:var(--chart-3)">' + known.length + ' team available</span><div style="color:var(--muted-foreground);margin-top:2px">Some team options may be limited by your ticket permissions. Showing verified available teams.</div>';
       return true;
     }
     setNoTeamOnly('No teams available for this department. Ticket can still be submitted without team assignment.');
@@ -7305,7 +7305,7 @@ async function ltrLoadTeamsForDept(deptId) {
       if (teams.length > 0) {
         sel.innerHTML = '<option value="">— No team (assign later) —</option>';
         addTeams(teams);
-        if (status) status.innerHTML = '<span style="color:#059669">' + teams.length + ' team(s) available</span>';
+        if (status) status.innerHTML = '<span style="color:var(--chart-3)">' + teams.length + ' team(s) available</span>';
         return;
       }
     }
@@ -7394,8 +7394,8 @@ async function ltrSearchLocation() {
     body.currentPage = page;
     body.pageSize = pageSize;
     const resp = await safeFetch(WMS_BASE + '/api/wms-bam/wms-location/search-by-paging', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    if (!resp || resp._needsAuth) { el.innerHTML='<div style="color:#dc2626;font-weight:600;margin-bottom:8px">Your WMS session needs to be refreshed before locations can load.</div><button class="btn btn-primary" onclick="showReconnect()" style="font-size:12px;padding:6px 14px">Reconnect WMS Session</button><span style="font-size:11px;color:#6b7280;margin-left:8px">After reconnecting, click Search again.</span>'; return; }
-    if (resp.success === false) { el.innerHTML='<span style="color:#d97706">Could not load locations for the selected filters. Please retry.</span>'; return; }
+    if (!resp || resp._needsAuth) { el.innerHTML='<div style="color:var(--destructive);font-weight:600;margin-bottom:8px">Your WMS session needs to be refreshed before locations can load.</div><button class="btn btn-primary" onclick="showReconnect()" style="font-size:12px;padding:6px 14px">Reconnect WMS Session</button><span style="font-size:11px;color:var(--muted-foreground);margin-left:8px">After reconnecting, click Search again.</span>'; return; }
+    if (resp.success === false) { el.innerHTML='<span style="color:var(--chart-4)">Could not load locations for the selected filters. Please retry.</span>'; return; }
     const d = resp.data || resp;
     const rows = d.list || d.records || [];
     total = Number(d.totalCount || d.total || d.count || total || rows.length || 0);
@@ -7413,13 +7413,13 @@ async function ltrSearchLocation() {
   if (selectedTagId) {
     list = list.filter(loc => ltrLocMatchesTag(loc, selectedTagId, selectedTagName));
   }
-  if (list.length === 0) { el.innerHTML='<span style="color:#d97706">No locations found matching filters at ' + esc(FACILITY_NAME||FACILITY_ID) + '.</span>'; return; }
+  if (list.length === 0) { el.innerHTML='<span style="color:var(--chart-4)">No locations found matching filters at ' + esc(FACILITY_NAME||FACILITY_ID) + '.</span>'; return; }
 
-  el.innerHTML = '<div style="font-size:11px;color:#6b7280;margin-bottom:6px">' + list.length.toLocaleString() + ' result(s) — select locations to request updates' + (selectedTagId ? ' <span style="color:#9ca3af">(tag filter applied)</span>' : '') + '</div>' +
-    '<div style="max-height:320px;overflow-y:auto;border:1px solid #e5e7eb;border-radius:6px"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:#f9fafb;position:sticky;top:0"><th style="padding:4px 6px;width:28px"><input type="checkbox" onchange="ltrToggleAll(this.checked)" style="accent-color:#753BBD"/></th><th style="padding:4px 6px;text-align:left">Name</th><th style="padding:4px 6px">Type</th><th style="padding:4px 6px">Status</th><th style="padding:4px 6px">Pick Type</th><th style="padding:4px 6px">Category</th><th style="padding:4px 6px">Aisle</th><th style="padding:4px 6px">Location Tag</th></tr></thead><tbody>' +
-    list.map((loc, i) => '<tr style="cursor:pointer;border-top:1px solid #f3f4f6" onmouseenter="this.style.background=\'#EDE9FE\'" onmouseleave="this.style.background=\'\'"><td style="padding:4px 6px"><input type="checkbox" data-idx="'+i+'" class="ltr-sel-cb" onchange="ltrUpdateSelection()" style="accent-color:#753BBD"/></td><td style="padding:4px 6px;font-family:monospace;color:#5B21B6;font-weight:600">' + esc(loc.name||loc.id) + '</td><td style="padding:4px 6px">' + esc(loc.type||'—') + '</td><td style="padding:4px 6px">' + esc(loc.status||'—') + '</td><td style="padding:4px 6px">' + esc(loc.supportPickType||'—') + '</td><td style="padding:4px 6px">' + esc(loc.category||'—') + '</td><td style="padding:4px 6px">' + esc(loc.aisle||'—') + '</td><td style="padding:4px 6px">' + esc(ltrTagLabel(loc)||'—') + '</td></tr>').join('') +
+  el.innerHTML = '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:6px">' + list.length.toLocaleString() + ' result(s) — select locations to request updates' + (selectedTagId ? ' <span style="color:var(--muted-foreground)">(tag filter applied)</span>' : '') + '</div>' +
+    '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:6px"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--accent);position:sticky;top:0"><th style="padding:4px 6px;width:28px"><input type="checkbox" onchange="ltrToggleAll(this.checked)" style="accent-color:var(--primary)"/></th><th style="padding:4px 6px;text-align:left">Name</th><th style="padding:4px 6px">Type</th><th style="padding:4px 6px">Status</th><th style="padding:4px 6px">Pick Type</th><th style="padding:4px 6px">Category</th><th style="padding:4px 6px">Aisle</th><th style="padding:4px 6px">Location Tag</th></tr></thead><tbody>' +
+    list.map((loc, i) => '<tr style="cursor:pointer;border-top:1px solid var(--muted)" onmouseenter="this.style.background=\'color-mix(in srgb,var(--primary) 12%,var(--card))\'" onmouseleave="this.style.background=\'\'"><td style="padding:4px 6px"><input type="checkbox" data-idx="'+i+'" class="ltr-sel-cb" onchange="ltrUpdateSelection()" style="accent-color:var(--primary)"/></td><td style="padding:4px 6px;font-family:monospace;color:var(--primary);font-weight:600">' + esc(loc.name||loc.id) + '</td><td style="padding:4px 6px">' + esc(loc.type||'—') + '</td><td style="padding:4px 6px">' + esc(loc.status||'—') + '</td><td style="padding:4px 6px">' + esc(loc.supportPickType||'—') + '</td><td style="padding:4px 6px">' + esc(loc.category||'—') + '</td><td style="padding:4px 6px">' + esc(loc.aisle||'—') + '</td><td style="padding:4px 6px">' + esc(ltrTagLabel(loc)||'—') + '</td></tr>').join('') +
     '</tbody></table></div>' +
-    '<div id="ltr-selection-bar" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span id="ltr-sel-count" style="font-size:11px;color:#6b7280">0 selected</span><button class="btn btn-primary" onclick="ltrUseSelected()" style="font-size:11px;padding:4px 12px;display:none" id="ltr-use-btn">Use Selected Location</button></div>';
+    '<div id="ltr-selection-bar" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span id="ltr-sel-count" style="font-size:11px;color:var(--muted-foreground)">0 selected</span><button class="btn btn-primary" onclick="ltrUseSelected()" style="font-size:11px;padding:4px 12px;display:none" id="ltr-use-btn">Use Selected Location</button></div>';
   window._ltrSearchResults = list;
 }
 
@@ -7450,7 +7450,7 @@ function ltrUseSelected() {
   window._ltrSelectedIndices = indices;
   if (indices.length > 1) {
     const curEl = document.getElementById('ltr-current');
-    if (curEl) curEl.innerHTML += '<div style="margin-top:6px;font-size:10px;color:#5B21B6;font-weight:600">' + indices.length + ' location(s) selected. Editing first location below. Submit will create one grouped request for all selected locations with the same changes.</div>';
+    if (curEl) curEl.innerHTML += '<div style="margin-top:6px;font-size:10px;color:var(--primary);font-weight:600">' + indices.length + ' location(s) selected. Editing first location below. Submit will create one grouped request for all selected locations with the same changes.</div>';
   }
 }
 
@@ -7461,9 +7461,9 @@ function ltrSelectResult(idx) {
   window._ltrCurrentLoc = loc;
   const curEl = document.getElementById('ltr-current');
   curEl.style.display = '';
-  curEl.innerHTML = '<strong style="color:#059669">Selected:</strong> ' + esc(loc.name||loc.id) +
-    '<table style="width:100%;font-size:10px;border-collapse:collapse;margin-top:6px"><tr style="background:#f3f4f6"><th style="padding:3px 4px;text-align:left">Field</th><th style="padding:3px 4px;text-align:left">Current WMS Value</th></tr>' +
-    [['ID',loc.id],['Name',loc.name],['Type',loc.type],['Status',loc.status],['Pick Type',loc.supportPickType],['Category',loc.category],['Capacity Type',loc.capacityType],['Aisle',loc.aisle],['Bay/Section',loc.bay||loc.section],['Level',loc.level],['Slot',loc.slot],['Customers',(loc.customerIds||[]).join(', ')||'—'],['Tag',ltrTagLabel(loc)||'—'],['Disallow Mix',loc.disallowToMixItemOnSameLocation||'—']].map(([k,v])=>'<tr><td style="padding:2px 4px;color:#6b7280">'+esc(k)+'</td><td style="padding:2px 4px">'+esc(String(v||'—'))+'</td></tr>').join('') +
+  curEl.innerHTML = '<strong style="color:var(--chart-3)">Selected:</strong> ' + esc(loc.name||loc.id) +
+    '<table style="width:100%;font-size:10px;border-collapse:collapse;margin-top:6px"><tr style="background:var(--muted)"><th style="padding:3px 4px;text-align:left">Field</th><th style="padding:3px 4px;text-align:left">Current WMS Value</th></tr>' +
+    [['ID',loc.id],['Name',loc.name],['Type',loc.type],['Status',loc.status],['Pick Type',loc.supportPickType],['Category',loc.category],['Capacity Type',loc.capacityType],['Aisle',loc.aisle],['Bay/Section',loc.bay||loc.section],['Level',loc.level],['Slot',loc.slot],['Customers',(loc.customerIds||[]).join(', ')||'—'],['Tag',ltrTagLabel(loc)||'—'],['Disallow Mix',loc.disallowToMixItemOnSameLocation||'—']].map(([k,v])=>'<tr><td style="padding:2px 4px;color:var(--muted-foreground)">'+esc(k)+'</td><td style="padding:2px 4px">'+esc(String(v||'—'))+'</td></tr>').join('') +
     '</table>';
   document.getElementById('ltr-fields-wrap').style.display = '';
   const setVal = (id, val) => { const e = document.getElementById(id); if (e && val) e.value = val; };
@@ -7509,8 +7509,8 @@ function ltrCustRender() {
   const q = (document.getElementById('ltr-cust-search') || {}).value.toLowerCase();
   const custs = (FACILITY_CUSTOMERS[FACILITY_ID] || []).filter(x => !q || (x.name||'').toLowerCase().includes(q) || (x.id||'').includes(q));
   const sel = new Set(window._ltrCustSel);
-  c.innerHTML = custs.length === 0 ? '<div style="padding:6px 8px;font-size:11px;color:#9ca3af">No customers</div>' :
-    custs.map(x => '<label style="display:flex;align-items:center;gap:5px;padding:3px 8px;font-size:11px;cursor:pointer" onmouseenter="this.style.background=\'#F3EEFF\'" onmouseleave="this.style.background=\'\'"><input type="checkbox" ' + (sel.has(x.id)?'checked':'') + ' onchange="ltrCustCheck(\''+escAttr(x.id)+'\',this.checked)" style="accent-color:#753BBD"/>' + esc(x.name) + ' <span style="color:#9ca3af;font-size:10px">(' + esc(x.id) + ')</span></label>').join('');
+  c.innerHTML = custs.length === 0 ? '<div style="padding:6px 8px;font-size:11px;color:var(--muted-foreground)">No customers</div>' :
+    custs.map(x => '<label style="display:flex;align-items:center;gap:5px;padding:3px 8px;font-size:11px;cursor:pointer" onmouseenter="this.style.background=\'color-mix(in srgb,var(--primary) 10%,var(--card))\'" onmouseleave="this.style.background=\'\'"><input type="checkbox" ' + (sel.has(x.id)?'checked':'') + ' onchange="ltrCustCheck(\''+escAttr(x.id)+'\',this.checked)" style="accent-color:var(--primary)"/>' + esc(x.name) + ' <span style="color:var(--muted-foreground);font-size:10px">(' + esc(x.id) + ')</span></label>').join('');
 }
 function ltrCustCheck(id, on) {
   if (on && !window._ltrCustSel.includes(id)) window._ltrCustSel.push(id);
@@ -7523,8 +7523,8 @@ function ltrCustSync() {
   const hidden = document.getElementById('ltr-f-customerIds');
   const custs = FACILITY_CUSTOMERS[FACILITY_ID] || [];
   const lookup = {}; custs.forEach(c => lookup[c.id] = c.name);
-  if (trigger) trigger.innerHTML = window._ltrCustSel.length === 0 ? '<span style="color:#9ca3af">Select customer(s)…</span>' : '<span style="font-size:11px;color:#374151">' + window._ltrCustSel.length + ' customer(s) selected</span>';
-  if (chips) chips.innerHTML = window._ltrCustSel.map(id => '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#EDE9FE;color:#5B21B6;display:inline-flex;align-items:center;gap:2px">' + esc(lookup[id]||id) + ' <span onclick="ltrCustCheck(\'' + escAttr(id) + '\',false);ltrCustRender()" style="cursor:pointer;font-weight:700">×</span></span>').join('');
+  if (trigger) trigger.innerHTML = window._ltrCustSel.length === 0 ? '<span style="color:var(--muted-foreground)">Select customer(s)…</span>' : '<span style="font-size:11px;color:var(--foreground)">' + window._ltrCustSel.length + ' customer(s) selected</span>';
+  if (chips) chips.innerHTML = window._ltrCustSel.map(id => '<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:color-mix(in srgb,var(--primary) 12%,var(--card));color:var(--primary);display:inline-flex;align-items:center;gap:2px">' + esc(lookup[id]||id) + ' <span onclick="ltrCustCheck(\'' + escAttr(id) + '\',false);ltrCustRender()" style="cursor:pointer;font-weight:700">×</span></span>').join('');
   if (hidden) { hidden.innerHTML = ''; window._ltrCustSel.forEach(id => { const o = document.createElement('option'); o.value = id; o.selected = true; hidden.appendChild(o); }); }
 }
 function ltrCustPreselect(ids) {
@@ -7733,17 +7733,17 @@ function ltrViewDetail(idx) {
   if (!r) return;
   const changes = r.changes || {};
   const current = r.currentValues || {};
-  let diff = Object.keys(changes).map(k => '<tr><td style="padding:3px 6px">' + esc(k) + '</td><td style="padding:3px 6px;color:#9ca3af">' + esc(String(current[k]||'—')) + '</td><td style="padding:3px 6px;color:#059669;font-weight:600">' + esc(changes[k]) + '</td></tr>').join('');
+  let diff = Object.keys(changes).map(k => '<tr><td style="padding:3px 6px">' + esc(k) + '</td><td style="padding:3px 6px;color:var(--muted-foreground)">' + esc(String(current[k]||'—')) + '</td><td style="padding:3px 6px;color:var(--chart-3);font-weight:600">' + esc(changes[k]) + '</td></tr>').join('');
   const form = document.getElementById('ltr-form');
   form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #6b7280">' +
-    '<div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:8px">Request Detail — ' + esc(r.locationName||r.locationId) + '</div>' +
-    '<div style="font-size:11px;color:#6b7280;margin-bottom:4px">Status: <strong>' + esc(r.status.replace(/_/g,' ')) + '</strong> · Requester: ' + esc(r.requester) + ' · ' + (r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '') + '</div>' +
-    (r.appliedAt ? '<div style="font-size:11px;color:#059669;margin-bottom:4px">Applied: ' + new Date(r.appliedAt).toLocaleString() + '</div>' : '') +
-    (r.rejectedAt ? '<div style="font-size:11px;color:#dc2626;margin-bottom:4px">Rejected: ' + new Date(r.rejectedAt).toLocaleString() + '</div>' : '') +
-    (r.errorMsg ? '<div style="font-size:11px;color:#dc2626;margin-bottom:4px">Error: ' + esc(r.errorMsg) + '</div>' : '') +
-    (r.applyNote ? '<div style="font-size:11px;color:#92400e;margin-bottom:4px">Apply note: ' + esc(r.applyNote) + '</div>' : '') +
-    '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:8px"><thead><tr style="background:#f9fafb"><th style="padding:4px 6px;text-align:left">Field</th><th style="padding:4px 6px;text-align:left">Current</th><th style="padding:4px 6px;text-align:left">Requested</th></tr></thead><tbody>' + diff + '</tbody></table>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--muted-foreground)">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:8px">Request Detail — ' + esc(r.locationName||r.locationId) + '</div>' +
+    '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:4px">Status: <strong>' + esc(r.status.replace(/_/g,' ')) + '</strong> · Requester: ' + esc(r.requester) + ' · ' + (r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '') + '</div>' +
+    (r.appliedAt ? '<div style="font-size:11px;color:var(--chart-3);margin-bottom:4px">Applied: ' + new Date(r.appliedAt).toLocaleString() + '</div>' : '') +
+    (r.rejectedAt ? '<div style="font-size:11px;color:var(--destructive);margin-bottom:4px">Rejected: ' + new Date(r.rejectedAt).toLocaleString() + '</div>' : '') +
+    (r.errorMsg ? '<div style="font-size:11px;color:var(--destructive);margin-bottom:4px">Error: ' + esc(r.errorMsg) + '</div>' : '') +
+    (r.applyNote ? '<div style="font-size:11px;color:var(--chart-4);margin-bottom:4px">Apply note: ' + esc(r.applyNote) + '</div>' : '') +
+    '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:8px"><thead><tr style="background:var(--accent)"><th style="padding:4px 6px;text-align:left">Field</th><th style="padding:4px 6px;text-align:left">Current</th><th style="padding:4px 6px;text-align:left">Requested</th></tr></thead><tbody>' + diff + '</tbody></table>' +
     '<div style="margin-top:10px"><button class="btn btn-secondary" onclick="document.getElementById(\'ltr-form\').style.display=\'none\'" style="font-size:12px;padding:6px 14px">Close</button></div></div>';
 }
 
@@ -7995,18 +7995,18 @@ function ltrEditRequest(idx) {
   const changes = r.changes || {};
   const current = r.currentValues || {};
   form.style.display = '';
-  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid #2563eb">' +
-    '<div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:4px">Edit Request — ' + esc(r.locationName || r.locationId) + '</div>' +
-    '<div style="font-size:11px;color:#6b7280;margin-bottom:12px">Edit requested changes. Saving will reset status to Pending Approval.</div>' +
-    (r.errorMsg ? '<div style="font-size:10px;color:#dc2626;margin-bottom:8px;padding:4px 8px;background:#FEF2F2;border-radius:4px">Previous failure: ' + esc(r.errorMsg) + '</div>' : '') +
-    '<div style="margin-bottom:12px;padding:8px;background:#f9fafbdius:6px;border:1px solid #e5e7eb;font-size:10px"><strong>Current WMS values:</strong><br>' +
+  form.innerHTML = '<div class="card" style="padding:16px;margin-bottom:16px;border-left:4px solid var(--chart-5)">' +
+    '<div style="font-size:13px;font-weight:700;color:var(--foreground);margin-bottom:4px">Edit Request — ' + esc(r.locationName || r.locationId) + '</div>' +
+    '<div style="font-size:11px;color:var(--muted-foreground);margin-bottom:12px">Edit requested changes. Saving will reset status to Pending Approval.</div>' +
+    (r.errorMsg ? '<div style="font-size:10px;color:var(--destructive);margin-bottom:8px;padding:4px 8px;background:color-mix(in srgb,var(--destructive) 12%,var(--card));border-radius:4px">Previous failure: ' + esc(r.errorMsg) + '</div>' : '') +
+    '<div style="margin-bottom:12px;padding:8px;background:var(--accent);border-radius:6px;border:1px solid var(--border);font-size:10px"><strong>Current WMS values:</strong><br>' +
     [['Name',current.name],['Type',current.type],['Status',current.status],['Pick Type',current.supportPickType],['Tag',current.tagName||'—']].map(([k,v])=>esc(k)+': '+esc(String(v||'—'))).join(' · ') + '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">type</label><select class="cc-input" id="ltr-e-type" style="font-size:11px"><option value="">— No change —</option><option value="LOCATION"' + (changes.type==='LOCATION'?' selected':'') + '>LOCATION</option><option value="PICK"' + (changes.type==='PICK'?' selected':'') + '>PICK</option><option value="STAGING"' + (changes.type==='STAGING'?' selected':'') + '>STAGING</option><option value="DOCK"' + (changes.type==='DOCK'?' selected':'') + '>DOCK</option><option value="AUTOMATED_LOCATION"' + (changes.type==='AUTOMATED_LOCATION'?' selected':'') + '>AUTOMATED_LOCATION</option><option value="ZONE"' + (changes.type==='ZONE'?' selected':'') + '>ZONE</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">status</label><select class="cc-input" id="ltr-e-status" style="font-size:11px"><option value="">— No change —</option><option value="USABLE"' + (changes.status==='USABLE'?' selected':'') + '>USABLE</option><option value="DISABLED"' + (changes.status==='DISABLED'?' selected':'') + '>DISABLED</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">supportPickType</label><select class="cc-input" id="ltr-e-supportPickType" style="font-size:11px"><option value="">— No change —</option><option value="PALLET_PICK"' + (changes.supportPickType==='PALLET_PICK'?' selected':'') + '>PALLET_PICK</option><option value="CASE_PICK"' + (changes.supportPickType==='CASE_PICK'?' selected':'') + '>CASE_PICK</option><option value="PIECE_PICK"' + (changes.supportPickType==='PIECE_PICK'?' selected':'') + '>PIECE_PICK</option><option value="BULK_PICK"' + (changes.supportPickType==='BULK_PICK'?' selected':'') + '>BULK_PICK</option><option value="NONE"' + (changes.supportPickType==='NONE'?' selected':'') + '>NONE</option></select></div>' +
     '<div class="cc-field" style="margin:0"><label class="cc-label">disallowMix</label><select class="cc-input" id="ltr-e-disallowToMixItemOnSameLocation" style="font-size:11px"><option value="">— No change —</option><option value="TRUE"' + (changes.disallowToMixItemOnSameLocation==='TRUE'?' selected':'') + '>TRUE</option><option value="FALSE"' + (changes.disallowToMixItemOnSameLocation==='FALSE'?' selected':'') + '>FALSE</option></select></div>' +
-    '<div class="cc-field" style="margin:0"><label class="cc-label">Location Tag</label><select class="cc-input" id="ltr-e-tagName" style="font-size:11px"><option value="">— No change —</option>' + (r.tagId ? '<option value="' + escAttr(r.tagId) + '" selected>' + esc(r.tagName || r.tagId) + '</option>' : '') + '</select><button onclick="ltrLoadEditTags(\'' + escAttr(String(idx)) + '\')" style="font-size:9px;padding:2px 6px;margin-top:4px;cursor:pointer;background:#EDE9FE;border:1px solid #d8b4fe;border-radius:3px;color:#5B21B6">Load Tags</button></div>' +
+    '<div class="cc-field" style="margin:0"><label class="cc-label">Location Tag</label><select class="cc-input" id="ltr-e-tagName" style="font-size:11px"><option value="">— No change —</option>' + (r.tagId ? '<option value="' + escAttr(r.tagId) + '" selected>' + esc(r.tagName || r.tagId) + '</option>' : '') + '</select><button onclick="ltrLoadEditTags(\'' + escAttr(String(idx)) + '\')" style="font-size:9px;padding:2px 6px;margin-top:4px;cursor:pointer;background:color-mix(in srgb,var(--primary) 12%,var(--card));border:1px solid var(--chart-5);border-radius:3px;color:var(--primary)">Load Tags</button></div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">' +
     '</div>' +
@@ -8153,8 +8153,8 @@ function dashRenderInventory(rows, customersChecked) {
   const body = document.getElementById('dash-low-stock-body');
   if (body) body.innerHTML = lowRows.length ? lowRows.map(r => {
     const qty = dashAvail(r); const cls = qty <= 0 ? 'out' : qty <= 3 ? 'vlow' : 'low'; const label = qty <= 0 ? 'Out' : qty <= 3 ? 'Very Low' : 'Low';
-    return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:#9ca3af">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
-  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9ca3af">No low-stock rows in the live sample.</td></tr>';
+    return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:var(--muted-foreground)">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)">No low-stock rows in the live sample.</td></tr>';
 }
 const HRM_ASSIGNMENT_LABELS = {1:'Driver',2:'General Labor',3:'Inventory',4:'Quality Control',5:'Housekeeping',6:'CSR',7:'Gate / Security',8:'Yard Jockey',9:'IT',10:'Lead',11:'Supervisor',12:'General Manager'};
 function dashOwnershipRows(resp) {
@@ -8171,9 +8171,9 @@ function dashEmployeeInitials(name) {
   return (parts[0]?.[0] || '') + (parts[1]?.[0] || parts[0]?.[1] || '');
 }
 function dashOwnershipStatusColor(row) {
-  if (Number(row.status) === 1) return '#22c55e';
-  if (row.status === 0 || row.status === false) return '#f59e0b';
-  return '#06b6d4';
+  if (Number(row.status) === 1) return 'var(--chart-3)';
+  if (row.status === 0 || row.status === false) return 'var(--chart-4)';
+  return 'var(--chart-3)';
 }
 function dashOwnershipPhotoUrl(row) {
   const raw = row && (row.headPhotoUrl || row.photoUrl || row.avatarUrl || row.pictureUrl || row.imageUrl || row.profilePhotoUrl || row.headPhoto || row.photo);
@@ -8244,7 +8244,7 @@ function dashRenderEmployeeOwnership(rows) {
   const strip = document.getElementById('dash-ownership-strip');
   if (!strip) return;
   if (!rows || !rows.length) {
-    strip.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:24px">No HRM ownership employees returned. Open HRM Card to create or update records.</div>';
+    strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">No HRM ownership employees returned. Open HRM Card to create or update records.</div>';
     return;
   }
   strip.innerHTML = rows.slice(0, 40).map((r, idx) => {
@@ -8256,9 +8256,9 @@ function dashRenderEmployeeOwnership(rows) {
       ? '<img src="' + escAttr(photo) + '" alt="' + escAttr(name) + '" onerror="this.style.display=\'none\';this.parentNode.textContent=\'' + escAttr(initials || '👤') + '\'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>'
       : esc(initials || '👤');
     return '<div onclick="dashOpenOwnershipDetail(' + idx + ')" style="width:92px;flex:0 0 92px;text-align:center;cursor:pointer;position:relative" title="' + escAttr(name) + '">' +
-      '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,#F7F2FF,#ECFDF5);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#1f2937;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden">' + avatarHtml + '</div>' +
-      '<span style="position:absolute;right:12px;top:54px;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid white"></span>' +
-      '<div style="font-size:11px;line-height:1.15;font-weight:800;color:#1f2937;white-space:normal;min-height:26px">' + esc(String(name).split(/\s+/).slice(0,2).join(' ')) + '</div>' +
+      '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 10%,var(--card)),color-mix(in srgb,var(--chart-3) 14%,var(--card)));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--foreground);box-shadow:0 2px 8px color-mix(in srgb,var(--foreground) 8%,transparent);overflow:hidden">' + avatarHtml + '</div>' +
+      '<span style="position:absolute;right:12px;top:54px;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid var(--card)"></span>' +
+      '<div style="font-size:11px;line-height:1.15;font-weight:800;color:var(--foreground);white-space:normal;min-height:26px">' + esc(String(name).split(/\s+/).slice(0,2).join(' ')) + '</div>' +
     '</div>';
   }).join('');
 }
@@ -8292,12 +8292,12 @@ async function dashOpenOwnershipDetail(idx) {
   const avatar = detailPhoto ? '<img src="' + escAttr(detailPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
   const html = '<div class="modal-overlay open" id="dash-owner-modal" onclick="if(event.target===this)dashCloseOwnershipDetail()"><div class="modal" style="max-width:980px"><div class="modal-hdr"><h2>Employee Ownership Card</h2><button class="modal-x" onclick="dashCloseOwnershipDetail()">×</button></div>' +
     '<div class="modal-body" style="display:grid;grid-template-columns:260px 1fr;gap:18px">' +
-      '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:#111827;color:white;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:#1f2937;margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:#6b7280;margin-top:4px">Employee Code ' + esc(detail.employeeCode || '—') + '</div></div>' +
-      '<div style="display:grid;gap:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:#111;color:#fff;border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">RANK</div><div style="font-size:36px;font-weight:900">' + esc(rank) + '</div></div><div style="background:#111;color:#fff;border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">YEAR</div><div style="font-size:36px;font-weight:900">' + esc(years) + '</div><div style="font-size:10px">OF SERVICE</div></div></div>' +
-      '<div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">SCHEDULE</div><div style="font-size:13px">' + esc(dashScheduleText(detail)) + '</div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">SKILLS</div><div style="font-size:12px">' + esc(dashListText(detail.skills)) + '</div></div><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">EQUIPMENTS</div><div style="font-size:12px">' + esc(dashListText(detail.equipments || detail.equipment)) + '</div></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">TECHNOLOGY</div><div style="font-size:12px">' + esc(dashListText(detail.technology)) + '</div></div><div style="border:1px solid #111;border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:#111;color:#fff;margin:-10px -10px 8px;padding:4px">TOOLS</div><div style="font-size:12px">' + esc(dashListText(detail.tools)) + '</div></div></div>' +
-      '<div style="font-size:12px;color:#6b7280">Supervisor: ' + esc(detail.supervisorName || '—') + ' · Status: ' + esc(status) + '</div></div></div></div></div>';
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:var(--foreground);color:var(--card);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:var(--foreground);margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:var(--muted-foreground);margin-top:4px">Employee Code ' + esc(detail.employeeCode || '—') + '</div></div>' +
+      '<div style="display:grid;gap:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">RANK</div><div style="font-size:36px;font-weight:900">' + esc(rank) + '</div></div><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">YEAR</div><div style="font-size:36px;font-weight:900">' + esc(years) + '</div><div style="font-size:10px">OF SERVICE</div></div></div>' +
+      '<div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">SCHEDULE</div><div style="font-size:13px">' + esc(dashScheduleText(detail)) + '</div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">SKILLS</div><div style="font-size:12px">' + esc(dashListText(detail.skills)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">EQUIPMENTS</div><div style="font-size:12px">' + esc(dashListText(detail.equipments || detail.equipment)) + '</div></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">TECHNOLOGY</div><div style="font-size:12px">' + esc(dashListText(detail.technology)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">TOOLS</div><div style="font-size:12px">' + esc(dashListText(detail.tools)) + '</div></div></div>' +
+      '<div style="font-size:12px;color:var(--muted-foreground)">Supervisor: ' + esc(detail.supervisorName || '—') + ' · Status: ' + esc(status) + '</div></div></div></div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
 }
 function dashCloseOwnershipDetail() { const m = document.getElementById('dash-owner-modal'); if (m) m.remove(); }
@@ -8330,12 +8330,12 @@ function dashRenderTasks(tickets) {
 async function loadDashboardLiveData() {
   ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending'].forEach(id => dashSet(id, '…'));
   const strip = document.getElementById('dash-ownership-strip');
-  if (strip) strip.innerHTML = '<div style="font-size:12px;color:#9ca3af;padding:24px">Loading HRM ownership employees…</div>';
+  if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">Loading HRM ownership employees…</div>';
   const ok = await ensureWiseToken(false);
   if (!ok) {
     dashSet('dash-kpi-inv-sub', 'Sign in to load live WMS data');
-    if (strip) strip.innerHTML = '<div style="font-size:12px;color:#ef4444;padding:24px">Sign in to load HRM ownership employees.</div>';
-    const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#ef4444">Please sign in to load live WMS inventory.</td></tr>';
+    if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--destructive);padding:24px">Sign in to load HRM ownership employees.</div>';
+    const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--destructive)">Please sign in to load live WMS inventory.</td></tr>';
     return;
   }
   const [ticketsResult, invResult, ownershipResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample(), dashFetchOwnershipEmployees()]);
@@ -8356,7 +8356,7 @@ async function loadDashboardLiveData() {
 async function loadDashCycleCountKpi() {
   const container = document.getElementById('dash-cc-kpi');
   if (!container) return;
-  if (!WISE_TOKEN) { container.innerHTML = '<span style="color:#9ca3af">Sign in to view cycle count metrics.</span>'; return; }
+  if (!WISE_TOKEN) { container.innerHTML = '<span style="color:var(--muted-foreground)">Sign in to view cycle count metrics.</span>'; return; }
   container.innerHTML = '<span class="spinner"></span> Loading cycle count records…';
 
   const resp = await safeFetch(WMS_BASE + '/api/cyclecount-app/cycle-count/count-ticket/search-by-paging', {
@@ -8365,11 +8365,11 @@ async function loadDashCycleCountKpi() {
     body: JSON.stringify({currentPage:1, pageSize:100, facilityId: FACILITY_ID, warehouseId: FACILITY_ID}),
   });
 
-  if (!resp || resp._needsAuth) { container.innerHTML = '<span style="color:#ef4444">Authentication required. Please sign in.</span>'; return; }
+  if (!resp || resp._needsAuth) { container.innerHTML = '<span style="color:var(--destructive)">Authentication required. Please sign in.</span>'; return; }
   const d = resp.data || resp;
   const tickets = d.list || d.records || [];
 
-  if (tickets.length === 0) { container.innerHTML = '<span style="color:#9ca3af">No cycle count records found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</span>'; return; }
+  if (tickets.length === 0) { container.innerHTML = '<span style="color:var(--muted-foreground)">No cycle count records found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</span>'; return; }
 
   // Group by customer
   const custLookup = {};
@@ -8395,13 +8395,13 @@ async function loadDashCycleCountKpi() {
   const completedAll = rows.reduce((s, r) => s + r.completed, 0);
 
   let html = '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">' +
-    '<div style="text-align:center;padding:8px 16px;background:#F3EEFF;border-radius:8px"><div style="font-size:18px;font-weight:700;color:#5B21B6">' + totalAll + '</div><div style="font-size:10px;color:#6b7280">Total Tickets</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:#ECFDF5;border-radius:8px"><div style="font-size:18px;font-weight:700;color:#059669">' + completedAll + '</div><div style="font-size:10px;color:#6b7280">Completed</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:#FEF3C7;border-radius:8px"><div style="font-size:18px;font-weight:700;color:#d97706">' + openAll + '</div><div style="font-size:10px;color:#6b7280">Open / In Progress</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:#f3f4f6;border-radius:8px"><div style="font-size:18px;font-weight:700;color:#374151">' + rows.length + '</div><div style="font-size:10px;color:#6b7280">Customers</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--primary) 10%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--primary)">' + totalAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Total Tickets</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-3)">' + completedAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Completed</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-4)">' + openAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Open / In Progress</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:var(--muted);border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--foreground)">' + rows.length + '</div><div style="font-size:10px;color:var(--muted-foreground)">Customers</div></div>' +
     '</div>';
 
-  html += '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:#f9fafb;border-bottom:1px solid #e5e7eb">' +
+  html += '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--accent);border-bottom:1px solid var(--border)">' +
     '<th style="padding:6px 8px;text-align:left">Customer</th>' +
     '<th style="padding:6px 8px;text-align:center">Total</th>' +
     '<th style="padding:6px 8px;text-align:center">Open</th>' +
@@ -8412,20 +8412,20 @@ async function loadDashCycleCountKpi() {
 
   rows.forEach(r => {
     const pct = r.total > 0 ? Math.round((r.completed / r.total) * 100) : 0;
-    const pctColor = pct >= 80 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
-    const nameDisplay = r.name === 'UNASSIGNED' ? '<span style="color:#9ca3af;font-style:italic">Unassigned</span>' : esc(String(r.name).slice(0, 30));
-    html += '<tr style="border-bottom:1px solid #f3f4f6">' +
+    const pctColor = pct >= 80 ? 'var(--chart-3)' : pct >= 50 ? 'var(--chart-4)' : 'var(--destructive)';
+    const nameDisplay = r.name === 'UNASSIGNED' ? '<span style="color:var(--muted-foreground);font-style:italic">Unassigned</span>' : esc(String(r.name).slice(0, 30));
+    html += '<tr style="border-bottom:1px solid var(--muted)">' +
       '<td style="padding:5px 8px;font-weight:600">' + nameDisplay + '</td>' +
       '<td style="padding:5px 8px;text-align:center">' + r.total + '</td>' +
-      '<td style="padding:5px 8px;text-align:center;color:#d97706;font-weight:600">' + (r.open || '—') + '</td>' +
-      '<td style="padding:5px 8px;text-align:center;color:#059669">' + (r.completed || '—') + '</td>' +
-      '<td style="padding:5px 8px;text-align:center;color:#9ca3af">' + (r.cancelled || '—') + '</td>' +
+      '<td style="padding:5px 8px;text-align:center;color:var(--chart-4);font-weight:600">' + (r.open || '—') + '</td>' +
+      '<td style="padding:5px 8px;text-align:center;color:var(--chart-3)">' + (r.completed || '—') + '</td>' +
+      '<td style="padding:5px 8px;text-align:center;color:var(--muted-foreground)">' + (r.cancelled || '—') + '</td>' +
       '<td style="padding:5px 8px;text-align:center"><span style="color:' + pctColor + ';font-weight:600">' + pct + '%</span></td>' +
       '</tr>';
   });
 
   html += '</tbody></table>';
-  html += '<div style="font-size:10px;color:#9ca3af;margin-top:8px">Based on ' + totalAll + ' cycle count tickets at ' + esc(FACILITY_NAME || FACILITY_ID) + '. Refresh for latest data.</div>';
+  html += '<div style="font-size:10px;color:var(--muted-foreground);margin-top:8px">Based on ' + totalAll + ' cycle count tickets at ' + esc(FACILITY_NAME || FACILITY_ID) + '. Refresh for latest data.</div>';
   container.innerHTML = html;
 }
 
@@ -8442,7 +8442,7 @@ async function loadLiveInventory() {
   // diagnostics moved to console only
   if (facLabel) facLabel.textContent = 'Loading inventory for ' + (FACILITY_NAME || FACILITY_ID) + '…';
   if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af"><span class="spinner"></span> Fetching live inventory for ' + esc(FACILITY_NAME || FACILITY_ID) + '…</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Fetching live inventory for ' + esc(FACILITY_NAME || FACILITY_ID) + '…</td></tr>';
 
   // Use the same session flow as the rest of the WMS dashboard. The access
   // token may not be present yet even when a refresh token exists, so try the
@@ -8450,7 +8450,7 @@ async function loadLiveInventory() {
   const hasSession = await ensureWiseToken(false);
   if (!hasSession) {
     if (facLabel) facLabel.textContent = 'Sign in to view live inventory for ' + (FACILITY_NAME || FACILITY_ID);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#ef4444">Please sign in again to view live inventory.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in again to view live inventory.</td></tr>';
     if (btn) { btn.disabled = false; btn.textContent = 'Load Live Inventory'; }
     return;
   }
@@ -8467,9 +8467,9 @@ async function loadLiveInventory() {
   if (!resp || resp._needsAuth) {
     if (facLabel) facLabel.textContent = '';
     if (!WISE_TOKEN) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#ef4444">Please sign in again to view live inventory.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in again to view live inventory.</td></tr>';
     } else {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#d97706">Inventory data is currently unavailable. Your session may need to be refreshed — try signing in again.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--chart-4)">Inventory data is currently unavailable. Your session may need to be refreshed — try signing in again.</td></tr>';
     }
     return;
   }
@@ -8480,7 +8480,7 @@ async function loadLiveInventory() {
 
   if (list.length === 0) {
     if (facLabel) facLabel.textContent = 'No inventory records found for ' + (FACILITY_NAME || FACILITY_ID);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af">No inventory data available for ' + esc(FACILITY_NAME || FACILITY_ID) + '. The warehouse may have no active inventory or API access may be restricted.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No inventory data available for ' + esc(FACILITY_NAME || FACILITY_ID) + '. The warehouse may have no active inventory or API access may be restricted.</td></tr>';
     return;
   }
 
@@ -8519,18 +8519,18 @@ function invRenderTable() {
   document.getElementById('inv-sub-title').textContent = filtered.length + ' inventory record(s)' + (q ? ' matching "' + q + '"' : '');
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9ca3af">No records match the filter.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No records match the filter.</td></tr>';
     return;
   }
 
   tbody.innerHTML = filtered.slice(0, 200).map(r => {
     const pickLabel = {PALLET_PICK:'Pallet', CASE_PICK:'Case', PIECE_PICK:'Piece', BULK_PICK:'Bulk'}[r.supportPickType] || r.supportPickType || '—';
     return '<tr>' +
-      '<td style="font-family:monospace;font-size:11px;color:#753BBD">' + esc(r.locationName) + '</td>' +
+      '<td style="font-family:monospace;font-size:11px;color:var(--primary)">' + esc(r.locationName) + '</td>' +
       '<td style="font-size:12px" title="' + escAttr(r.itemId) + '">' + esc(String(r.itemName).slice(0,35)) + '</td>' +
       '<td style="font-size:11px">' + esc(String(r.customerName).slice(0,25)) + '</td>' +
       '<td style="font-weight:600">' + r.qty + '</td>' +
-      '<td style="font-size:11px;color:#6b7280">' + esc(r.uom) + '</td>' +
+      '<td style="font-size:11px;color:var(--muted-foreground)">' + esc(r.uom) + '</td>' +
       '<td><span class="badge ' + (r.status === 'USABLE' ? 'ok' : 'idle') + '">' + esc(r.status) + '</span></td>' +
       '<td style="font-size:11px">' + esc(pickLabel) + '</td>' +
       '</tr>';
@@ -8600,13 +8600,13 @@ async function eomCompare() {
   if (!dateA || !dateB) { alert('Please select both Date A and Date B.'); return; }
 
   EOM_DATA = [];
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9ca3af"><span class="spinner"></span> Loading month-end inventory reports for ' + esc(FACILITY_NAME || FACILITY_ID) + '…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Loading month-end inventory reports for ' + esc(FACILITY_NAME || FACILITY_ID) + '…</td></tr>';
   if (note) note.textContent = 'Preparing customer list…';
   document.getElementById('eom-subtitle').textContent = 'Comparing month-end inventory report ILP totals by customer';
 
   const customers = await eomLoadFacilityCustomers();
   if (customers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9ca3af">No customers found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted-foreground)">No customers found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
     if (note) note.textContent = '';
     return;
   }
@@ -8648,18 +8648,18 @@ async function eomCompare() {
   document.getElementById('eom-total-a').textContent = grandTotalA.toLocaleString();
   document.getElementById('eom-total-b').textContent = grandTotalB.toLocaleString();
   document.getElementById('eom-variance').textContent = (grandVar >= 0 ? '+' : '') + grandVar.toLocaleString();
-  document.getElementById('eom-variance').style.color = grandVar >= 0 ? '#059669' : '#dc2626';
+  document.getElementById('eom-variance').style.color = grandVar >= 0 ? 'var(--chart-3)' : 'var(--destructive)';
   document.getElementById('eom-variance-pct').textContent = (grandPct >= 0 ? '+' : '') + grandPct.toFixed(1) + '%';
-  document.getElementById('eom-variance-pct').style.color = grandPct >= 0 ? '#059669' : '#dc2626';
+  document.getElementById('eom-variance-pct').style.color = grandPct >= 0 ? 'var(--chart-3)' : 'var(--destructive)';
 
   if (EOM_DATA.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9ca3af">No month-end inventory report records found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted-foreground)">No month-end inventory report records found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</td></tr>';
     if (note) note.textContent = '';
     return;
   }
 
   tbody.innerHTML = EOM_DATA.map(r => {
-    const varColor = r.variance > 0 ? '#059669' : (r.variance < 0 ? '#dc2626' : '#6b7280');
+    const varColor = r.variance > 0 ? 'var(--chart-3)' : (r.variance < 0 ? 'var(--destructive)' : 'var(--muted-foreground)');
     const pctText = (r.variancePct >= 0 ? '+' : '') + r.variancePct.toFixed(1) + '%';
     const noteAttr = r.note ? ' title="' + escAttr(r.note) + '"' : '';
     return '<tr' + noteAttr + '>' +
@@ -8746,8 +8746,8 @@ function consolSwitchTab(tab) {
 async function consolFetchData() {
   const bulkBody = document.getElementById('consol-bulk-body');
   const rackBody = document.getElementById('consol-rack-body');
-  if (bulkBody) bulkBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#9ca3af"><span class="spinner"></span> Loading consolidation data\u2026</td></tr>';
-  if (rackBody) rackBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#9ca3af"><span class="spinner"></span> Loading\u2026</td></tr>';
+  if (bulkBody) bulkBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted-foreground)"><span class="spinner"></span> Loading consolidation data\u2026</td></tr>';
+  if (rackBody) rackBody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted-foreground)"><span class="spinner"></span> Loading\u2026</td></tr>';
 
   // Step 1: Try consolidation tasks endpoint (ontology-verified: POST /task/consolidate-task/search-by-paging)
   const taskResp = await safeFetch(WMS_BASE + '/api/wms-bam/task/consolidate-task/search-by-paging', {
@@ -8758,7 +8758,7 @@ async function consolFetchData() {
 
   if (!taskResp || taskResp._needsAuth) {
     if (!WISE_TOKEN) {
-      const msg = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#ef4444">Please sign in to view consolidation data.</td></tr>';
+      const msg = '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--destructive)">Please sign in to view consolidation data.</td></tr>';
       if (bulkBody) bulkBody.innerHTML = msg;
       if (rackBody) rackBody.innerHTML = msg;
       return;
@@ -8880,10 +8880,10 @@ async function consolFetchInventory() {
 function consolRenderEmpty(tab, message) {
   const tbody = document.getElementById(tab === 'bulk' ? 'consol-bulk-body' : 'consol-rack-body');
   const label = tab === 'bulk' ? 'BULK' : 'Rack';
-  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#9ca3af">' +
-    '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div>' +
-    '<strong style="color:#6b7280">No ' + label + ' consolidation candidates</strong><br>' +
-    '<span style="font-size:12px;color:#9ca3af">' + esc(message) + '</span>' +
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+    '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div>' +
+    '<strong style="color:var(--muted-foreground)">No ' + label + ' consolidation candidates</strong><br>' +
+    '<span style="font-size:12px;color:var(--muted-foreground)">' + esc(message) + '</span>' +
     '</td></tr>';
 }
 
@@ -8913,7 +8913,7 @@ function consolRenderTaskTable(tab, list) {
     const priority = t.priority != null ? t.priority : '\u2014';
     const assignee = t.assigneeUserId || t.preAssigneeUserId || '\u2014';
     return '<tr>' +
-      '<td style="font-family:monospace;font-size:12px;color:#753BBD">' + esc(String(t.id || '\u2014').slice(-8)) + '</td>' +
+      '<td style="font-family:monospace;font-size:12px;color:var(--primary)">' + esc(String(t.id || '\u2014').slice(-8)) + '</td>' +
       '<td>' + esc(t.batchNo || '\u2014') + '</td>' +
       '<td>' + esc(t.customerId || '\u2014') + '</td>' +
       '<td>' + esc(subtypeLabel) + '</td>' +
@@ -8922,7 +8922,7 @@ function consolRenderTaskTable(tab, list) {
       '<td>' + (priority !== '\u2014' ? '<span style="font-weight:600">' + esc(String(priority)) + '</span>' : '\u2014') + '</td>' +
       '<td><span class="consol-status ' + statusCls + '">' + statusLabel + '</span></td>' +
       '<td style="font-size:12px">' + esc(String(assignee)) + '</td>' +
-      '<td style="font-size:11px;color:#9ca3af">' + updated + '</td>' +
+      '<td style="font-size:11px;color:var(--muted-foreground)">' + updated + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -8954,15 +8954,15 @@ function consolRenderInventoryTable(tab, list) {
     const checked = consolIsSelected(r) ? 'checked' : '';
     const rowIdx = list.indexOf(r);
     return '<tr style="cursor:pointer" onclick="consolToggleSelect(' + rowIdx + ',\'' + tab + '\')">' +
-      '<td><input type="checkbox" ' + checked + ' style="accent-color:#753BBD;cursor:pointer" onclick="event.stopPropagation();consolToggleSelect(' + rowIdx + ',\'' + tab + '\')"/></td>' +
-      '<td style="font-family:monospace;font-size:12px;color:#753BBD">' + esc(r.locationName || '\u2014') + '</td>' +
+      '<td><input type="checkbox" ' + checked + ' style="accent-color:var(--primary);cursor:pointer" onclick="event.stopPropagation();consolToggleSelect(' + rowIdx + ',\'' + tab + '\')"/></td>' +
+      '<td style="font-family:monospace;font-size:12px;color:var(--primary)">' + esc(r.locationName || '\u2014') + '</td>' +
       '<td title="' + esc(r.itemId || '') + '">' + esc(String(r.itemName || '\u2014').slice(0, 30)) + '</td>' +
       '<td style="font-size:12px">' + esc(String(r.customerName || '\u2014').slice(0, 25)) + '</td>' +
       '<td style="font-weight:600">' + esc(String(r.qty || 0)) + '</td>' +
-      '<td style="font-size:11px;color:#6b7280">' + esc(r.uom) + '</td>' +
+      '<td style="font-size:11px;color:var(--muted-foreground)">' + esc(r.uom) + '</td>' +
       '<td style="font-family:monospace;font-size:11px">' + esc(String(r.lpId || '\u2014').slice(-12)) + '</td>' +
       '<td style="font-size:11px">' + esc(r.lotNo || '\u2014') + '</td>' +
-      '<td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:#F3F4F6;color:#374151">' + esc(pickLabel) + '</span></td>' +
+      '<td><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--muted);color:var(--foreground)">' + esc(pickLabel) + '</span></td>' +
       '<td><span class="consol-status ' + statusCls + '">' + esc(r.status || '\u2014') + '</span></td>' +
     '</tr>';
   }).join('');
@@ -9118,12 +9118,12 @@ function consolWfOpen() {
   const tab = CONSOL_ACTIVE_TAB;
   var tabLabel = tab === 'bulk' ? 'BULK' : 'Rack';
 
-  let html = '<div style="margin-bottom:16px;padding:12px 16px;background:#F7F2FF;border-radius:8px;border:1px solid #E8DAFF">' +
+  let html = '<div style="margin-bottom:16px;padding:12px 16px;background:color-mix(in srgb,var(--primary) 10%,var(--card));border-radius:8px;border:1px solid color-mix(in srgb,var(--primary) 30%,var(--border))">' +
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5F2E98" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg>' +
-    '<strong style="color:#5F2E98">' + tabLabel + ' Consolidation Plan</strong>' +
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg>' +
+    '<strong style="color:var(--primary)">' + tabLabel + ' Consolidation Plan</strong>' +
     '</div>' +
-    '<span style="font-size:12px;color:#6b7280">' + CONSOL_SELECTED.length + ' inventory item' + (CONSOL_SELECTED.length > 1 ? 's' : '') + ' selected for consolidation</span>' +
+    '<span style="font-size:12px;color:var(--muted-foreground)">' + CONSOL_SELECTED.length + ' inventory item' + (CONSOL_SELECTED.length > 1 ? 's' : '') + ' selected for consolidation</span>' +
     '</div>';
 
   // Destination location input
@@ -9138,12 +9138,12 @@ function consolWfOpen() {
   Object.keys(byCustomer).forEach(cid => {
     const group = byCustomer[cid];
     html += '<div style="margin-bottom:14px">' +
-      '<div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px;padding:4px 0;border-bottom:1px solid #f3f4f6">' +
-      esc(group.name) + ' <span style="color:#9ca3af;font-weight:400">(' + group.items.length + ' item' + (group.items.length > 1 ? 's' : '') + ')</span></div>' +
+      '<div style="font-size:12px;font-weight:600;color:var(--foreground);margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--muted)">' +
+      esc(group.name) + ' <span style="color:var(--muted-foreground);font-weight:400">(' + group.items.length + ' item' + (group.items.length > 1 ? 's' : '') + ')</span></div>' +
       '<table class="tbl" style="margin:0;font-size:12px"><thead><tr><th>Location</th><th>Item</th><th>Qty</th><th>LP</th><th>Lot</th></tr></thead><tbody>';
     group.items.forEach(r => {
       html += '<tr>' +
-        '<td style="font-family:monospace;font-size:11px;color:#753BBD">' + esc(r.locationName || '—') + '</td>' +
+        '<td style="font-family:monospace;font-size:11px;color:var(--primary)">' + esc(r.locationName || '—') + '</td>' +
         '<td>' + esc(String(r.itemName || '—').slice(0, 25)) + '</td>' +
         '<td style="font-weight:600">' + esc(String(r.qty || 0)) + ' ' + esc(r.uom || '') + '</td>' +
         '<td style="font-family:monospace;font-size:11px">' + esc(String(r.lpId || '—').slice(-12)) + '</td>' +
@@ -9154,7 +9154,7 @@ function consolWfOpen() {
   });
 
   // Info banner about task creation
-  html += '<div style="margin-top:16px;padding:12px 16px;background:#FEF9C3;border-radius:8px;border:1px solid #FDE68A;font-size:12px;color:#92400E">' +
+  html += '<div style="margin-top:16px;padding:12px 16px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:8px;border:1px solid color-mix(in srgb,var(--chart-4) 40%,var(--border));font-size:12px;color:var(--chart-4)">' +
     '<strong>About task creation:</strong> This will submit a consolidation task to WISE via the verified create endpoint. ' +
     'The task will appear in the consolidation queue for operators to execute. A destination location is required.' +
     '</div>';
@@ -9173,7 +9173,7 @@ async function consolWfSubmit() {
   const note = (document.getElementById('consol-wf-note') || {}).value || '';
 
   if (!dest.trim()) {
-    document.getElementById('consol-wf-dest').style.borderColor = '#ef4444';
+    document.getElementById('consol-wf-dest').style.borderColor = 'var(--destructive)';
     document.getElementById('consol-wf-dest').focus();
     return;
   }
@@ -9232,9 +9232,9 @@ async function consolWfSubmit() {
   if (successes.length > 0) {
     const taskIds = successes.map(r => (r.resp.data && r.resp.data.id) ? String(r.resp.data.id).slice(-8) : '').filter(Boolean);
     const idNote = taskIds.length > 0 ? (' Task ID' + (taskIds.length > 1 ? 's' : '') + ': ' + taskIds.join(', ')) : '';
-    resultHtml += '<div style="padding:12px 16px;background:#ECFDF5;border-radius:8px;border:1px solid #A7F3D0;margin-bottom:12px">' +
-      '<strong style="color:#047857">✓ Consolidation task' + (successes.length > 1 ? 's' : '') + ' created successfully</strong>' +
-      '<div style="font-size:12px;color:#065F46;margin-top:4px">' + successes.reduce((s,r) => s + r.count, 0) + ' item(s) submitted across ' + successes.length + ' task(s).' + esc(idNote) + '</div></div>';
+    resultHtml += '<div style="padding:12px 16px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:8px;border:1px solid color-mix(in srgb,var(--chart-3) 30%,var(--border));margin-bottom:12px">' +
+      '<strong style="color:var(--chart-3)">✓ Consolidation task' + (successes.length > 1 ? 's' : '') + ' created successfully</strong>' +
+      '<div style="font-size:12px;color:var(--chart-3);margin-top:4px">' + successes.reduce((s,r) => s + r.count, 0) + ' item(s) submitted across ' + successes.length + ' task(s).' + esc(idNote) + '</div></div>';
   }
   if (failures.length > 0) {
     const errMsg = failures.map(f => {
@@ -9242,9 +9242,9 @@ async function consolWfSubmit() {
       if (f.resp._needsAuth) return 'Authentication required — please sign in again';
       return f.resp.msg || f.resp.message || (f.resp.data && f.resp.data.msg) || 'Task creation was not confirmed';
     }).join('; ');
-    resultHtml += '<div style="padding:12px 16px;background:#FEF2F2;border-radius:8px;border:1px solid #FECACA;margin-bottom:12px">' +
-      '<strong style="color:#B91C1C">✗ Some tasks could not be created</strong>' +
-      '<div style="font-size:12px;color:#991B1B;margin-top:4px">' + esc(errMsg) + '</div></div>';
+    resultHtml += '<div style="padding:12px 16px;background:color-mix(in srgb,var(--destructive) 12%,var(--card));border-radius:8px;border:1px solid color-mix(in srgb,var(--destructive) 32%,var(--border));margin-bottom:12px">' +
+      '<strong style="color:var(--destructive)">✗ Some tasks could not be created</strong>' +
+      '<div style="font-size:12px;color:var(--destructive);margin-top:4px">' + esc(errMsg) + '</div></div>';
   }
 
   if (successes.length > 0) {
@@ -9276,7 +9276,7 @@ let REPL_TOTAL = 0;
 async function loadReplenishView() {
   REPL_PAGE = (arguments[0] > 0) ? arguments[0] : REPL_PAGE;
   const tbody = document.getElementById('repl-table-body');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#9ca3af"><span class="spinner"></span> Loading replenishment data\u2026</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted-foreground)"><span class="spinner"></span> Loading replenishment data\u2026</td></tr>';
 
   const statusFilter = (document.getElementById('repl-filter-status') || {}).value || '';
   const daysFilter = parseInt((document.getElementById('repl-filter-days') || {}).value || '7');
@@ -9295,11 +9295,11 @@ async function loadReplenishView() {
   });
 
   if (!resp || resp._needsAuth) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#ef4444">Please sign in to view replenishment data.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">Please sign in to view replenishment data.</td></tr>';
     return;
   }
   if (resp.success === false) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:#ef4444">Unable to load replenishment data.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">Unable to load replenishment data.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
     return;
   }
 
@@ -9327,10 +9327,10 @@ function replRenderTable(list) {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:#9ca3af">' +
-      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div>' +
-      '<strong style="color:#6b7280">No replenishment records</strong><br>' +
-      '<span style="font-size:12px;color:#9ca3af">No replenishment activity found for the selected time range and filters.</span>' +
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
+      '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div>' +
+      '<strong style="color:var(--muted-foreground)">No replenishment records</strong><br>' +
+      '<span style="font-size:12px;color:var(--muted-foreground)">No replenishment activity found for the selected time range and filters.</span>' +
       '</td></tr>';
     return;
   }
@@ -9345,7 +9345,7 @@ function replRenderTable(list) {
     var operator = r.createdBy || '\u2014';
 
     return '<tr style="cursor:pointer" onclick="replShowDetail(' + idx + ')">' +
-      '<td style="font-family:monospace;font-size:12px;color:#753BBD">' + esc(String(r.taskId || '\u2014').slice(-8)) + '</td>' +
+      '<td style="font-family:monospace;font-size:12px;color:var(--primary)">' + esc(String(r.taskId || '\u2014').slice(-8)) + '</td>' +
       '<td title="' + esc(r.description || '') + '">' + esc(String(r.itemName || '\u2014').slice(0, 25)) + '</td>' +
       '<td style="font-size:12px">' + esc(String(r.customerName || '\u2014').slice(0, 20)) + '</td>' +
       '<td style="font-family:monospace;font-size:11px">' + esc(fromLoc) + '</td>' +
@@ -9353,7 +9353,7 @@ function replRenderTable(list) {
       '<td style="font-weight:600">' + qty + '</td>' +
       '<td><span class="consol-status ' + statusCls + '">' + statusLabel + '</span></td>' +
       '<td style="font-size:12px">' + esc(operator) + '</td>' +
-      '<td style="font-size:11px;color:#9ca3af">' + timeStr + '</td>' +
+      '<td style="font-size:11px;color:var(--muted-foreground)">' + timeStr + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -9390,7 +9390,7 @@ function replShowDetail(idx) {
 }
 
 function replField(label, value) {
-  return '<div><div style="font-size:11px;color:#9ca3af;margin-bottom:2px">' + esc(label) + '</div><div style="font-size:13px;color:#1a1f2e;font-weight:500">' + esc(value) + '</div></div>';
+  return '<div><div style="font-size:11px;color:var(--muted-foreground);margin-bottom:2px">' + esc(label) + '</div><div style="font-size:13px;color:var(--foreground);font-weight:500">' + esc(value) + '</div></div>';
 }
 
 function replCloseDetail() {
