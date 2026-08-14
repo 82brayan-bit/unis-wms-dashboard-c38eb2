@@ -47,11 +47,35 @@ test('GIS route is facility-scoped and wired to lazy real location data', () => 
   assert.match(modules, /await FacilityData\.load\(facilityId\)/);
   assert.match(modules, /token !== GIS\.requestToken \|\| facilityId !== String\(FACILITY_ID \|\| ''\)/);
   assert.match(modules, /Object\.entries\(locations \|\| \{\}\)/);
-  assert.match(modules, /GIS_RENDER_LIMIT = 600/);
+  assert.match(modules, /GIS_MAP_CELL_LIMIT = 600/);
 });
 
-test('GIS communicates the verified robot-position limitation without synthetic markers', () => {
-  assert.match(html, /Live robot positions are not available for this facility\./);
-  assert.match(html, /topology shows recorded warehouse locations only/i);
+test('GIS renders a bounded accessible aisle and bay floor schematic', () => {
+  assert.match(html, /id="gis-map-svg"[^>]+role="img"/);
+  assert.match(html, /id="gis-map-viewport"[^>]+tabindex="0"/);
+  assert.match(html, /id="gis-zoom-out"[^>]+aria-label="Zoom out"/);
+  assert.match(html, /id="gis-zoom-in"[^>]+aria-label="Zoom in"/);
+  assert.match(html, /id="gis-fit-map"[^>]+aria-label="Fit map to view"/);
+  assert.match(html, /id="gis-detail-content"[^>]+aria-live="polite"/);
+  assert.match(modules, /function gisBuildBayGroups/);
+  assert.match(modules, /function gisRenderMapSvg/);
+  assert.match(modules, /function gisSelectBay/);
+  assert.match(modules, /function gisZoomMap/);
+  assert.match(modules, /function gisPanMap/);
+  assert.match(modules, /function gisFitMap/);
+  assert.match(modules, /slice\(0, GIS_DETAIL_LIMIT\)/);
+});
+
+test('GIS supports real occupancy, customer and status coloring', () => {
+  assert.match(html, /id="gis-color-mode"[\s\S]*value="occupancy"[\s\S]*value="customer"[\s\S]*value="status"/);
+  assert.match(modules, /function gisBayColorClass\(group, mode\)/);
+  assert.match(modules, /mode === 'customer'/);
+  assert.match(modules, /mode === 'status'/);
+});
+
+test('GIS communicates schematic and robot-coordinate limitations without synthetic markers', () => {
+  assert.match(html, /schematic, not-to-scale layout derived from real WMS aisle and bay topology/i);
+  assert.match(html, /Live robot coordinates are unavailable for this facility\./);
+  assert.match(html, /schematic uses WMS aisle and bay topology only/i);
   assert.doesNotMatch(modules, /latitude|longitude|robotMarker|fakeMarker|sampleMarker/i);
 });

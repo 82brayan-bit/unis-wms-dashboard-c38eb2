@@ -428,41 +428,96 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 .gis-context{display:flex;align-items:center;gap:7px;margin-top:14px;padding:9px 11px;border:1px solid var(--border);border-radius:6px;background:var(--accent);font-size:12px;color:var(--muted-foreground)}
 .gis-context strong{color:var(--foreground)}
 .gis-context-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground)}
-.gis-filter-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-top:14px}
+.gis-filter-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:12px;margin-top:14px}
 .gis-filter-grid .cc-field{margin:0}
 .gis-status{min-height:18px;margin-top:10px;font-size:12px;color:var(--muted-foreground)}
 .gis-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
-.gis-content-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
+.gis-content-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start}
 .gis-topology-card{min-width:0}
 .gis-topology-card .card-hdr{align-items:flex-start;gap:16px}
+.gis-map-actions{display:flex;align-items:flex-end;flex-direction:column;gap:9px;max-width:58%}
+.gis-map-controls{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--card)}
+.gis-map-btn{width:34px;height:32px;display:inline-flex;align-items:center;justify-content:center;border:0;border-right:1px solid var(--border);background:var(--card);color:var(--foreground);font:inherit;font-size:17px;cursor:pointer}
+.gis-map-btn:last-child{border-right:0}
+.gis-map-btn:hover:not(:disabled){background:var(--accent);color:var(--accent-foreground)}
+.gis-map-btn:focus-visible{outline:2px solid var(--ring);outline-offset:-3px}
+.gis-map-btn:disabled{opacity:.42;cursor:not-allowed}
+.gis-map-btn svg{width:15px;height:15px}
+.gis-zoom-label{min-width:50px;text-align:center;font-size:10.5px;font-weight:700;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
 .gis-legend{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;font-size:10.5px;color:var(--muted-foreground)}
 .gis-legend span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
 .gis-legend-dot{width:8px;height:8px;border-radius:2px;border:1px solid var(--border);background:var(--muted)}
 .gis-legend-dot.empty{background:color-mix(in srgb,var(--chart-3) 38%,var(--card));border-color:color-mix(in srgb,var(--chart-3) 65%,var(--border))}
 .gis-legend-dot.occupied{background:color-mix(in srgb,var(--primary) 38%,var(--card));border-color:color-mix(in srgb,var(--primary) 65%,var(--border))}
 .gis-legend-dot.full{background:color-mix(in srgb,var(--chart-2) 45%,var(--card));border-color:color-mix(in srgb,var(--chart-2) 70%,var(--border))}
-.gis-topology{max-height:620px;min-height:260px;overflow:auto;border:1px solid var(--border);border-radius:6px;background:var(--background)}
-.gis-aisle{padding:12px 14px;border-bottom:1px solid var(--border)}
-.gis-aisle:last-child{border-bottom:0}
-.gis-aisle-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;color:var(--foreground);font-size:12px}
-.gis-aisle-heading span{color:var(--muted-foreground);font-size:10.5px}
-.gis-location-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
-.gis-location{min-width:0;min-height:48px;padding:7px 8px;border:1px solid var(--border);border-left-width:3px;border-radius:5px;background:var(--card);color:var(--card-foreground);outline:none}
-.gis-location strong,.gis-location span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gis-location strong{font-size:11px;font-variant-numeric:tabular-nums}
-.gis-location span{margin-top:3px;font-size:9.5px;color:var(--muted-foreground)}
-.gis-location.empty{border-left-color:var(--chart-3);background:color-mix(in srgb,var(--chart-3) 8%,var(--card))}
-.gis-location.occupied{border-left-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--card))}
-.gis-location.full{border-left-color:var(--chart-2);background:color-mix(in srgb,var(--chart-2) 10%,var(--card))}
-.gis-location.unknown{border-left-color:var(--muted-foreground)}
-.gis-location:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.gis-legend-dot.mixed{background:color-mix(in srgb,var(--chart-5) 40%,var(--card));border-color:color-mix(in srgb,var(--chart-5) 70%,var(--border))}
+.gis-legend-dot.customer-0{background:var(--primary)}
+.gis-legend-dot.customer-1{background:var(--chart-2)}
+.gis-legend-dot.customer-2{background:var(--chart-3)}
+.gis-legend-dot.customer-3{background:var(--chart-4)}
+.gis-legend-dot.customer-4{background:var(--chart-5)}
+.gis-legend-dot.status-usable{background:var(--chart-3)}
+.gis-legend-dot.status-disabled{background:var(--destructive)}
+.gis-topology{min-height:520px;border:1px solid var(--border);border-radius:6px;background:var(--background);overflow:hidden}
+.gis-map-viewport{position:relative;width:100%;height:560px;overflow:hidden;background:var(--background);cursor:grab;touch-action:none;outline:none}
+.gis-map-viewport.dragging{cursor:grabbing}
+.gis-map-viewport:focus-visible{box-shadow:inset 0 0 0 2px var(--ring)}
+.gis-map-svg{display:block;width:100%;height:100%;user-select:none}
+.gis-map-floor{fill:var(--background);stroke:var(--border);stroke-width:1.5}
+.gis-map-lane{fill:var(--muted);stroke:var(--border);stroke-width:1}
+.gis-map-aisle-label{fill:var(--foreground);font-family:inherit;font-size:10px;font-weight:700}
+.gis-map-bay{cursor:pointer;outline:none}
+.gis-map-bay-shape{fill:var(--card);stroke:var(--border);stroke-width:1.25;transition:stroke-width .12s,filter .12s}
+.gis-map-bay-label{fill:var(--foreground);font-family:inherit;font-size:9px;font-weight:700;pointer-events:none}
+.gis-map-bay-count{fill:var(--muted-foreground);font-family:inherit;font-size:7.5px;pointer-events:none}
+.gis-map-bay:hover .gis-map-bay-shape{stroke:var(--ring);stroke-width:2}
+.gis-map-bay:focus .gis-map-bay-shape{stroke:var(--ring);stroke-width:3}
+.gis-map-bay.selected .gis-map-bay-shape{stroke:var(--foreground);stroke-width:3}
+.gis-map-bay.empty .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-3) 24%,var(--card));stroke:color-mix(in srgb,var(--chart-3) 70%,var(--border))}
+.gis-map-bay.occupied .gis-map-bay-shape{fill:color-mix(in srgb,var(--primary) 26%,var(--card));stroke:color-mix(in srgb,var(--primary) 70%,var(--border))}
+.gis-map-bay.full .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-2) 30%,var(--card));stroke:color-mix(in srgb,var(--chart-2) 75%,var(--border))}
+.gis-map-bay.mixed .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-5) 25%,var(--card));stroke:color-mix(in srgb,var(--chart-5) 72%,var(--border))}
+.gis-map-bay.unknown .gis-map-bay-shape{fill:var(--muted);stroke:var(--muted-foreground)}
+.gis-map-bay.customer-0 .gis-map-bay-shape{fill:color-mix(in srgb,var(--primary) 28%,var(--card));stroke:var(--primary)}
+.gis-map-bay.customer-1 .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-2) 30%,var(--card));stroke:var(--chart-2)}
+.gis-map-bay.customer-2 .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-3) 27%,var(--card));stroke:var(--chart-3)}
+.gis-map-bay.customer-3 .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-4) 29%,var(--card));stroke:var(--chart-4)}
+.gis-map-bay.customer-4 .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-5) 27%,var(--card));stroke:var(--chart-5)}
+.gis-map-bay.status-usable .gis-map-bay-shape{fill:color-mix(in srgb,var(--chart-3) 25%,var(--card));stroke:var(--chart-3)}
+.gis-map-bay.status-disabled .gis-map-bay-shape{fill:color-mix(in srgb,var(--destructive) 24%,var(--card));stroke:var(--destructive)}
+.gis-map-tooltip{position:absolute;z-index:5;width:232px;padding:9px 10px;border:1px solid var(--border);border-radius:6px;background:var(--popover);color:var(--popover-foreground);box-shadow:0 8px 24px color-mix(in srgb,var(--foreground) 14%,transparent);pointer-events:none}
+.gis-map-tooltip strong,.gis-map-tooltip span{display:block}
+.gis-map-tooltip strong{font-size:12px;margin-bottom:4px}
+.gis-map-tooltip span{font-size:10.5px;line-height:1.45;color:var(--muted-foreground)}
 .gis-state{min-height:258px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:5px;padding:24px;color:var(--muted-foreground)}
 .gis-state strong{font-size:14px;color:var(--foreground)}
 .gis-state span{max-width:430px;font-size:12px;line-height:1.5}
+.gis-side-stack{display:grid;gap:16px;align-content:start}
 .gis-availability{display:flex;align-items:flex-start;gap:11px}
 .gis-availability-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex:0 0 34px;border-radius:6px;background:var(--muted);color:var(--muted-foreground)}
 .gis-availability-icon svg{width:17px;height:17px}
 .gis-availability p{margin:7px 0 0;font-size:12px;line-height:1.45;color:var(--foreground)}
+.gis-detail-content{margin-top:12px}
+.gis-detail-empty{font-size:12px;line-height:1.5;color:var(--muted-foreground)}
+.gis-detail-bay{font-size:13px;font-weight:700;color:var(--foreground);padding-bottom:9px;border-bottom:1px solid var(--border)}
+.gis-detail-summary,.gis-selected-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.gis-detail-field{min-width:0}
+.gis-detail-field span,.gis-detail-field strong{display:block}
+.gis-detail-field span{font-size:9.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-foreground)}
+.gis-detail-field strong{margin-top:2px;font-size:10.5px;line-height:1.35;color:var(--foreground);overflow-wrap:anywhere}
+.gis-detail-section-title{margin-top:14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground)}
+.gis-selected-location{margin-top:7px;padding:9px;border:1px solid var(--border);border-radius:6px;background:var(--accent)}
+.gis-selected-location>strong{display:block;font-size:12px;color:var(--accent-foreground);overflow-wrap:anywhere}
+.gis-slot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px;max-height:240px;overflow:auto}
+.gis-slot-button{min-width:0;padding:6px;border:1px solid var(--border);border-left-width:3px;border-radius:5px;background:var(--card);color:var(--card-foreground);font:inherit;font-size:10px;text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gis-slot-button:hover{background:var(--accent)}
+.gis-slot-button:focus-visible{outline:2px solid var(--ring);outline-offset:1px}
+.gis-slot-button.selected{border-color:var(--foreground);background:var(--accent);font-weight:700}
+.gis-slot-button.empty{border-left-color:var(--chart-3)}
+.gis-slot-button.occupied{border-left-color:var(--primary)}
+.gis-slot-button.full{border-left-color:var(--chart-2)}
+.gis-slot-button.unknown{border-left-color:var(--muted-foreground)}
+.gis-detail-limit{margin-top:8px;font-size:10px;line-height:1.4;color:var(--muted-foreground)}
 
 @media (max-width:760px){
   .sidebar{position:static;width:100%;height:auto;display:block;overflow:visible}
@@ -485,7 +540,9 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
   .gis-filter-grid,.gis-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .gis-content-grid{grid-template-columns:1fr}
   .gis-topology-card .card-hdr{display:block}
-  .gis-legend{justify-content:flex-start;margin-top:10px}
+  .gis-map-actions{align-items:flex-start;max-width:none;margin-top:10px}
+  .gis-legend{justify-content:flex-start}
+  .gis-map-viewport{height:440px}
 }
 
 @media (max-width:480px){
@@ -493,7 +550,7 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
   .gis-refresh{margin-top:12px;width:100%}
   .gis-filter-grid,.gis-metrics{grid-template-columns:1fr}
   .gis-context{align-items:flex-start;flex-wrap:wrap}
-  .gis-location-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gis-map-viewport{height:380px}
 }
 
 /* Item theme controls */

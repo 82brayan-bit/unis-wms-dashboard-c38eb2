@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const appUrl = process.argv[2] || 'http://127.0.0.1:4173/';
 const initialAppUrl = new URL(appUrl);
-initialAppUrl.hash = 'robots';
+if (!initialAppUrl.hash) initialAppUrl.hash = 'robots';
 const debuggingPort = Number(process.env.CHROME_DEBUG_PORT || 9223);
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -199,6 +199,7 @@ async function main() {
       expanded:initialTrigger.getAttribute('aria-expanded'),
       parentActive:initialTrigger.classList.contains('active'),
       overviewActive:initialOverview.classList.contains('active'),
+      gisActive:initialGis.classList.contains('active'),
       submenuOpen:initialSubmenu.classList.contains('open'),
       submenuVisible:visible(initialSubmenu) && visible(initialOverview) && visible(initialGis),
       caretVisible:visible(initialCaret),
@@ -240,12 +241,43 @@ async function main() {
       overviewVisible:visible(document.getElementById('view-robots'))
     };
     document.querySelector('#robot-sub [data-view="gis"]').click();
-    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
-    const firstLocation = document.querySelector('.gis-location');
+    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && document.querySelectorAll('.gis-map-bay').length > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const occupancyBay = document.querySelector('.gis-map-bay');
+    const occupancyClass = occupancyBay ? occupancyBay.getAttribute('class') : '';
+    document.getElementById('gis-color-mode').value = 'customer';
+    renderGisTopology();
+    const customerBay = document.querySelector('.gis-map-bay');
+    const customerClass = customerBay ? customerBay.getAttribute('class') : '';
+    document.getElementById('gis-color-mode').value = 'status';
+    renderGisTopology();
+    const statusBay = document.querySelector('.gis-map-bay');
+    const statusClass = statusBay ? statusBay.getAttribute('class') : '';
+    document.getElementById('gis-color-mode').value = 'occupancy';
+    renderGisTopology();
+    const firstLocation = document.querySelector('.gis-map-bay');
+    firstLocation.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+    firstLocation.focus();
+    firstLocation.dispatchEvent(new FocusEvent('focus'));
+    const tooltip = document.getElementById('gis-map-tooltip');
+    const tooltipVisible = tooltip ? !tooltip.hidden : false;
+    const tooltipText = tooltip ? tooltip.textContent : '';
+    const initialTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    document.getElementById('gis-zoom-in').click();
+    const zoomedScale = GIS.map.scale;
+    const zoomedTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    gisPanMap(-40, -24);
+    const pannedTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    document.getElementById('gis-fit-map').click();
+    const fitTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    const fitScale = GIS.map.scale;
+    const viewport = document.getElementById('gis-map-viewport');
+    viewport.dispatchEvent(new KeyboardEvent('keydown', {key:'+',bubbles:true}));
+    const keyboardZoomScale = GIS.map.scale;
+    viewport.dispatchEvent(new KeyboardEvent('keydown', {key:'0',bubbles:true}));
     ItemTheme.applyTheme('light', {persist:true});
-    const lightTopology = firstLocation ? getComputedStyle(firstLocation).backgroundColor : '';
+    const lightTopology = firstLocation ? getComputedStyle(firstLocation.querySelector('.gis-map-bay-shape')).fill : '';
     ItemTheme.applyTheme('dark', {persist:true});
-    const darkTopology = firstLocation ? getComputedStyle(firstLocation).backgroundColor : '';
+    const darkTopology = firstLocation ? getComputedStyle(firstLocation.querySelector('.gis-map-bay-shape')).fill : '';
     const gisNavigation = {
       title:document.getElementById('tb-title').textContent,
       childActive:document.querySelector('#robot-sub [data-view="gis"]').classList.contains('active'),
@@ -253,8 +285,16 @@ async function main() {
       facilityId:GIS.facilityId,
       facilityText:document.getElementById('gis-facility-id').textContent,
       locations:GIS.records.length,
-      rendered:document.querySelectorAll('.gis-location').length,
+      rendered:document.querySelectorAll('.gis-map-bay').length,
+      aisles:document.querySelectorAll('.gis-map-aisle').length,
+      svgViewBox:document.getElementById('gis-map-svg').getAttribute('viewBox'),
       firstLabel:firstLocation ? firstLocation.getAttribute('aria-label') : '',
+      detail:document.getElementById('gis-detail-content').textContent,
+      slotButtons:document.querySelectorAll('.gis-slot-button').length,
+      tooltipVisible,tooltipText,
+      occupancyClass,customerClass,statusClass,
+      initialTransform,zoomedScale,zoomedTransform,pannedTransform,fitScale,fitTransform,keyboardZoomScale,
+      renderNote:document.getElementById('gis-render-note').textContent,
       status:document.getElementById('gis-status').textContent,
       limitation:document.querySelector('.gis-availability').textContent,
       lightTopology,darkTopology
@@ -299,8 +339,10 @@ async function main() {
     assert(state.background && state.foreground && state.background !== state.foreground, 'Theme tokens are missing');
   }
   assert(Object.values(summary.views).every(Boolean), 'A representative production view did not render: ' + JSON.stringify(summary.views));
-  assert(summary.initialRobotNavigation.hash === '#robots' && summary.initialRobotNavigation.activeView === 'view-robots', 'Smoke did not start directly in Robot Count');
-  assert(summary.initialRobotNavigation.expanded === 'true' && summary.initialRobotNavigation.parentActive && summary.initialRobotNavigation.overviewActive, 'Initial Robot Count active states were not synchronized');
+  const expectedInitialView = initialAppUrl.hash === '#gis' ? 'view-gis' : 'view-robots';
+  const expectedInitialChildActive = initialAppUrl.hash === '#gis' ? summary.initialRobotNavigation.gisActive : summary.initialRobotNavigation.overviewActive;
+  assert(summary.initialRobotNavigation.hash === initialAppUrl.hash && summary.initialRobotNavigation.activeView === expectedInitialView, 'Smoke did not start directly in ' + initialAppUrl.hash);
+  assert(summary.initialRobotNavigation.expanded === 'true' && summary.initialRobotNavigation.parentActive && expectedInitialChildActive, 'Initial Robot Count active states were not synchronized');
   assert(summary.initialRobotNavigation.submenuOpen && summary.initialRobotNavigation.submenuVisible, 'Initial Robot Count submenu was not visible');
   assert(summary.initialRobotNavigation.caretVisible && summary.initialRobotNavigation.caretOpen, 'Initial Robot Count caret was not visible and open');
   assert(summary.initialRobotNavigation.caretInsideTrigger && summary.initialRobotNavigation.caretInsideSidebar && summary.initialRobotNavigation.sidebarWidth === 235, 'Robot Count caret escaped the 235px sidebar geometry');
@@ -316,9 +358,19 @@ async function main() {
   assert(summary.robotNavigation.overviewActive && summary.robotNavigation.overviewVisible, 'Robot Count overview child did not route');
   assert(summary.gisNavigation.title === 'GIS' && summary.gisNavigation.childActive && summary.gisNavigation.parentActive, 'GIS child route or active state failed');
   assert(summary.gisNavigation.facilityId === 'LT_F42' && summary.gisNavigation.facilityText.includes('LT_F42'), 'GIS did not use the selected facility');
-  assert(summary.gisNavigation.locations > 0 && summary.gisNavigation.rendered > 0 && summary.gisNavigation.rendered <= 600, 'GIS topology did not render real facility locations within its DOM cap');
-  assert(summary.gisNavigation.firstLabel && summary.gisNavigation.status.includes('recorded locations loaded'), 'GIS accessibility or success state is missing');
-  assert(summary.gisNavigation.limitation.includes('Live robot positions are not available'), 'GIS did not expose the robot-position unavailable state');
+  assert(summary.gisNavigation.locations > 0 && summary.gisNavigation.rendered > 0 && summary.gisNavigation.rendered <= 600 && summary.gisNavigation.aisles > 0, 'GIS floor map did not render bounded real aisle/bay cells');
+  assert(summary.gisNavigation.svgViewBox && summary.gisNavigation.firstLabel && summary.gisNavigation.status.includes('recorded locations loaded'), 'GIS map accessibility, geometry, or success state is missing');
+  assert(summary.gisNavigation.detail.includes('Selected location') && summary.gisNavigation.slotButtons > 0, 'GIS level/slot drill-down did not render');
+  assert(summary.gisNavigation.tooltipVisible && summary.gisNavigation.tooltipText.includes('Aisle'), 'GIS hover/focus tooltip did not render');
+  assert(/empty|occupied|full|mixed|unknown/.test(summary.gisNavigation.occupancyClass), 'GIS occupancy coloring is missing');
+  assert(/customer-[0-4]|mixed/.test(summary.gisNavigation.customerClass), 'GIS customer coloring is missing');
+  assert(/status-usable|status-disabled|mixed|unknown/.test(summary.gisNavigation.statusClass), 'GIS status coloring is missing');
+  assert(summary.gisNavigation.zoomedScale > 1 && summary.gisNavigation.zoomedTransform !== summary.gisNavigation.initialTransform, 'GIS zoom control did not change the map');
+  assert(summary.gisNavigation.pannedTransform !== summary.gisNavigation.zoomedTransform, 'GIS pan did not change the map transform');
+  assert(summary.gisNavigation.fitScale === 1 && summary.gisNavigation.fitTransform.includes('translate(0 0) scale(1)'), 'GIS fit-to-view did not reset the map');
+  assert(summary.gisNavigation.keyboardZoomScale > 1, 'GIS keyboard zoom did not work');
+  assert(summary.gisNavigation.renderNote.includes('Schematic, not to scale'), 'GIS schematic disclosure is missing');
+  assert(summary.gisNavigation.limitation.includes('Live robot coordinates are unavailable'), 'GIS did not expose the robot-coordinate unavailable state');
   assert(summary.gisNavigation.lightTopology && summary.gisNavigation.darkTopology && summary.gisNavigation.lightTopology !== summary.gisNavigation.darkTopology, 'GIS topology did not respond to both themes');
   assert(summary.gisSwitchState.facilityId === 'LT_F42' && summary.gisSwitchState.gisFacilityId === 'LT_F42' && summary.gisSwitchState.context.includes('LT_F42'), 'GIS rapid facility switching retained stale data');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');

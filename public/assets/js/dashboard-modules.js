@@ -2805,8 +2805,24 @@ const GIS = {
   facilityId: '',
   records: [],
   customers: new Map(),
+  map: {
+    scale: 1,
+    x: 0,
+    y: 0,
+    width: 960,
+    height: 520,
+    groups: new Map(),
+    selectedKey: '',
+    selectedLocationName: '',
+    dragging: false,
+    pointerId: null,
+    lastClientX: 0,
+    lastClientY: 0,
+  },
 };
-const GIS_RENDER_LIMIT = 600;
+const GIS_MAP_CELL_LIMIT = 600;
+const GIS_DETAIL_LIMIT = 120;
+const GIS_SVG_NS = 'http://www.w3.org/2000/svg';
 
 function gisSetLoading(loading) {
   const topology = document.getElementById('gis-topology');
@@ -2815,6 +2831,10 @@ function gisSetLoading(loading) {
   if (topology) topology.setAttribute('aria-busy', String(loading));
   if (refresh) refresh.disabled = loading;
   if (label) label.textContent = loading ? 'Loading…' : 'Refresh';
+  ['gis-zoom-out','gis-zoom-in','gis-fit-map'].forEach(id => {
+    const button = document.getElementById(id);
+    if (button) button.disabled = loading;
+  });
 }
 
 function gisSetStatus(message) {
@@ -2823,17 +2843,23 @@ function gisSetStatus(message) {
 }
 
 function gisSetState(title, message) {
-  const topology = document.getElementById('gis-topology');
-  if (!topology) return;
-  topology.innerHTML = '';
-  const state = document.createElement('div');
-  state.className = 'gis-state';
-  const heading = document.createElement('strong');
-  heading.textContent = title;
-  const detail = document.createElement('span');
-  detail.textContent = message;
-  state.append(heading, detail);
-  topology.appendChild(state);
+  const state = document.getElementById('gis-map-state');
+  const viewport = document.getElementById('gis-map-viewport');
+  if (viewport) viewport.hidden = true;
+  if (!state) return;
+  state.hidden = false;
+  const heading = state.querySelector('strong');
+  const detail = state.querySelector('span');
+  if (heading) heading.textContent = title;
+  if (detail) detail.textContent = message;
+  gisHideMapTooltip();
+}
+
+function gisShowMap() {
+  const state = document.getElementById('gis-map-state');
+  const viewport = document.getElementById('gis-map-viewport');
+  if (state) state.hidden = true;
+  if (viewport) viewport.hidden = false;
 }
 
 function gisUpdateMetric(id, value) {
@@ -2877,8 +2903,10 @@ function gisPopulateFilters(customers, records, resetSelections) {
   if (resetSelections) {
     const search = document.getElementById('gis-search');
     const occupancy = document.getElementById('gis-occupancy');
+    const colorMode = document.getElementById('gis-color-mode');
     if (search) search.value = '';
     if (occupancy) occupancy.value = '';
+    if (colorMode) colorMode.value = 'occupancy';
   }
 }
 
@@ -2908,19 +2936,432 @@ function gisNaturalCompare(left, right) {
   return String(left || '').localeCompare(String(right || ''), undefined, {numeric:true, sensitivity:'base'});
 }
 
-function renderGisTopology() {
-  if (!document.getElementById('view-gis')) return;
+function gisFilteredRecords() {
   const customer = (document.getElementById('gis-customer') || {}).value || '';
   const query = ((document.getElementById('gis-search') || {}).value || '').trim().toLowerCase();
   const occupancy = (document.getElementById('gis-occupancy') || {}).value || '';
   const type = (document.getElementById('gis-type') || {}).value || '';
-  const filtered = GIS.records.filter(record => {
+  return GIS.records.filter(record => {
     if (customer && record.customerId !== customer) return false;
     if (occupancy && record.occupancyStatus !== occupancy) return false;
     if (type && record.type !== type) return false;
     if (query && ![record.name, record.aisle, record.bay, record.customerName].some(value => String(value || '').toLowerCase().includes(query))) return false;
     return true;
   });
+}
+
+function gisBuildBayGroups(records) {
+  const groups = new Map();
+  let unmappedCount = 0;
+  records.forEach(record => {
+    const aisle = String(record.aisle || '').trim();
+    const bay = String(record.bay || record.section || '').trim();
+    if (!aisle || !bay) {
+      unmappedCount++;
+      return;
+    }
+    const key = JSON.stringify([aisle, bay]);
+    if (!groups.has(key)) groups.set(key, {key, aisle, bay, records:[]});
+    groups.get(key).records.push(record);
+  });
+  const ordered = Array.from(groups.values()).sort((a, b) => gisNaturalCompare(a.aisle, b.aisle) || gisNaturalCompare(a.bay, b.bay));
+  return {groups:ordered, unmappedCount};
+}
+
+function gisLimitBayGroups(groups) {
+  if (groups.length <= GIS_MAP_CELL_LIMIT) return groups;
+  const lanes = new Map();
+  groups.forEach(group => {
+    if (!lanes.has(group.aisle)) lanes.set(group.aisle, []);
+    lanes.get(group.aisle).push(group);
+  });
+  const laneValues = Array.from(lanes.values());
+  const quota = Math.max(1, Math.floor(GIS_MAP_CELL_LIMIT / laneValues.length));
+  const selected = [];
+  laneValues.forEach(lane => selected.push(...lane.slice(0, quota)));
+  let offset = quota;
+  while (selected.length < GIS_MAP_CELL_LIMIT) {
+    let added = false;
+    for (const lane of laneValues) {
+      if (selected.length >= GIS_MAP_CELL_LIMIT) break;
+      if (lane[offset]) { selected.push(lane[offset]); added = true; }
+    }
+    if (!added) break;
+    offset++;
+  }
+  return selected.sort((a, b) => gisNaturalCompare(a.aisle, b.aisle) || gisNaturalCompare(a.bay, b.bay));
+}
+
+function gisDistinct(values) {
+  return Array.from(new Set(values.map(value => String(value || '').trim()).filter(Boolean)));
+}
+
+function gisCustomerColorIndex(customerId) {
+  let hash = 0;
+  const value = String(customerId || '');
+  for (let index = 0; index < value.length; index++) hash = ((hash * 31) + value.charCodeAt(index)) | 0;
+  return Math.abs(hash) % 5;
+}
+
+function gisBayColorClass(group, mode) {
+  if (mode === 'customer') {
+    const customers = gisDistinct(group.records.map(record => record.customerId));
+    return customers.length === 1 ? 'customer-' + gisCustomerColorIndex(customers[0]) : 'mixed';
+  }
+  if (mode === 'status') {
+    const statuses = gisDistinct(group.records.map(record => record.status));
+    if (statuses.length !== 1) return statuses.length ? 'mixed' : 'unknown';
+    if (statuses[0] === 'USABLE' || statuses[0] === 'ACTIVE') return 'status-usable';
+    if (statuses[0] === 'DISABLED' || statuses[0] === 'INACTIVE') return 'status-disabled';
+    return 'unknown';
+  }
+  const occupancies = gisDistinct(group.records.map(record => record.occupancyStatus));
+  if (occupancies.length !== 1) return occupancies.length ? 'mixed' : 'unknown';
+  return ['EMPTY','OCCUPIED','FULL'].includes(occupancies[0]) ? occupancies[0].toLowerCase() : 'unknown';
+}
+
+function gisOccupancySummary(records) {
+  const counts = {EMPTY:0,OCCUPIED:0,FULL:0,UNKNOWN:0};
+  records.forEach(record => {
+    const key = ['EMPTY','OCCUPIED','FULL'].includes(record.occupancyStatus) ? record.occupancyStatus : 'UNKNOWN';
+    counts[key]++;
+  });
+  return ['EMPTY','OCCUPIED','FULL','UNKNOWN'].filter(key => counts[key]).map(key => counts[key].toLocaleString() + ' ' + (key === 'UNKNOWN' ? 'not recorded' : key.toLowerCase())).join(', ');
+}
+
+function gisCreateLegendItem(container, colorClass, label) {
+  const item = document.createElement('span');
+  const dot = document.createElement('i');
+  dot.className = 'gis-legend-dot ' + colorClass;
+  item.append(dot, document.createTextNode(label));
+  container.appendChild(item);
+}
+
+function gisRenderLegend(records, colorMode) {
+  const legend = document.getElementById('gis-map-legend');
+  if (!legend) return;
+  legend.innerHTML = '';
+  if (colorMode === 'customer') {
+    const customers = new Map();
+    records.forEach(record => customers.set(record.customerId, record.customerName));
+    Array.from(customers.entries()).sort((a, b) => gisNaturalCompare(a[1], b[1])).slice(0, 5).forEach(([id, name]) => gisCreateLegendItem(legend, 'customer-' + gisCustomerColorIndex(id), name));
+    if (customers.size > 5) gisCreateLegendItem(legend, 'mixed', 'Additional customers');
+  } else if (colorMode === 'status') {
+    gisCreateLegendItem(legend, 'status-usable', 'Usable / active');
+    gisCreateLegendItem(legend, 'status-disabled', 'Disabled / inactive');
+    gisCreateLegendItem(legend, 'unknown', 'Not recorded');
+    gisCreateLegendItem(legend, 'mixed', 'Mixed');
+  } else {
+    gisCreateLegendItem(legend, 'empty', 'Empty');
+    gisCreateLegendItem(legend, 'occupied', 'Occupied');
+    gisCreateLegendItem(legend, 'full', 'Full');
+    gisCreateLegendItem(legend, 'unknown', 'Not recorded');
+    gisCreateLegendItem(legend, 'mixed', 'Mixed');
+  }
+}
+
+function gisSvgElement(name, attributes) {
+  const element = document.createElementNS(GIS_SVG_NS, name);
+  Object.entries(attributes || {}).forEach(([key, value]) => element.setAttribute(key, String(value)));
+  return element;
+}
+
+function gisBayAriaLabel(group) {
+  const customers = gisDistinct(group.records.map(record => record.customerName));
+  return 'Aisle ' + group.aisle + ', bay ' + group.bay + ', ' + group.records.length.toLocaleString() + ' locations, ' + gisOccupancySummary(group.records) + ', ' + customers.length.toLocaleString() + (customers.length === 1 ? ' customer' : ' customers') + '. Select to inspect levels and slots.';
+}
+
+function gisRenderMapSvg(groups, colorMode) {
+  const svg = document.getElementById('gis-map-svg');
+  const layer = document.getElementById('gis-map-layer');
+  if (!svg || !layer) return;
+  const lanes = new Map();
+  groups.forEach(group => {
+    if (!lanes.has(group.aisle)) lanes.set(group.aisle, []);
+    lanes.get(group.aisle).push(group);
+  });
+  const laneEntries = Array.from(lanes.entries()).sort((a, b) => gisNaturalCompare(a[0], b[0]));
+  const labelWidth = 76;
+  const cellWidth = 66;
+  const cellHeight = 38;
+  const cellGap = 8;
+  const laneHeight = 62;
+  const top = 30;
+  const maxBayCount = Math.max(1, ...laneEntries.map(entry => entry[1].length));
+  GIS.map.width = Math.max(760, labelWidth + maxBayCount * (cellWidth + cellGap) + 28);
+  GIS.map.height = Math.max(320, top + laneEntries.length * laneHeight + 24);
+  svg.setAttribute('viewBox', '0 0 ' + GIS.map.width + ' ' + GIS.map.height);
+  layer.innerHTML = '';
+  const floor = gisSvgElement('rect', {x:8,y:8,width:GIS.map.width-16,height:GIS.map.height-16,rx:8,class:'gis-map-floor'});
+  layer.appendChild(floor);
+  GIS.map.groups = new Map(groups.map(group => [group.key, group]));
+
+  laneEntries.forEach(([aisle, bays], laneIndex) => {
+    const y = top + laneIndex * laneHeight;
+    const lane = gisSvgElement('g', {class:'gis-map-aisle','data-aisle':aisle});
+    lane.appendChild(gisSvgElement('rect', {x:labelWidth-8,y:y-5,width:Math.max(110, bays.length*(cellWidth+cellGap)+8),height:cellHeight+10,rx:5,class:'gis-map-lane'}));
+    const aisleLabel = gisSvgElement('text', {x:16,y:y+24,class:'gis-map-aisle-label'});
+    aisleLabel.textContent = 'Aisle ' + aisle;
+    lane.appendChild(aisleLabel);
+    bays.sort((a, b) => gisNaturalCompare(a.bay, b.bay)).forEach((group, bayIndex) => {
+      const x = labelWidth + bayIndex * (cellWidth + cellGap);
+      const bay = gisSvgElement('g', {class:'gis-map-bay ' + gisBayColorClass(group, colorMode),transform:'translate(' + x + ' ' + y + ')',tabindex:'0',role:'button','aria-label':gisBayAriaLabel(group),'data-bay-key':group.key});
+      bay.appendChild(gisSvgElement('rect', {x:0,y:0,width:cellWidth,height:cellHeight,rx:4,class:'gis-map-bay-shape'}));
+      const label = gisSvgElement('text', {x:cellWidth/2,y:16,class:'gis-map-bay-label','text-anchor':'middle'});
+      label.textContent = group.bay.length > 9 ? group.bay.slice(0, 8) + '…' : group.bay;
+      const count = gisSvgElement('text', {x:cellWidth/2,y:29,class:'gis-map-bay-count','text-anchor':'middle'});
+      count.textContent = group.records.length.toLocaleString() + (group.records.length === 1 ? ' loc' : ' locs');
+      bay.append(label, count);
+      bay.addEventListener('click', () => gisSelectBay(group.key));
+      bay.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); gisSelectBay(group.key); }
+      });
+      bay.addEventListener('pointerenter', event => gisShowMapTooltip(event, group));
+      bay.addEventListener('pointermove', event => gisShowMapTooltip(event, group));
+      bay.addEventListener('pointerleave', gisHideMapTooltip);
+      bay.addEventListener('focus', event => gisShowMapTooltip(event, group, bay));
+      bay.addEventListener('blur', gisHideMapTooltip);
+      lane.appendChild(bay);
+    });
+    layer.appendChild(lane);
+  });
+  gisBindMapInteractions();
+  gisShowMap();
+  gisFitMap();
+}
+
+function gisResetDetail(message) {
+  const content = document.getElementById('gis-detail-content');
+  if (!content) return;
+  content.innerHTML = '';
+  const empty = document.createElement('div');
+  empty.className = 'gis-detail-empty';
+  empty.textContent = message || 'Select a bay on the map to inspect its real levels and slots.';
+  content.appendChild(empty);
+}
+
+function gisDetailField(label, value) {
+  const field = document.createElement('div');
+  field.className = 'gis-detail-field';
+  const key = document.createElement('span');
+  key.textContent = label;
+  const data = document.createElement('strong');
+  data.textContent = value || 'Not recorded';
+  field.append(key, data);
+  return field;
+}
+
+function gisRenderBayDetail(group) {
+  const content = document.getElementById('gis-detail-content');
+  if (!content || !group) return;
+  const ordered = group.records.slice().sort((a, b) => gisNaturalCompare(a.level, b.level) || gisNaturalCompare(a.slot, b.slot) || gisNaturalCompare(a.name, b.name));
+  const selected = ordered.find(record => record.name === GIS.map.selectedLocationName) || ordered[0];
+  GIS.map.selectedLocationName = selected ? selected.name : '';
+  content.innerHTML = '';
+  const bayTitle = document.createElement('div');
+  bayTitle.className = 'gis-detail-bay';
+  bayTitle.textContent = 'Aisle ' + group.aisle + ' · Bay ' + group.bay;
+  const summary = document.createElement('div');
+  summary.className = 'gis-detail-summary';
+  summary.append(
+    gisDetailField('Locations', group.records.length.toLocaleString()),
+    gisDetailField('Customers', gisDistinct(group.records.map(record => record.customerName)).length.toLocaleString()),
+    gisDetailField('Occupancy', gisOccupancySummary(group.records)),
+    gisDetailField('Statuses', gisDistinct(group.records.map(record => record.status)).join(', ') || 'Not recorded')
+  );
+  const selectedTitle = document.createElement('div');
+  selectedTitle.className = 'gis-detail-section-title';
+  selectedTitle.textContent = 'Selected location';
+  const selectedPanel = document.createElement('div');
+  selectedPanel.className = 'gis-selected-location';
+  if (selected) {
+    const name = document.createElement('strong');
+    name.textContent = selected.name;
+    const fields = document.createElement('div');
+    fields.className = 'gis-selected-fields';
+    fields.append(
+      gisDetailField('Level', selected.level == null ? 'Not recorded' : String(selected.level)),
+      gisDetailField('Slot', selected.slot || 'Not recorded'),
+      gisDetailField('Occupancy', selected.occupancyStatus || 'Not recorded'),
+      gisDetailField('Customer', selected.customerName),
+      gisDetailField('Type', String(selected.type || 'LOCATION').replaceAll('_', ' ')),
+      gisDetailField('Status', selected.status || 'Not recorded')
+    );
+    selectedPanel.append(name, fields);
+  }
+  const levelTitle = document.createElement('div');
+  levelTitle.className = 'gis-detail-section-title';
+  levelTitle.textContent = 'Levels and slots';
+  const slots = document.createElement('div');
+  slots.className = 'gis-slot-grid';
+  ordered.slice(0, GIS_DETAIL_LIMIT).forEach(record => {
+    const button = document.createElement('button');
+    const occupancyClass = ['EMPTY','OCCUPIED','FULL'].includes(record.occupancyStatus) ? record.occupancyStatus.toLowerCase() : 'unknown';
+    button.type = 'button';
+    button.className = 'gis-slot-button ' + occupancyClass + (record.name === GIS.map.selectedLocationName ? ' selected' : '');
+    button.dataset.locationName = record.name;
+    button.textContent = record.level == null && !record.slot ? record.name : 'L' + (record.level == null ? '—' : record.level) + ' · S' + (record.slot || '—');
+    button.setAttribute('aria-label', gisLocationLabel(record));
+    button.setAttribute('aria-pressed', String(record.name === GIS.map.selectedLocationName));
+    button.addEventListener('click', () => gisSelectLocation(group.key, record.name));
+    slots.appendChild(button);
+  });
+  content.append(bayTitle, summary, selectedTitle, selectedPanel, levelTitle, slots);
+  if (ordered.length > GIS_DETAIL_LIMIT) {
+    const note = document.createElement('div');
+    note.className = 'gis-detail-limit';
+    note.textContent = 'Showing ' + GIS_DETAIL_LIMIT.toLocaleString() + ' of ' + ordered.length.toLocaleString() + ' level/slot records. Refine filters to inspect fewer locations.';
+    content.appendChild(note);
+  }
+}
+
+function gisSelectBay(key) {
+  const group = GIS.map.groups.get(key);
+  if (!group) return;
+  GIS.map.selectedKey = key;
+  GIS.map.selectedLocationName = group.records[0] ? group.records[0].name : '';
+  document.querySelectorAll('.gis-map-bay').forEach(element => element.classList.toggle('selected', element.dataset.bayKey === key));
+  gisRenderBayDetail(group);
+}
+
+function gisSelectLocation(groupKey, locationName) {
+  const group = GIS.map.groups.get(groupKey);
+  if (!group) return;
+  GIS.map.selectedKey = groupKey;
+  GIS.map.selectedLocationName = locationName;
+  gisRenderBayDetail(group);
+}
+
+function gisTooltipPosition(event, focusTarget) {
+  const viewport = document.getElementById('gis-map-viewport');
+  if (!viewport) return {left:8,top:8};
+  const viewportRect = viewport.getBoundingClientRect();
+  const targetRect = focusTarget ? focusTarget.getBoundingClientRect() : null;
+  const clientX = targetRect ? targetRect.left + targetRect.width / 2 : event.clientX;
+  const clientY = targetRect ? targetRect.top : event.clientY;
+  return {
+    left:Math.max(8, Math.min(viewportRect.width - 244, clientX - viewportRect.left + 12)),
+    top:Math.max(8, Math.min(viewportRect.height - 104, clientY - viewportRect.top + 12)),
+  };
+}
+
+function gisShowMapTooltip(event, group, focusTarget) {
+  const tooltip = document.getElementById('gis-map-tooltip');
+  if (!tooltip || !group) return;
+  tooltip.innerHTML = '';
+  const title = document.createElement('strong');
+  title.textContent = 'Aisle ' + group.aisle + ' · Bay ' + group.bay;
+  const locations = document.createElement('span');
+  locations.textContent = group.records.length.toLocaleString() + (group.records.length === 1 ? ' location' : ' locations');
+  const occupancy = document.createElement('span');
+  occupancy.textContent = gisOccupancySummary(group.records);
+  const customers = document.createElement('span');
+  const customerNames = gisDistinct(group.records.map(record => record.customerName));
+  customers.textContent = customerNames.slice(0, 2).join(', ') + (customerNames.length > 2 ? ' +' + (customerNames.length - 2).toLocaleString() : '');
+  tooltip.append(title, locations, occupancy, customers);
+  const position = gisTooltipPosition(event, focusTarget);
+  tooltip.style.left = position.left + 'px';
+  tooltip.style.top = position.top + 'px';
+  tooltip.hidden = false;
+}
+
+function gisHideMapTooltip() {
+  const tooltip = document.getElementById('gis-map-tooltip');
+  if (tooltip) tooltip.hidden = true;
+}
+
+function gisApplyMapTransform() {
+  const layer = document.getElementById('gis-map-layer');
+  const zoomLabel = document.getElementById('gis-zoom-label');
+  const zoomOut = document.getElementById('gis-zoom-out');
+  const zoomIn = document.getElementById('gis-zoom-in');
+  if (GIS.map.scale < 1) {
+    GIS.map.x = (GIS.map.width - GIS.map.width * GIS.map.scale) / 2;
+    GIS.map.y = (GIS.map.height - GIS.map.height * GIS.map.scale) / 2;
+  } else {
+    GIS.map.x = Math.min(0, Math.max(GIS.map.width * (1 - GIS.map.scale), GIS.map.x));
+    GIS.map.y = Math.min(0, Math.max(GIS.map.height * (1 - GIS.map.scale), GIS.map.y));
+  }
+  if (layer) layer.setAttribute('transform', 'translate(' + GIS.map.x + ' ' + GIS.map.y + ') scale(' + GIS.map.scale + ')');
+  if (zoomLabel) zoomLabel.textContent = Math.round(GIS.map.scale * 100) + '%';
+  if (zoomOut) zoomOut.disabled = GIS.map.scale <= 0.75;
+  if (zoomIn) zoomIn.disabled = GIS.map.scale >= 3;
+}
+
+function gisZoomMap(direction) {
+  const previous = GIS.map.scale;
+  const next = Math.max(0.75, Math.min(3, previous * (direction > 0 ? 1.25 : 0.8)));
+  if (next === previous) return;
+  const centerX = GIS.map.width / 2;
+  const centerY = GIS.map.height / 2;
+  const ratio = next / previous;
+  GIS.map.x = centerX - (centerX - GIS.map.x) * ratio;
+  GIS.map.y = centerY - (centerY - GIS.map.y) * ratio;
+  GIS.map.scale = next;
+  gisApplyMapTransform();
+}
+
+function gisFitMap() {
+  GIS.map.scale = 1;
+  GIS.map.x = 0;
+  GIS.map.y = 0;
+  gisApplyMapTransform();
+}
+
+function gisPanMap(deltaX, deltaY) {
+  GIS.map.x += deltaX;
+  GIS.map.y += deltaY;
+  gisApplyMapTransform();
+}
+
+function gisBindMapInteractions() {
+  const viewport = document.getElementById('gis-map-viewport');
+  if (!viewport || viewport.dataset.mapBound === 'true') return;
+  viewport.dataset.mapBound = 'true';
+  viewport.addEventListener('wheel', event => {
+    event.preventDefault();
+    gisZoomMap(event.deltaY < 0 ? 1 : -1);
+  }, {passive:false});
+  viewport.addEventListener('pointerdown', event => {
+    if (event.target.closest('.gis-map-bay')) return;
+    GIS.map.dragging = true;
+    GIS.map.pointerId = event.pointerId;
+    GIS.map.lastClientX = event.clientX;
+    GIS.map.lastClientY = event.clientY;
+    viewport.classList.add('dragging');
+    viewport.setPointerCapture(event.pointerId);
+  });
+  viewport.addEventListener('pointermove', event => {
+    if (!GIS.map.dragging || GIS.map.pointerId !== event.pointerId) return;
+    const rect = viewport.getBoundingClientRect();
+    const unitX = GIS.map.width / Math.max(1, rect.width);
+    const unitY = GIS.map.height / Math.max(1, rect.height);
+    gisPanMap((event.clientX - GIS.map.lastClientX) * unitX, (event.clientY - GIS.map.lastClientY) * unitY);
+    GIS.map.lastClientX = event.clientX;
+    GIS.map.lastClientY = event.clientY;
+  });
+  const stopDrag = event => {
+    if (GIS.map.pointerId === event.pointerId && viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
+    GIS.map.dragging = false;
+    GIS.map.pointerId = null;
+    viewport.classList.remove('dragging');
+  };
+  viewport.addEventListener('pointerup', stopDrag);
+  viewport.addEventListener('pointercancel', stopDrag);
+  viewport.addEventListener('keydown', event => {
+    if (event.key === '+' || event.key === '=') { event.preventDefault(); gisZoomMap(1); }
+    else if (event.key === '-') { event.preventDefault(); gisZoomMap(-1); }
+    else if (event.key === '0' || event.key === 'Home') { event.preventDefault(); gisFitMap(); }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); gisPanMap(36, 0); }
+    else if (event.key === 'ArrowRight') { event.preventDefault(); gisPanMap(-36, 0); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); gisPanMap(0, 36); }
+    else if (event.key === 'ArrowDown') { event.preventDefault(); gisPanMap(0, -36); }
+  });
+}
+
+function renderGisTopology() {
+  if (!document.getElementById('view-gis')) return;
+  const filtered = gisFilteredRecords();
   const aisleNames = new Set(filtered.map(record => record.aisle).filter(Boolean));
   const empty = filtered.filter(record => record.occupancyStatus === 'EMPTY').length;
   const used = filtered.filter(record => record.occupancyStatus === 'OCCUPIED' || record.occupancyStatus === 'FULL').length;
@@ -2933,55 +3374,27 @@ function renderGisTopology() {
   if (!filtered.length) {
     if (note) note.textContent = 'No locations match the current filters.';
     gisSetState('No matching locations', 'Adjust the customer, occupancy, type, or search filters.');
+    gisResetDetail();
     return;
   }
-
-  const ordered = filtered.slice().sort((a, b) => gisNaturalCompare(a.aisle, b.aisle) || gisNaturalCompare(a.bay, b.bay) || gisNaturalCompare(a.level, b.level) || gisNaturalCompare(a.slot, b.slot) || gisNaturalCompare(a.name, b.name));
-  const displayed = ordered.slice(0, GIS_RENDER_LIMIT);
-  if (note) note.textContent = displayed.length < filtered.length
-    ? 'Showing ' + displayed.length.toLocaleString() + ' of ' + filtered.length.toLocaleString() + ' matching locations. Refine filters to inspect a smaller area.'
-    : 'Showing all ' + filtered.length.toLocaleString() + ' matching locations grouped by recorded aisle.';
-
-  const groups = new Map();
-  displayed.forEach(record => {
-    const key = record.aisle || 'Other locations';
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(record);
-  });
-  const topology = document.getElementById('gis-topology');
-  if (!topology) return;
-  topology.innerHTML = '';
-  const fragment = document.createDocumentFragment();
-  Array.from(groups.entries()).sort((a, b) => gisNaturalCompare(a[0], b[0])).forEach(([aisle, records]) => {
-    const lane = document.createElement('section');
-    lane.className = 'gis-aisle';
-    const heading = document.createElement('div');
-    heading.className = 'gis-aisle-heading';
-    const title = document.createElement('strong');
-    title.textContent = aisle === 'Other locations' ? aisle : 'Aisle ' + aisle;
-    const count = document.createElement('span');
-    count.textContent = records.length.toLocaleString() + (records.length === 1 ? ' location' : ' locations');
-    heading.append(title, count);
-    const cells = document.createElement('div');
-    cells.className = 'gis-location-grid';
-    records.forEach(record => {
-      const cell = document.createElement('div');
-      const occupancyClass = ['EMPTY','OCCUPIED','FULL'].includes(record.occupancyStatus) ? record.occupancyStatus.toLowerCase() : 'unknown';
-      cell.className = 'gis-location ' + occupancyClass;
-      cell.tabIndex = 0;
-      cell.setAttribute('role', 'group');
-      cell.setAttribute('aria-label', gisLocationLabel(record));
-      const name = document.createElement('strong');
-      name.textContent = record.name;
-      const detail = document.createElement('span');
-      detail.textContent = [record.bay && 'Bay ' + record.bay, record.level != null && 'L' + record.level, record.slot && 'S' + record.slot].filter(Boolean).join(' · ') || String(record.type || 'Location').replaceAll('_', ' ');
-      cell.append(name, detail);
-      cells.appendChild(cell);
-    });
-    lane.append(heading, cells);
-    fragment.appendChild(lane);
-  });
-  topology.appendChild(fragment);
+  const built = gisBuildBayGroups(filtered);
+  if (!built.groups.length) {
+    if (note) note.textContent = filtered.length.toLocaleString() + ' matching locations do not contain both aisle and bay topology.';
+    gisSetState('No mappable aisle and bay records', 'The matching locations remain available in WMS, but cannot be placed on this schematic.');
+    gisResetDetail('No selected bay is available for the current filters.');
+    return;
+  }
+  const displayedGroups = gisLimitBayGroups(built.groups);
+  const representedLocations = displayedGroups.reduce((sum, group) => sum + group.records.length, 0);
+  const mappedLocations = built.groups.reduce((sum, group) => sum + group.records.length, 0);
+  if (note) {
+    note.textContent = 'Showing ' + displayedGroups.length.toLocaleString() + ' of ' + built.groups.length.toLocaleString() + ' aisle/bay cells, representing ' + representedLocations.toLocaleString() + ' of ' + mappedLocations.toLocaleString() + ' mapped locations.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.';
+  }
+  const colorMode = (document.getElementById('gis-color-mode') || {}).value || 'occupancy';
+  gisRenderLegend(filtered, colorMode);
+  gisRenderMapSvg(displayedGroups, colorMode);
+  const selected = GIS.map.groups.get(GIS.map.selectedKey) || displayedGroups[0];
+  if (selected) gisSelectBay(selected.key);
 }
 
 function queueGisRender() {
@@ -3004,6 +3417,7 @@ async function initGisView(options) {
   gisSetLoading(true);
   gisSetStatus('Loading locations for ' + facilityName + '…');
   gisSetState('Loading facility topology', 'Preparing recorded warehouse locations.');
+  gisResetDetail('Loading location detail…');
   gisResetMetrics();
   try {
     const result = await FacilityData.load(facilityId);
@@ -3013,15 +3427,21 @@ async function initGisView(options) {
     GIS.facilityId = facilityId;
     GIS.records = flattened.records;
     GIS.customers = flattened.customerNames;
+    if (changed) {
+      GIS.map.selectedKey = '';
+      GIS.map.selectedLocationName = '';
+    }
     gisPopulateFilters(customers, GIS.records, changed);
     if (result.unavailable) {
       gisSetStatus('Location topology is unavailable for ' + facilityName + '.');
       gisSetState('Facility locations are unavailable', 'No location snapshot is available for this facility. Try Refresh after changing facilities.');
+      gisResetDetail('No location detail is available for this facility.');
       return {unavailable:true, facilityId};
     }
     if (!GIS.records.length) {
       gisSetStatus('No recorded locations were found for ' + facilityName + '.');
       gisSetState('No facility locations found', 'There are no recorded locations available for this facility.');
+      gisResetDetail('No location detail is available for this facility.');
       return {empty:true, facilityId};
     }
     gisSetStatus(GIS.records.length.toLocaleString() + ' recorded locations loaded for ' + facilityName + '.');
@@ -3036,6 +3456,7 @@ async function initGisView(options) {
     gisPopulateFilters([], [], true);
     gisSetStatus('Location topology could not be loaded for ' + facilityName + '.');
     gisSetState('Facility topology could not be loaded', 'Check the selected facility and try Refresh.');
+    gisResetDetail('Location detail could not be loaded.');
     return {error:true, facilityId};
   } finally {
     if (token === GIS.requestToken) gisSetLoading(false);
