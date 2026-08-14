@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const runtime = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-runtime.js'), 'utf8');
 const modules = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-modules.js'), 'utf8');
+const facilityF42 = fs.readFileSync(path.join(ROOT, 'public/assets/data/facilities/lt-f42.js'), 'utf8');
 
 test('Robot Count is an accessible parent with overview and GIS routes', () => {
   assert.match(html, /id="robot-menu-trigger"[^>]+role="button"[^>]+tabindex="0"/);
@@ -47,23 +48,28 @@ test('GIS route is facility-scoped and wired to lazy real location data', () => 
   assert.match(modules, /await FacilityData\.load\(facilityId\)/);
   assert.match(modules, /token !== GIS\.requestToken \|\| facilityId !== String\(FACILITY_ID \|\| ''\)/);
   assert.match(modules, /Object\.entries\(locations \|\| \{\}\)/);
-  assert.match(modules, /GIS_MAP_CELL_LIMIT = 600/);
+  assert.match(modules, /presentCustomerIds\.has\(String\(customer\.id\)\)/);
 });
 
-test('GIS renders a bounded accessible aisle and bay floor schematic', () => {
-  assert.match(html, /id="gis-map-svg"[^>]+role="img"/);
-  assert.match(html, /id="gis-map-viewport"[^>]+tabindex="0"/);
+test('GIS renders every aisle and bay on one canvas with bounded keyboard access', () => {
+  assert.match(html, /id="gis-map-canvas"[^>]+aria-hidden="true"/);
+  assert.match(html, /id="gis-map-viewport"[^>]+role="region"[^>]+tabindex="0"/);
+  assert.match(html, /id="gis-bay-picker"[^>]+gisSelectBayFromPicker/);
   assert.match(html, /id="gis-zoom-out"[^>]+aria-label="Zoom out"/);
   assert.match(html, /id="gis-zoom-in"[^>]+aria-label="Zoom in"/);
   assert.match(html, /id="gis-fit-map"[^>]+aria-label="Fit map to view"/);
   assert.match(html, /id="gis-detail-content"[^>]+aria-live="polite"/);
   assert.match(modules, /function gisBuildBayGroups/);
-  assert.match(modules, /function gisRenderMapSvg/);
+  assert.match(modules, /function gisRenderMapCanvas/);
+  assert.match(modules, /GIS\.map\.cells\.push/);
+  assert.match(modules, /canvas\.dataset\.cellCount/);
+  assert.match(modules, /GIS_BAY_PICKER_LIMIT = 100/);
   assert.match(modules, /function gisSelectBay/);
   assert.match(modules, /function gisZoomMap/);
   assert.match(modules, /function gisPanMap/);
   assert.match(modules, /function gisFitMap/);
   assert.match(modules, /slice\(0, GIS_DETAIL_LIMIT\)/);
+  assert.doesNotMatch(modules, /GIS_MAP_CELL_LIMIT/);
 });
 
 test('GIS supports real occupancy, customer and status coloring', () => {
@@ -73,9 +79,25 @@ test('GIS supports real occupancy, customer and status coloring', () => {
   assert.match(modules, /mode === 'status'/);
 });
 
+test('GIS customer filtering exposes only real customer coverage and shared bays', () => {
+  assert.match(html, /id="gis-customer"[^>]+gisHandleCustomerChange/);
+  assert.match(html, /id="gis-customer-summary"[^>]+aria-live="polite"/);
+  assert.match(modules, /if \(customer && record\.customerId !== customer\) return false/);
+  assert.match(modules, /function gisStorageZone\(record\)[\s\S]*record && record\.storageZone/);
+  assert.match(modules, /aisle\/bay customer coverage, not an official WMS zone/i);
+  assert.match(modules, /allCustomers\.length > 1/);
+  assert.match(modules, /other customer assignments?'[\s\S]*suppressed|other customer assignment/);
+  assert.match(modules, /Other customer cells suppressed/);
+  assert.match(modules, /if \(changed\)[\s\S]*selectedKey = ''[\s\S]*gisPopulateFilters\(customers, GIS\.records, changed\)/);
+  assert.match(modules, /const prior = resetSelections \? '' : customerSelect\.value/);
+  assert.match(facilityF42, /MONSTER ENERGY COMPANY/);
+  assert.match(facilityF42, /STAR ELITE INC\./);
+});
+
 test('GIS communicates schematic and robot-coordinate limitations without synthetic markers', () => {
   assert.match(html, /schematic, not-to-scale layout derived from real WMS aisle and bay topology/i);
   assert.match(html, /Live robot coordinates are unavailable for this facility\./);
   assert.match(html, /schematic uses WMS aisle and bay topology only/i);
   assert.doesNotMatch(modules, /latitude|longitude|robotMarker|fakeMarker|sampleMarker/i);
+  assert.doesNotMatch(modules, /syntheticZone|fakeZone|sampleZone/i);
 });

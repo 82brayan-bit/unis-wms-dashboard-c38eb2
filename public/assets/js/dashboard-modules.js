@@ -2811,18 +2811,26 @@ const GIS = {
     y: 0,
     width: 960,
     height: 520,
+    fitScale: 1,
     groups: new Map(),
+    allGroups: new Map(),
+    cells: [],
     selectedKey: '',
     selectedLocationName: '',
+    hoveredKey: '',
     dragging: false,
     pointerId: null,
     lastClientX: 0,
     lastClientY: 0,
   },
 };
-const GIS_MAP_CELL_LIMIT = 600;
 const GIS_DETAIL_LIMIT = 120;
-const GIS_SVG_NS = 'http://www.w3.org/2000/svg';
+const GIS_BAY_PICKER_LIMIT = 100;
+const GIS_CELL_WIDTH = 22;
+const GIS_CELL_HEIGHT = 24;
+const GIS_CELL_GAP = 4;
+const GIS_LANE_HEIGHT = 38;
+const GIS_LABEL_WIDTH = 68;
 
 function gisSetLoading(loading) {
   const topology = document.getElementById('gis-topology');
@@ -2879,8 +2887,9 @@ function gisPopulateFilters(customers, records, resetSelections) {
   const typeSelect = document.getElementById('gis-type');
   if (customerSelect) {
     const prior = resetSelections ? '' : customerSelect.value;
+    const presentCustomerIds = new Set(records.map(record => record.customerId));
     customerSelect.innerHTML = '<option value="">All customers</option>';
-    customers.forEach(customer => {
+    customers.filter(customer => presentCustomerIds.has(String(customer.id))).forEach(customer => {
       const option = document.createElement('option');
       option.value = customer.id;
       option.textContent = customer.name || customer.id;
@@ -2968,28 +2977,19 @@ function gisBuildBayGroups(records) {
   return {groups:ordered, unmappedCount};
 }
 
-function gisLimitBayGroups(groups) {
-  if (groups.length <= GIS_MAP_CELL_LIMIT) return groups;
-  const lanes = new Map();
-  groups.forEach(group => {
-    if (!lanes.has(group.aisle)) lanes.set(group.aisle, []);
-    lanes.get(group.aisle).push(group);
-  });
-  const laneValues = Array.from(lanes.values());
-  const quota = Math.max(1, Math.floor(GIS_MAP_CELL_LIMIT / laneValues.length));
-  const selected = [];
-  laneValues.forEach(lane => selected.push(...lane.slice(0, quota)));
-  let offset = quota;
-  while (selected.length < GIS_MAP_CELL_LIMIT) {
-    let added = false;
-    for (const lane of laneValues) {
-      if (selected.length >= GIS_MAP_CELL_LIMIT) break;
-      if (lane[offset]) { selected.push(lane[offset]); added = true; }
-    }
-    if (!added) break;
-    offset++;
-  }
-  return selected.sort((a, b) => gisNaturalCompare(a.aisle, b.aisle) || gisNaturalCompare(a.bay, b.bay));
+function gisStorageZone(record) {
+  return String(record && record.storageZone || '').trim();
+}
+
+function gisSelectedCustomerId() {
+  return (document.getElementById('gis-customer') || {}).value || '';
+}
+
+function gisHandleCustomerChange() {
+  GIS.map.selectedKey = '';
+  GIS.map.selectedLocationName = '';
+  gisHideMapTooltip();
+  queueGisRender();
 }
 
 function gisDistinct(values) {
@@ -3037,7 +3037,7 @@ function gisCreateLegendItem(container, colorClass, label) {
   container.appendChild(item);
 }
 
-function gisRenderLegend(records, colorMode) {
+function gisRenderLegend(records, colorMode, customerId, groups) {
   const legend = document.getElementById('gis-map-legend');
   if (!legend) return;
   legend.innerHTML = '';
@@ -3058,12 +3058,17 @@ function gisRenderLegend(records, colorMode) {
     gisCreateLegendItem(legend, 'unknown', 'Not recorded');
     gisCreateLegendItem(legend, 'mixed', 'Mixed');
   }
-}
-
-function gisSvgElement(name, attributes) {
-  const element = document.createElementNS(GIS_SVG_NS, name);
-  Object.entries(attributes || {}).forEach(([key, value]) => element.setAttribute(key, String(value)));
-  return element;
+  if (customerId) {
+    const zones = gisDistinct(records.map(gisStorageZone));
+    if (zones.length) zones.slice(0, 5).forEach(zone => gisCreateLegendItem(legend, 'customer-' + gisCustomerColorIndex(zone), 'WMS zone ' + zone));
+    else gisCreateLegendItem(legend, 'coverage', 'Customer coverage');
+    const sharedCount = (groups || []).filter(group => {
+      const allGroup = GIS.map.allGroups.get(group.key);
+      return allGroup && gisDistinct(allGroup.records.map(record => record.customerId)).length > 1;
+    }).length;
+    if (sharedCount) gisCreateLegendItem(legend, 'shared', 'Shared bay coverage');
+    gisCreateLegendItem(legend, 'suppressed', 'Other customer cells suppressed');
+  }
 }
 
 function gisBayAriaLabel(group) {
@@ -3071,59 +3076,145 @@ function gisBayAriaLabel(group) {
   return 'Aisle ' + group.aisle + ', bay ' + group.bay + ', ' + group.records.length.toLocaleString() + ' locations, ' + gisOccupancySummary(group.records) + ', ' + customers.length.toLocaleString() + (customers.length === 1 ? ' customer' : ' customers') + '. Select to inspect levels and slots.';
 }
 
-function gisRenderMapSvg(groups, colorMode) {
-  const svg = document.getElementById('gis-map-svg');
-  const layer = document.getElementById('gis-map-layer');
-  if (!svg || !layer) return;
+function gisCanvasPalette() {
+  const palette = {};
+  document.querySelectorAll('#gis-map-palette [data-gis-color]').forEach(swatch => {
+    const style = getComputedStyle(swatch);
+    palette[swatch.dataset.gisColor] = {fill:style.backgroundColor,stroke:style.borderColor,text:style.color};
+  });
+  return palette;
+}
+
+function gisCanvasRect(context, x, y, width, height, radius) {
+  context.beginPath();
+  if (typeof context.roundRect === 'function') context.roundRect(x, y, width, height, radius);
+  else context.rect(x, y, width, height);
+}
+
+function gisCanvasGeometry() {
+  const viewport = document.getElementById('gis-map-viewport');
+  const canvas = document.getElementById('gis-map-canvas');
+  if (!viewport || !canvas) return null;
+  const rect = viewport.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  if (canvas.width !== Math.round(width * pixelRatio) || canvas.height !== Math.round(height * pixelRatio)) {
+    canvas.width = Math.round(width * pixelRatio);
+    canvas.height = Math.round(height * pixelRatio);
+  }
+  GIS.map.fitScale = Math.min((width - 16) / GIS.map.width, (height - 16) / GIS.map.height);
+  const scale = GIS.map.fitScale * GIS.map.scale;
+  return {
+    canvas,context:canvas.getContext('2d'),rect,width,height,pixelRatio,scale,
+    originX:(width - GIS.map.width * scale) / 2 + GIS.map.x,
+    originY:(height - GIS.map.height * scale) / 2 + GIS.map.y,
+  };
+}
+
+function gisDrawMapCanvas() {
+  const geometry = gisCanvasGeometry();
+  if (!geometry || !geometry.context) return;
+  const {canvas,context,width,height,pixelRatio,scale,originX,originY} = geometry;
+  const palette = gisCanvasPalette();
+  context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = (palette.floor || {}).fill;
+  context.fillRect(0, 0, width, height);
+  context.save();
+  context.translate(originX, originY);
+  context.scale(scale, scale);
+  context.font = '600 11px Satoshi, sans-serif';
+  context.textBaseline = 'middle';
+  (GIS.map.lanes || []).forEach(lane => {
+    const laneColor = palette.lane || palette.floor;
+    context.fillStyle = laneColor.fill;
+    context.strokeStyle = laneColor.stroke;
+    context.lineWidth = 1 / scale;
+    gisCanvasRect(context, GIS_LABEL_WIDTH - 8, lane.y - 5, lane.width, GIS_CELL_HEIGHT + 10, 5);
+    context.fill();
+    context.stroke();
+    context.fillStyle = laneColor.text;
+    context.fillText('Aisle ' + lane.aisle, 12, lane.y + GIS_CELL_HEIGHT / 2);
+  });
+  GIS.map.cells.forEach(cell => {
+    const color = palette[cell.colorClass] || palette.unknown || palette.floor;
+    context.fillStyle = color.fill;
+    context.strokeStyle = color.stroke;
+    context.lineWidth = 1.1 / scale;
+    gisCanvasRect(context, cell.x, cell.y, cell.width, cell.height, 3);
+    context.fill();
+    context.stroke();
+    if (cell.active && cell.coverageClass) {
+      const coverage = palette[cell.coverageClass] || palette.coverage;
+      context.strokeStyle = coverage.stroke;
+      context.lineWidth = 2.2 / scale;
+      gisCanvasRect(context, cell.x + 1.5, cell.y + 1.5, cell.width - 3, cell.height - 3, 2);
+      context.stroke();
+    }
+    if (cell.active && cell.shared) {
+      const shared = palette.shared || palette.coverage;
+      context.save();
+      context.setLineDash([3 / scale, 2 / scale]);
+      context.strokeStyle = shared.stroke;
+      context.lineWidth = 2.6 / scale;
+      gisCanvasRect(context, cell.x + 3, cell.y + 3, cell.width - 6, cell.height - 6, 1);
+      context.stroke();
+      context.restore();
+    }
+    if (cell.key === GIS.map.selectedKey || cell.key === GIS.map.hoveredKey) {
+      const selected = palette.selected || palette.coverage;
+      context.strokeStyle = selected.stroke;
+      context.lineWidth = (cell.key === GIS.map.selectedKey ? 3.2 : 2.2) / scale;
+      gisCanvasRect(context, cell.x - 1, cell.y - 1, cell.width + 2, cell.height + 2, 4);
+      context.stroke();
+    }
+    if (cell.active && scale >= 0.72) {
+      context.fillStyle = color.text;
+      context.font = '700 7px Satoshi, sans-serif';
+      context.textAlign = 'center';
+      context.fillText(cell.group.bay.length > 6 ? cell.group.bay.slice(0, 5) + '…' : cell.group.bay, cell.x + cell.width / 2, cell.y + cell.height / 2);
+    }
+  });
+  context.restore();
+  canvas.dataset.cellCount = String(GIS.map.cells.length);
+  canvas.dataset.activeCellCount = String(GIS.map.cells.filter(cell => cell.active).length);
+  canvas.dataset.sharedCellCount = String(GIS.map.cells.filter(cell => cell.active && cell.shared).length);
+  canvas.dataset.renderedTheme = document.documentElement.dataset.theme || '';
+}
+
+function gisRenderMapCanvas(allGroups, activeGroups, colorMode, customerId) {
   const lanes = new Map();
-  groups.forEach(group => {
+  allGroups.forEach(group => {
     if (!lanes.has(group.aisle)) lanes.set(group.aisle, []);
     lanes.get(group.aisle).push(group);
   });
   const laneEntries = Array.from(lanes.entries()).sort((a, b) => gisNaturalCompare(a[0], b[0]));
-  const labelWidth = 76;
-  const cellWidth = 66;
-  const cellHeight = 38;
-  const cellGap = 8;
-  const laneHeight = 62;
-  const top = 30;
+  const activeMap = new Map(activeGroups.map(group => [group.key, group]));
+  const top = 24;
   const maxBayCount = Math.max(1, ...laneEntries.map(entry => entry[1].length));
-  GIS.map.width = Math.max(760, labelWidth + maxBayCount * (cellWidth + cellGap) + 28);
-  GIS.map.height = Math.max(320, top + laneEntries.length * laneHeight + 24);
-  svg.setAttribute('viewBox', '0 0 ' + GIS.map.width + ' ' + GIS.map.height);
-  layer.innerHTML = '';
-  const floor = gisSvgElement('rect', {x:8,y:8,width:GIS.map.width-16,height:GIS.map.height-16,rx:8,class:'gis-map-floor'});
-  layer.appendChild(floor);
-  GIS.map.groups = new Map(groups.map(group => [group.key, group]));
-
+  GIS.map.width = Math.max(760, GIS_LABEL_WIDTH + maxBayCount * (GIS_CELL_WIDTH + GIS_CELL_GAP) + 20);
+  GIS.map.height = Math.max(320, top + laneEntries.length * GIS_LANE_HEIGHT + 18);
+  GIS.map.groups = activeMap;
+  GIS.map.allGroups = new Map(allGroups.map(group => [group.key, group]));
+  GIS.map.cells = [];
+  GIS.map.lanes = [];
   laneEntries.forEach(([aisle, bays], laneIndex) => {
-    const y = top + laneIndex * laneHeight;
-    const lane = gisSvgElement('g', {class:'gis-map-aisle','data-aisle':aisle});
-    lane.appendChild(gisSvgElement('rect', {x:labelWidth-8,y:y-5,width:Math.max(110, bays.length*(cellWidth+cellGap)+8),height:cellHeight+10,rx:5,class:'gis-map-lane'}));
-    const aisleLabel = gisSvgElement('text', {x:16,y:y+24,class:'gis-map-aisle-label'});
-    aisleLabel.textContent = 'Aisle ' + aisle;
-    lane.appendChild(aisleLabel);
+    const y = top + laneIndex * GIS_LANE_HEIGHT;
+    GIS.map.lanes.push({aisle,y,width:Math.max(80, bays.length * (GIS_CELL_WIDTH + GIS_CELL_GAP) + 6)});
     bays.sort((a, b) => gisNaturalCompare(a.bay, b.bay)).forEach((group, bayIndex) => {
-      const x = labelWidth + bayIndex * (cellWidth + cellGap);
-      const bay = gisSvgElement('g', {class:'gis-map-bay ' + gisBayColorClass(group, colorMode),transform:'translate(' + x + ' ' + y + ')',tabindex:'0',role:'button','aria-label':gisBayAriaLabel(group),'data-bay-key':group.key});
-      bay.appendChild(gisSvgElement('rect', {x:0,y:0,width:cellWidth,height:cellHeight,rx:4,class:'gis-map-bay-shape'}));
-      const label = gisSvgElement('text', {x:cellWidth/2,y:16,class:'gis-map-bay-label','text-anchor':'middle'});
-      label.textContent = group.bay.length > 9 ? group.bay.slice(0, 8) + '…' : group.bay;
-      const count = gisSvgElement('text', {x:cellWidth/2,y:29,class:'gis-map-bay-count','text-anchor':'middle'});
-      count.textContent = group.records.length.toLocaleString() + (group.records.length === 1 ? ' loc' : ' locs');
-      bay.append(label, count);
-      bay.addEventListener('click', () => gisSelectBay(group.key));
-      bay.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); gisSelectBay(group.key); }
+      const activeGroup = activeMap.get(group.key);
+      const allCustomers = gisDistinct(group.records.map(record => record.customerId));
+      const zones = activeGroup ? gisDistinct(activeGroup.records.map(gisStorageZone)) : [];
+      GIS.map.cells.push({
+        key:group.key,group:activeGroup || group,allGroup:group,active:!!activeGroup,
+        x:GIS_LABEL_WIDTH + bayIndex * (GIS_CELL_WIDTH + GIS_CELL_GAP),y,width:GIS_CELL_WIDTH,height:GIS_CELL_HEIGHT,
+        colorClass:activeGroup ? gisBayColorClass(activeGroup, colorMode) : 'suppressed',
+        coverageClass:customerId ? (zones.length === 1 ? 'customer-' + gisCustomerColorIndex(zones[0]) : 'coverage') : '',
+        shared:!!customerId && allCustomers.length > 1,
       });
-      bay.addEventListener('pointerenter', event => gisShowMapTooltip(event, group));
-      bay.addEventListener('pointermove', event => gisShowMapTooltip(event, group));
-      bay.addEventListener('pointerleave', gisHideMapTooltip);
-      bay.addEventListener('focus', event => gisShowMapTooltip(event, group, bay));
-      bay.addEventListener('blur', gisHideMapTooltip);
-      lane.appendChild(bay);
     });
-    layer.appendChild(lane);
   });
   gisBindMapInteractions();
   gisShowMap();
@@ -3154,6 +3245,11 @@ function gisDetailField(label, value) {
 function gisRenderBayDetail(group) {
   const content = document.getElementById('gis-detail-content');
   if (!content || !group) return;
+  const customerId = gisSelectedCustomerId();
+  const allGroup = GIS.map.allGroups.get(group.key) || group;
+  const zones = gisDistinct(group.records.map(gisStorageZone));
+  const allCustomerNames = gisDistinct(allGroup.records.map(record => record.customerName));
+  const otherCustomerCount = customerId ? allCustomerNames.filter(name => name !== GIS.customers.get(customerId)).length : 0;
   const ordered = group.records.slice().sort((a, b) => gisNaturalCompare(a.level, b.level) || gisNaturalCompare(a.slot, b.slot) || gisNaturalCompare(a.name, b.name));
   const selected = ordered.find(record => record.name === GIS.map.selectedLocationName) || ordered[0];
   GIS.map.selectedLocationName = selected ? selected.name : '';
@@ -3167,7 +3263,9 @@ function gisRenderBayDetail(group) {
     gisDetailField('Locations', group.records.length.toLocaleString()),
     gisDetailField('Customers', gisDistinct(group.records.map(record => record.customerName)).length.toLocaleString()),
     gisDetailField('Occupancy', gisOccupancySummary(group.records)),
-    gisDetailField('Statuses', gisDistinct(group.records.map(record => record.status)).join(', ') || 'Not recorded')
+    gisDetailField('Statuses', gisDistinct(group.records.map(record => record.status)).join(', ') || 'Not recorded'),
+    gisDetailField('Coverage', zones.length ? 'WMS storage zone ' + zones.join(', ') : (customerId ? 'Customer coverage (aisle / bay)' : 'Overall facility')),
+    gisDetailField('Shared bay', otherCustomerCount ? 'Yes · ' + otherCustomerCount.toLocaleString() + (otherCustomerCount === 1 ? ' other customer assignment' : ' other customer assignments') + ' suppressed' : 'No')
   );
   const selectedTitle = document.createElement('div');
   selectedTitle.className = 'gis-detail-section-title';
@@ -3184,6 +3282,7 @@ function gisRenderBayDetail(group) {
       gisDetailField('Slot', selected.slot || 'Not recorded'),
       gisDetailField('Occupancy', selected.occupancyStatus || 'Not recorded'),
       gisDetailField('Customer', selected.customerName),
+      gisDetailField('Coverage', gisStorageZone(selected) || (customerId ? 'Customer coverage · Aisle ' + group.aisle + ' / Bay ' + group.bay : 'No WMS storage zone recorded')),
       gisDetailField('Type', String(selected.type || 'LOCATION').replaceAll('_', ' ')),
       gisDetailField('Status', selected.status || 'Not recorded')
     );
@@ -3220,8 +3319,29 @@ function gisSelectBay(key) {
   if (!group) return;
   GIS.map.selectedKey = key;
   GIS.map.selectedLocationName = group.records[0] ? group.records[0].name : '';
-  document.querySelectorAll('.gis-map-bay').forEach(element => element.classList.toggle('selected', element.dataset.bayKey === key));
   gisRenderBayDetail(group);
+  const picker = document.getElementById('gis-bay-picker');
+  if (picker && Array.from(picker.options).some(option => option.value === key)) picker.value = key;
+  gisDrawMapCanvas();
+}
+
+function gisCenterBay(key) {
+  const cell = GIS.map.cells.find(candidate => candidate.key === key && candidate.active);
+  const geometry = gisCanvasGeometry();
+  if (!cell || !geometry) return;
+  const baseOriginX = (geometry.width - GIS.map.width * geometry.scale) / 2;
+  const baseOriginY = (geometry.height - GIS.map.height * geometry.scale) / 2;
+  GIS.map.x = geometry.width / 2 - baseOriginX - (cell.x + cell.width / 2) * geometry.scale;
+  GIS.map.y = geometry.height / 2 - baseOriginY - (cell.y + cell.height / 2) * geometry.scale;
+  gisApplyMapTransform();
+}
+
+function gisSelectBayFromPicker() {
+  const picker = document.getElementById('gis-bay-picker');
+  if (!picker || !picker.value) return;
+  gisSelectBay(picker.value);
+  gisCenterBay(picker.value);
+  document.getElementById('gis-map-viewport')?.focus();
 }
 
 function gisSelectLocation(groupKey, locationName) {
@@ -3232,20 +3352,19 @@ function gisSelectLocation(groupKey, locationName) {
   gisRenderBayDetail(group);
 }
 
-function gisTooltipPosition(event, focusTarget) {
+function gisTooltipPosition(event) {
   const viewport = document.getElementById('gis-map-viewport');
   if (!viewport) return {left:8,top:8};
   const viewportRect = viewport.getBoundingClientRect();
-  const targetRect = focusTarget ? focusTarget.getBoundingClientRect() : null;
-  const clientX = targetRect ? targetRect.left + targetRect.width / 2 : event.clientX;
-  const clientY = targetRect ? targetRect.top : event.clientY;
+  const clientX = Number.isFinite(event.clientX) ? event.clientX : viewportRect.left + viewportRect.width / 2;
+  const clientY = Number.isFinite(event.clientY) ? event.clientY : viewportRect.top + viewportRect.height / 2;
   return {
     left:Math.max(8, Math.min(viewportRect.width - 244, clientX - viewportRect.left + 12)),
     top:Math.max(8, Math.min(viewportRect.height - 104, clientY - viewportRect.top + 12)),
   };
 }
 
-function gisShowMapTooltip(event, group, focusTarget) {
+function gisShowMapTooltip(event, group) {
   const tooltip = document.getElementById('gis-map-tooltip');
   if (!tooltip || !group) return;
   tooltip.innerHTML = '';
@@ -3258,8 +3377,13 @@ function gisShowMapTooltip(event, group, focusTarget) {
   const customers = document.createElement('span');
   const customerNames = gisDistinct(group.records.map(record => record.customerName));
   customers.textContent = customerNames.slice(0, 2).join(', ') + (customerNames.length > 2 ? ' +' + (customerNames.length - 2).toLocaleString() : '');
-  tooltip.append(title, locations, occupancy, customers);
-  const position = gisTooltipPosition(event, focusTarget);
+  const coverage = document.createElement('span');
+  const zones = gisDistinct(group.records.map(gisStorageZone));
+  const allGroup = GIS.map.allGroups.get(group.key) || group;
+  const shared = gisSelectedCustomerId() && gisDistinct(allGroup.records.map(record => record.customerId)).length > 1;
+  coverage.textContent = zones.length ? 'WMS storage zone ' + zones.join(', ') : (gisSelectedCustomerId() ? 'Customer coverage' + (shared ? ' · shared bay' : '') : 'Facility coverage');
+  tooltip.append(title, locations, occupancy, customers, coverage);
+  const position = gisTooltipPosition(event);
   tooltip.style.left = position.left + 'px';
   tooltip.style.top = position.top + 'px';
   tooltip.hidden = false;
@@ -3271,32 +3395,31 @@ function gisHideMapTooltip() {
 }
 
 function gisApplyMapTransform() {
-  const layer = document.getElementById('gis-map-layer');
   const zoomLabel = document.getElementById('gis-zoom-label');
   const zoomOut = document.getElementById('gis-zoom-out');
   const zoomIn = document.getElementById('gis-zoom-in');
-  if (GIS.map.scale < 1) {
-    GIS.map.x = (GIS.map.width - GIS.map.width * GIS.map.scale) / 2;
-    GIS.map.y = (GIS.map.height - GIS.map.height * GIS.map.scale) / 2;
-  } else {
-    GIS.map.x = Math.min(0, Math.max(GIS.map.width * (1 - GIS.map.scale), GIS.map.x));
-    GIS.map.y = Math.min(0, Math.max(GIS.map.height * (1 - GIS.map.scale), GIS.map.y));
+  const geometry = gisCanvasGeometry();
+  if (geometry) {
+    const scaledWidth = GIS.map.width * geometry.scale;
+    const scaledHeight = GIS.map.height * geometry.scale;
+    const limitX = Math.max(geometry.width * 0.4, (scaledWidth - geometry.width) / 2 + geometry.width * 0.4);
+    const limitY = Math.max(geometry.height * 0.4, (scaledHeight - geometry.height) / 2 + geometry.height * 0.4);
+    GIS.map.x = Math.max(-limitX, Math.min(limitX, GIS.map.x));
+    GIS.map.y = Math.max(-limitY, Math.min(limitY, GIS.map.y));
   }
-  if (layer) layer.setAttribute('transform', 'translate(' + GIS.map.x + ' ' + GIS.map.y + ') scale(' + GIS.map.scale + ')');
   if (zoomLabel) zoomLabel.textContent = Math.round(GIS.map.scale * 100) + '%';
   if (zoomOut) zoomOut.disabled = GIS.map.scale <= 0.75;
   if (zoomIn) zoomIn.disabled = GIS.map.scale >= 3;
+  gisDrawMapCanvas();
 }
 
 function gisZoomMap(direction) {
   const previous = GIS.map.scale;
   const next = Math.max(0.75, Math.min(3, previous * (direction > 0 ? 1.25 : 0.8)));
   if (next === previous) return;
-  const centerX = GIS.map.width / 2;
-  const centerY = GIS.map.height / 2;
   const ratio = next / previous;
-  GIS.map.x = centerX - (centerX - GIS.map.x) * ratio;
-  GIS.map.y = centerY - (centerY - GIS.map.y) * ratio;
+  GIS.map.x *= ratio;
+  GIS.map.y *= ratio;
   GIS.map.scale = next;
   gisApplyMapTransform();
 }
@@ -3314,6 +3437,14 @@ function gisPanMap(deltaX, deltaY) {
   gisApplyMapTransform();
 }
 
+function gisMapCellAtEvent(event) {
+  const geometry = gisCanvasGeometry();
+  if (!geometry) return null;
+  const mapX = (event.clientX - geometry.rect.left - geometry.originX) / geometry.scale;
+  const mapY = (event.clientY - geometry.rect.top - geometry.originY) / geometry.scale;
+  return GIS.map.cells.find(cell => cell.active && mapX >= cell.x && mapX <= cell.x + cell.width && mapY >= cell.y && mapY <= cell.y + cell.height) || null;
+}
+
 function gisBindMapInteractions() {
   const viewport = document.getElementById('gis-map-viewport');
   if (!viewport || viewport.dataset.mapBound === 'true') return;
@@ -3323,7 +3454,7 @@ function gisBindMapInteractions() {
     gisZoomMap(event.deltaY < 0 ? 1 : -1);
   }, {passive:false});
   viewport.addEventListener('pointerdown', event => {
-    if (event.target.closest('.gis-map-bay')) return;
+    if (gisMapCellAtEvent(event)) return;
     GIS.map.dragging = true;
     GIS.map.pointerId = event.pointerId;
     GIS.map.lastClientX = event.clientX;
@@ -3332,13 +3463,20 @@ function gisBindMapInteractions() {
     viewport.setPointerCapture(event.pointerId);
   });
   viewport.addEventListener('pointermove', event => {
-    if (!GIS.map.dragging || GIS.map.pointerId !== event.pointerId) return;
-    const rect = viewport.getBoundingClientRect();
-    const unitX = GIS.map.width / Math.max(1, rect.width);
-    const unitY = GIS.map.height / Math.max(1, rect.height);
-    gisPanMap((event.clientX - GIS.map.lastClientX) * unitX, (event.clientY - GIS.map.lastClientY) * unitY);
-    GIS.map.lastClientX = event.clientX;
-    GIS.map.lastClientY = event.clientY;
+    if (GIS.map.dragging && GIS.map.pointerId === event.pointerId) {
+      gisPanMap(event.clientX - GIS.map.lastClientX, event.clientY - GIS.map.lastClientY);
+      GIS.map.lastClientX = event.clientX;
+      GIS.map.lastClientY = event.clientY;
+      return;
+    }
+    const cell = gisMapCellAtEvent(event);
+    const hoveredKey = cell ? cell.key : '';
+    if (hoveredKey !== GIS.map.hoveredKey) {
+      GIS.map.hoveredKey = hoveredKey;
+      gisDrawMapCanvas();
+    }
+    if (cell) gisShowMapTooltip(event, cell.group);
+    else gisHideMapTooltip();
   });
   const stopDrag = event => {
     if (GIS.map.pointerId === event.pointerId && viewport.hasPointerCapture(event.pointerId)) viewport.releasePointerCapture(event.pointerId);
@@ -3348,6 +3486,22 @@ function gisBindMapInteractions() {
   };
   viewport.addEventListener('pointerup', stopDrag);
   viewport.addEventListener('pointercancel', stopDrag);
+  viewport.addEventListener('pointerleave', event => {
+    if (GIS.map.dragging) stopDrag(event);
+    GIS.map.hoveredKey = '';
+    gisDrawMapCanvas();
+    gisHideMapTooltip();
+  });
+  viewport.addEventListener('click', event => {
+    const cell = gisMapCellAtEvent(event);
+    if (cell) gisSelectBay(cell.key);
+  });
+  viewport.addEventListener('focus', () => {
+    const cell = GIS.map.cells.find(candidate => candidate.key === GIS.map.selectedKey && candidate.active);
+    const rect = viewport.getBoundingClientRect();
+    if (cell) gisShowMapTooltip({clientX:rect.left + rect.width / 2,clientY:rect.top + 16}, cell.group);
+  });
+  viewport.addEventListener('blur', gisHideMapTooltip);
   viewport.addEventListener('keydown', event => {
     if (event.key === '+' || event.key === '=') { event.preventDefault(); gisZoomMap(1); }
     else if (event.key === '-') { event.preventDefault(); gisZoomMap(-1); }
@@ -3357,11 +3511,54 @@ function gisBindMapInteractions() {
     else if (event.key === 'ArrowUp') { event.preventDefault(); gisPanMap(0, 36); }
     else if (event.key === 'ArrowDown') { event.preventDefault(); gisPanMap(0, -36); }
   });
+  window.addEventListener('resize', gisDrawMapCanvas);
+  window.addEventListener('item-theme-change', gisDrawMapCanvas);
+}
+
+function gisPopulateBayPicker(groups) {
+  const picker = document.getElementById('gis-bay-picker');
+  const note = document.getElementById('gis-bay-picker-note');
+  if (!picker) return;
+  const prior = GIS.map.selectedKey;
+  picker.innerHTML = '<option value="">Select a mapped bay</option>';
+  groups.slice(0, GIS_BAY_PICKER_LIMIT).forEach(group => {
+    const option = document.createElement('option');
+    option.value = group.key;
+    option.textContent = 'Aisle ' + group.aisle + ' · Bay ' + group.bay + ' · ' + group.records.length.toLocaleString() + (group.records.length === 1 ? ' location' : ' locations');
+    picker.appendChild(option);
+  });
+  picker.value = Array.from(picker.options).some(option => option.value === prior) ? prior : '';
+  picker.disabled = groups.length === 0;
+  if (note) {
+    note.textContent = groups.length > GIS_BAY_PICKER_LIMIT
+      ? 'Showing the first ' + GIS_BAY_PICKER_LIMIT.toLocaleString() + ' of ' + groups.length.toLocaleString() + ' matching bays. Use location search to narrow the list.'
+      : groups.length.toLocaleString() + (groups.length === 1 ? ' matching bay is' : ' matching bays are') + ' available for keyboard selection.';
+  }
+}
+
+function gisRenderCustomerSummary(records, groups, customerId) {
+  const summary = document.getElementById('gis-customer-summary');
+  if (!summary) return;
+  if (!customerId) {
+    summary.textContent = 'Overall facility · ' + records.length.toLocaleString() + ' matching locations across ' + groups.length.toLocaleString() + ' aisle/bay cells.';
+    return;
+  }
+  const customerName = GIS.customers.get(customerId) || customerId;
+  const aisles = new Set(groups.map(group => group.aisle)).size;
+  const zones = gisDistinct(records.map(gisStorageZone));
+  const shared = groups.filter(group => {
+    const allGroup = GIS.map.allGroups.get(group.key);
+    return allGroup && gisDistinct(allGroup.records.map(record => record.customerId)).length > 1;
+  }).length;
+  summary.textContent = customerName + ' · ' + records.length.toLocaleString() + ' locations · ' + groups.length.toLocaleString() + ' aisle/bay cells · ' + aisles.toLocaleString() + ' aisles · '
+    + (zones.length ? zones.length.toLocaleString() + ' recorded WMS storage ' + (zones.length === 1 ? 'zone' : 'zones') : 'aisle/bay customer coverage, not an official WMS zone')
+    + (shared ? ' · ' + shared.toLocaleString() + ' shared ' + (shared === 1 ? 'bay' : 'bays') : '');
 }
 
 function renderGisTopology() {
   if (!document.getElementById('view-gis')) return;
   const filtered = gisFilteredRecords();
+  const customerId = gisSelectedCustomerId();
   const aisleNames = new Set(filtered.map(record => record.aisle).filter(Boolean));
   const empty = filtered.filter(record => record.occupancyStatus === 'EMPTY').length;
   const used = filtered.filter(record => record.occupancyStatus === 'OCCUPIED' || record.occupancyStatus === 'FULL').length;
@@ -3375,25 +3572,33 @@ function renderGisTopology() {
     if (note) note.textContent = 'No locations match the current filters.';
     gisSetState('No matching locations', 'Adjust the customer, occupancy, type, or search filters.');
     gisResetDetail();
+    gisPopulateBayPicker([]);
+    gisRenderCustomerSummary([], [], customerId);
     return;
   }
+  const facilityBuilt = gisBuildBayGroups(GIS.records);
   const built = gisBuildBayGroups(filtered);
   if (!built.groups.length) {
     if (note) note.textContent = filtered.length.toLocaleString() + ' matching locations do not contain both aisle and bay topology.';
     gisSetState('No mappable aisle and bay records', 'The matching locations remain available in WMS, but cannot be placed on this schematic.');
     gisResetDetail('No selected bay is available for the current filters.');
+    gisPopulateBayPicker([]);
+    gisRenderCustomerSummary(filtered, [], customerId);
     return;
   }
-  const displayedGroups = gisLimitBayGroups(built.groups);
-  const representedLocations = displayedGroups.reduce((sum, group) => sum + group.records.length, 0);
   const mappedLocations = built.groups.reduce((sum, group) => sum + group.records.length, 0);
   if (note) {
-    note.textContent = 'Showing ' + displayedGroups.length.toLocaleString() + ' of ' + built.groups.length.toLocaleString() + ' aisle/bay cells, representing ' + representedLocations.toLocaleString() + ' of ' + mappedLocations.toLocaleString() + ' mapped locations.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.';
+    note.textContent = customerId
+      ? 'Customer coverage: ' + built.groups.length.toLocaleString() + ' mapped aisle/bay cells and ' + mappedLocations.toLocaleString() + ' mapped locations. All ' + facilityBuilt.groups.length.toLocaleString() + ' facility cells retain their position; unrelated customer cells are suppressed.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' customer locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.'
+      : 'Complete map: all ' + facilityBuilt.groups.length.toLocaleString() + ' real facility aisle/bay cells are represented. ' + built.groups.length.toLocaleString() + ' cells and ' + mappedLocations.toLocaleString() + ' mapped locations match the current filters.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.';
   }
   const colorMode = (document.getElementById('gis-color-mode') || {}).value || 'occupancy';
-  gisRenderLegend(filtered, colorMode);
-  gisRenderMapSvg(displayedGroups, colorMode);
-  const selected = GIS.map.groups.get(GIS.map.selectedKey) || displayedGroups[0];
+  gisRenderMapCanvas(facilityBuilt.groups, built.groups, colorMode, customerId);
+  gisRenderLegend(filtered, colorMode, customerId, built.groups);
+  gisPopulateBayPicker(built.groups);
+  gisRenderCustomerSummary(filtered, built.groups, customerId);
+  gisSetStatus(filtered.length.toLocaleString() + ' matching locations shown for ' + (customerId ? (GIS.customers.get(customerId) || customerId) : (FACILITY_NAME || FACILITY_ID)) + '.');
+  const selected = GIS.map.groups.get(GIS.map.selectedKey) || built.groups[0];
   if (selected) gisSelectBay(selected.key);
 }
 

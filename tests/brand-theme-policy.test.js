@@ -54,8 +54,9 @@ test('Robot Count dropdown and GIS view use the semantic theme surface', () => {
   assert.match(html, /data-view="robots"[^>]+role="link"/);
   assert.match(html, /data-view="gis"[^>]+role="link"/);
   assert.match(html, /id="view-gis"/);
-  assert.match(css, /\.gis-map-bay\.empty \.gis-map-bay-shape\{[^}]*var\(--chart-3\)/);
-  assert.match(css, /\.gis-map-bay:focus \.gis-map-bay-shape\{[^}]*var\(--ring\)/);
-  assert.match(css, /\.gis-map-bay\.customer-0 \.gis-map-bay-shape\{[^}]*var\(--primary\)/);
-  assert.match(css, /\.gis-map-bay\.status-usable \.gis-map-bay-shape\{[^}]*var\(--chart-3\)/);
+  assert.match(css, /\.gis-map-palette \.empty\{[^}]*var\(--chart-3\)/);
+  assert.match(css, /\.gis-map-viewport:focus-visible\{[^}]*var\(--ring\)/);
+  assert.match(css, /\.gis-map-palette \.customer-0\{[^}]*var\(--primary\)/);
+  assert.match(css, /\.gis-map-palette \.status-usable\{[^}]*var\(--chart-3\)/);
+  assert.match(css, /\.gis-map-palette \.suppressed\{[^}]*var\(--muted\)/);
 });

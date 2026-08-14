@@ -241,43 +241,94 @@ async function main() {
       overviewVisible:visible(document.getElementById('view-robots'))
     };
     document.querySelector('#robot-sub [data-view="gis"]').click();
-    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && document.querySelectorAll('.gis-map-bay').length > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
-    const occupancyBay = document.querySelector('.gis-map-bay');
-    const occupancyClass = occupancyBay ? occupancyBay.getAttribute('class') : '';
+    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    function canvasHash() {
+      const canvas = document.getElementById('gis-map-canvas');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let hash = 2166136261;
+      const colors = new Set();
+      for (let index = 0; index < pixels.length; index += 388) {
+        hash ^= pixels[index] + (pixels[index + 1] << 8) + (pixels[index + 2] << 16) + (pixels[index + 3] << 24);
+        hash = Math.imul(hash, 16777619);
+        colors.add(pixels[index] + ',' + pixels[index + 1] + ',' + pixels[index + 2] + ',' + pixels[index + 3]);
+      }
+      return {hash:String(hash >>> 0),colors:colors.size,width:canvas.width,height:canvas.height};
+    }
+    const fullGroups = gisBuildBayGroups(GIS.records).groups;
+    const fullGroupCount = fullGroups.length;
+    const fullCellCount = Number(document.getElementById('gis-map-canvas').dataset.cellCount);
+    const fullActiveCount = Number(document.getElementById('gis-map-canvas').dataset.activeCellCount);
+    const fullCanvas = canvasHash();
+    const occupancyClass = GIS.map.cells.find(cell => cell.active).colorClass;
     document.getElementById('gis-color-mode').value = 'customer';
     renderGisTopology();
-    const customerBay = document.querySelector('.gis-map-bay');
-    const customerClass = customerBay ? customerBay.getAttribute('class') : '';
+    const customerClass = GIS.map.cells.find(cell => cell.active).colorClass;
     document.getElementById('gis-color-mode').value = 'status';
     renderGisTopology();
-    const statusBay = document.querySelector('.gis-map-bay');
-    const statusClass = statusBay ? statusBay.getAttribute('class') : '';
+    const statusClass = GIS.map.cells.find(cell => cell.active).colorClass;
     document.getElementById('gis-color-mode').value = 'occupancy';
     renderGisTopology();
-    const firstLocation = document.querySelector('.gis-map-bay');
-    firstLocation.dispatchEvent(new MouseEvent('click', {bubbles:true}));
-    firstLocation.focus();
-    firstLocation.dispatchEvent(new FocusEvent('focus'));
+
+    const customerSelectGis = document.getElementById('gis-customer');
+    const customerOption = Array.from(customerSelectGis.options).filter(option => option.value && option.value !== '__UNASSIGNED__').find(option => {
+      const customerGroups = gisBuildBayGroups(GIS.records.filter(record => record.customerId === option.value)).groups;
+      return customerGroups.some(group => {
+        const allGroup = fullGroups.find(candidate => candidate.key === group.key);
+        return allGroup && gisDistinct(allGroup.records.map(record => record.customerId)).length > 1;
+      });
+    }) || Array.from(customerSelectGis.options).find(option => option.value && option.value !== '__UNASSIGNED__');
+    customerSelectGis.value = customerOption.value;
+    const expectedCustomerRecords = GIS.records.filter(record => record.customerId === customerOption.value);
+    const expectedCustomerGroups = gisBuildBayGroups(expectedCustomerRecords).groups;
+    gisHandleCustomerChange();
+    await waitFor(() => Number(document.getElementById('gis-map-canvas').dataset.activeCellCount) === expectedCustomerGroups.length);
+    const customerRecords = gisFilteredRecords();
+    const customerCellCount = Number(document.getElementById('gis-map-canvas').dataset.cellCount);
+    const customerActiveCount = Number(document.getElementById('gis-map-canvas').dataset.activeCellCount);
+    const customerSharedCount = Number(document.getElementById('gis-map-canvas').dataset.sharedCellCount);
+    const customerSummary = document.getElementById('gis-customer-summary').textContent;
+    const customerLegend = document.getElementById('gis-map-legend').textContent;
+    const customerNote = document.getElementById('gis-render-note').textContent;
+    const customerPickerOptions = document.getElementById('gis-bay-picker').options.length;
+    const customerZoneCount = gisDistinct(customerRecords.map(gisStorageZone)).length;
+    const firstCell = GIS.map.cells.find(cell => cell.active);
+    const picker = document.getElementById('gis-bay-picker');
+    picker.value = firstCell.key;
+    gisSelectBayFromPicker();
+    const viewport = document.getElementById('gis-map-viewport');
+    const cellGeometry = gisCanvasGeometry();
+    const pointerX = cellGeometry.rect.left + cellGeometry.originX + (firstCell.x + firstCell.width / 2) * cellGeometry.scale;
+    const pointerY = cellGeometry.rect.top + cellGeometry.originY + (firstCell.y + firstCell.height / 2) * cellGeometry.scale;
+    viewport.dispatchEvent(new PointerEvent('pointermove', {clientX:pointerX,clientY:pointerY,bubbles:true}));
+    viewport.dispatchEvent(new MouseEvent('click', {clientX:pointerX,clientY:pointerY,bubbles:true}));
+    const customerDetail = document.getElementById('gis-detail-content').textContent;
+    const otherCustomerNames = Array.from(GIS.customers.entries()).filter(([id]) => id !== customerOption.value).map(([,name]) => name).filter(Boolean);
     const tooltip = document.getElementById('gis-map-tooltip');
     const tooltipVisible = tooltip ? !tooltip.hidden : false;
     const tooltipText = tooltip ? tooltip.textContent : '';
-    const initialTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    const initialTransform = JSON.stringify({scale:GIS.map.scale,x:GIS.map.x,y:GIS.map.y});
     document.getElementById('gis-zoom-in').click();
     const zoomedScale = GIS.map.scale;
-    const zoomedTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    const zoomedTransform = JSON.stringify({scale:GIS.map.scale,x:GIS.map.x,y:GIS.map.y});
     gisPanMap(-40, -24);
-    const pannedTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    const pannedTransform = JSON.stringify({scale:GIS.map.scale,x:GIS.map.x,y:GIS.map.y});
     document.getElementById('gis-fit-map').click();
-    const fitTransform = document.getElementById('gis-map-layer').getAttribute('transform');
+    const fitTransform = JSON.stringify({scale:GIS.map.scale,x:GIS.map.x,y:GIS.map.y});
     const fitScale = GIS.map.scale;
-    const viewport = document.getElementById('gis-map-viewport');
     viewport.dispatchEvent(new KeyboardEvent('keydown', {key:'+',bubbles:true}));
     const keyboardZoomScale = GIS.map.scale;
     viewport.dispatchEvent(new KeyboardEvent('keydown', {key:'0',bubbles:true}));
     ItemTheme.applyTheme('light', {persist:true});
-    const lightTopology = firstLocation ? getComputedStyle(firstLocation.querySelector('.gis-map-bay-shape')).fill : '';
+    gisDrawMapCanvas();
+    const lightTopology = canvasHash();
     ItemTheme.applyTheme('dark', {persist:true});
-    const darkTopology = firstLocation ? getComputedStyle(firstLocation.querySelector('.gis-map-bay-shape')).fill : '';
+    gisDrawMapCanvas();
+    const darkTopology = canvasHash();
+    customerSelectGis.value = '';
+    gisHandleCustomerChange();
+    await waitFor(() => Number(document.getElementById('gis-map-canvas').dataset.activeCellCount) === fullGroupCount);
+    const restoredCellCount = Number(document.getElementById('gis-map-canvas').dataset.cellCount);
+    const restoredActiveCount = Number(document.getElementById('gis-map-canvas').dataset.activeCellCount);
     const gisNavigation = {
       title:document.getElementById('tb-title').textContent,
       childActive:document.querySelector('#robot-sub [data-view="gis"]').classList.contains('active'),
@@ -285,10 +336,10 @@ async function main() {
       facilityId:GIS.facilityId,
       facilityText:document.getElementById('gis-facility-id').textContent,
       locations:GIS.records.length,
-      rendered:document.querySelectorAll('.gis-map-bay').length,
-      aisles:document.querySelectorAll('.gis-map-aisle').length,
-      svgViewBox:document.getElementById('gis-map-svg').getAttribute('viewBox'),
-      firstLabel:firstLocation ? firstLocation.getAttribute('aria-label') : '',
+      rendered:fullCellCount,active:fullActiveCount,expectedCells:fullGroupCount,
+      canvasNodes:document.querySelectorAll('#gis-map-viewport canvas').length,
+      aisles:GIS.map.lanes.length,
+      firstLabel:gisBayAriaLabel(firstCell.group),
       detail:document.getElementById('gis-detail-content').textContent,
       slotButtons:document.querySelectorAll('.gis-slot-button').length,
       tooltipVisible,tooltipText,
@@ -297,9 +348,14 @@ async function main() {
       renderNote:document.getElementById('gis-render-note').textContent,
       status:document.getElementById('gis-status').textContent,
       limitation:document.querySelector('.gis-availability').textContent,
-      lightTopology,darkTopology
+      lightTopology,darkTopology,fullCanvas,
+      customer:{id:customerOption.value,name:customerOption.textContent,records:customerRecords.length,expectedRecords:expectedCustomerRecords.length,allRecordsMatch:customerRecords.every(record => record.customerId === customerOption.value),cells:customerCellCount,activeCells:customerActiveCount,expectedCells:expectedCustomerGroups.length,sharedCells:customerSharedCount,zoneCount:customerZoneCount,summary:customerSummary,legend:customerLegend,note:customerNote,pickerOptions:customerPickerOptions,detail:customerDetail,otherCustomerInformationHidden:otherCustomerNames.every(name => !customerDetail.includes(name))},
+      restoredCellCount,restoredActiveCount
     };
 
+    customerSelectGis.value = customerOption.value;
+    gisHandleCustomerChange();
+    await waitFor(() => document.getElementById('gis-customer').value === customerOption.value && Number(document.getElementById('gis-map-canvas').dataset.activeCellCount) === expectedCustomerGroups.length);
     const gisF40Switch = switchFacility('LT_F40');
     const gisF42Switch = switchFacility('LT_F42');
     await Promise.all([gisF40Switch, gisF42Switch]);
@@ -308,7 +364,8 @@ async function main() {
       facilityId:FACILITY_ID,
       gisFacilityId:GIS.facilityId,
       context:document.getElementById('gis-facility-id').textContent,
-      status:document.getElementById('gis-status').textContent
+      status:document.getElementById('gis-status').textContent,
+      customer:document.getElementById('gis-customer').value
     };
 
     const viewIds = ['dashboard','scheduler','cycle','robots','gis','abcSlotting','locationTag','locTagReq','reports','alerts'];
@@ -358,8 +415,8 @@ async function main() {
   assert(summary.robotNavigation.overviewActive && summary.robotNavigation.overviewVisible, 'Robot Count overview child did not route');
   assert(summary.gisNavigation.title === 'GIS' && summary.gisNavigation.childActive && summary.gisNavigation.parentActive, 'GIS child route or active state failed');
   assert(summary.gisNavigation.facilityId === 'LT_F42' && summary.gisNavigation.facilityText.includes('LT_F42'), 'GIS did not use the selected facility');
-  assert(summary.gisNavigation.locations > 0 && summary.gisNavigation.rendered > 0 && summary.gisNavigation.rendered <= 600 && summary.gisNavigation.aisles > 0, 'GIS floor map did not render bounded real aisle/bay cells');
-  assert(summary.gisNavigation.svgViewBox && summary.gisNavigation.firstLabel && summary.gisNavigation.status.includes('recorded locations loaded'), 'GIS map accessibility, geometry, or success state is missing');
+  assert(summary.gisNavigation.locations > 0 && summary.gisNavigation.rendered === summary.gisNavigation.expectedCells && summary.gisNavigation.active === summary.gisNavigation.expectedCells && summary.gisNavigation.rendered > 600 && summary.gisNavigation.aisles > 0, 'GIS floor map did not render every real aisle/bay cell');
+  assert(summary.gisNavigation.canvasNodes === 1 && summary.gisNavigation.fullCanvas.colors > 3 && summary.gisNavigation.fullCanvas.width > 0 && summary.gisNavigation.firstLabel && summary.gisNavigation.status.includes('matching locations shown'), 'GIS canvas accessibility, pixels, or success state is missing');
   assert(summary.gisNavigation.detail.includes('Selected location') && summary.gisNavigation.slotButtons > 0, 'GIS level/slot drill-down did not render');
   assert(summary.gisNavigation.tooltipVisible && summary.gisNavigation.tooltipText.includes('Aisle'), 'GIS hover/focus tooltip did not render');
   assert(/empty|occupied|full|mixed|unknown/.test(summary.gisNavigation.occupancyClass), 'GIS occupancy coloring is missing');
@@ -367,12 +424,20 @@ async function main() {
   assert(/status-usable|status-disabled|mixed|unknown/.test(summary.gisNavigation.statusClass), 'GIS status coloring is missing');
   assert(summary.gisNavigation.zoomedScale > 1 && summary.gisNavigation.zoomedTransform !== summary.gisNavigation.initialTransform, 'GIS zoom control did not change the map');
   assert(summary.gisNavigation.pannedTransform !== summary.gisNavigation.zoomedTransform, 'GIS pan did not change the map transform');
-  assert(summary.gisNavigation.fitScale === 1 && summary.gisNavigation.fitTransform.includes('translate(0 0) scale(1)'), 'GIS fit-to-view did not reset the map');
+  assert(summary.gisNavigation.fitScale === 1 && summary.gisNavigation.fitTransform === '{"scale":1,"x":0,"y":0}', 'GIS fit-to-view did not reset the map');
   assert(summary.gisNavigation.keyboardZoomScale > 1, 'GIS keyboard zoom did not work');
   assert(summary.gisNavigation.renderNote.includes('Schematic, not to scale'), 'GIS schematic disclosure is missing');
   assert(summary.gisNavigation.limitation.includes('Live robot coordinates are unavailable'), 'GIS did not expose the robot-coordinate unavailable state');
-  assert(summary.gisNavigation.lightTopology && summary.gisNavigation.darkTopology && summary.gisNavigation.lightTopology !== summary.gisNavigation.darkTopology, 'GIS topology did not respond to both themes');
-  assert(summary.gisSwitchState.facilityId === 'LT_F42' && summary.gisSwitchState.gisFacilityId === 'LT_F42' && summary.gisSwitchState.context.includes('LT_F42'), 'GIS rapid facility switching retained stale data');
+  assert(summary.gisNavigation.lightTopology.colors > 3 && summary.gisNavigation.darkTopology.colors > 3 && summary.gisNavigation.lightTopology.hash !== summary.gisNavigation.darkTopology.hash, 'GIS topology did not respond to both themes');
+  assert(summary.gisNavigation.customer.records === summary.gisNavigation.customer.expectedRecords && summary.gisNavigation.customer.allRecordsMatch, 'GIS customer filter mixed unrelated customer records');
+  assert(summary.gisNavigation.customer.cells === summary.gisNavigation.expectedCells && summary.gisNavigation.customer.activeCells === summary.gisNavigation.customer.expectedCells, 'GIS customer coverage did not preserve full geometry or exact active cells');
+  assert(summary.gisNavigation.customer.sharedCells > 0 && summary.gisNavigation.customer.legend.includes('Shared bay coverage'), 'GIS shared customer bays were not disclosed');
+  assert(summary.gisNavigation.customer.zoneCount === 0 && summary.gisNavigation.customer.summary.includes('aisle/bay customer coverage, not an official WMS zone'), 'GIS invented a zone or omitted the customer coverage limitation');
+  assert(summary.gisNavigation.customer.summary.includes(summary.gisNavigation.customer.name) && summary.gisNavigation.customer.note.includes('unrelated customer cells are suppressed') && summary.gisNavigation.customer.legend.includes('Other customer cells suppressed'), 'GIS customer-only context is incomplete');
+  assert(summary.gisNavigation.customer.detail.includes(summary.gisNavigation.customer.name) && summary.gisNavigation.customer.otherCustomerInformationHidden, 'GIS customer selection exposed unrelated customer detail');
+  assert(summary.gisNavigation.customer.pickerOptions > 1 && summary.gisNavigation.customer.pickerOptions <= 101, 'GIS accessible bay picker is not bounded');
+  assert(summary.gisNavigation.restoredCellCount === summary.gisNavigation.expectedCells && summary.gisNavigation.restoredActiveCount === summary.gisNavigation.expectedCells, 'Clearing the customer did not restore the full map');
+  assert(summary.gisSwitchState.facilityId === 'LT_F42' && summary.gisSwitchState.gisFacilityId === 'LT_F42' && summary.gisSwitchState.context.includes('LT_F42') && summary.gisSwitchState.customer === '', 'GIS rapid facility switching retained stale data or customer selection');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');
   await delay(250);
   assert(consoleErrors.length === 0, 'Browser console errors: ' + consoleErrors.join(' | '));

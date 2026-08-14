@@ -952,7 +952,7 @@
           <div class="gis-filter-grid">
             <div class="cc-field">
               <label class="cc-label" for="gis-customer">Customer</label>
-              <select class="cc-input" id="gis-customer" onchange="queueGisRender()"><option value="">All customers</option></select>
+              <select class="cc-input" id="gis-customer" onchange="gisHandleCustomerChange()"><option value="">All customers</option></select>
             </div>
             <div class="cc-field">
               <label class="cc-label" for="gis-search">Location or aisle</label>
@@ -972,6 +972,7 @@
             </div>
           </div>
           <div id="gis-status" class="gis-status" role="status" aria-live="polite">Choose GIS from Robot Count to load facility locations.</div>
+          <div id="gis-customer-summary" class="gis-customer-summary" role="status" aria-live="polite">Showing overall facility information.</div>
         </div>
 
         <div class="gis-metrics" aria-label="Location summary">
@@ -985,7 +986,7 @@
           <div class="card gis-topology-card">
             <div class="card-hdr">
               <div>
-                <div class="card-ttl">Facility Floor Schematic</div>
+                <div class="card-ttl">Complete Facility Floor Schematic</div>
                 <div class="scheduler-help" id="gis-render-note">Parallel lanes represent recorded aisles; ordered cells represent recorded bays.</div>
               </div>
               <div class="gis-map-actions">
@@ -1005,15 +1006,26 @@
                 </div>
               </div>
             </div>
+            <div class="gis-map-browser">
+              <div class="cc-field">
+                <label class="cc-label" for="gis-bay-picker">Browse mapped aisle / bay</label>
+                <select class="cc-input" id="gis-bay-picker" onchange="gisSelectBayFromPicker()"><option value="">Select a mapped bay</option></select>
+              </div>
+              <div id="gis-bay-picker-note" class="scheduler-help">Use search or customer filters to narrow the accessible bay list.</div>
+            </div>
             <div id="gis-topology" class="gis-topology" aria-live="polite" aria-busy="false">
               <div id="gis-map-state" class="gis-state"><strong>Warehouse map is ready to load</strong><span>Select GIS or use Refresh.</span></div>
-              <div id="gis-map-viewport" class="gis-map-viewport" tabindex="0" aria-label="Warehouse floor schematic" hidden>
-                <svg id="gis-map-svg" class="gis-map-svg" role="img" aria-labelledby="gis-map-title gis-map-description" preserveAspectRatio="xMinYMin meet">
-                  <title id="gis-map-title">Warehouse aisle and bay schematic</title>
-                  <desc id="gis-map-description">A deterministic schematic based on WMS aisle and bay fields. It is not a measured floor plan.</desc>
-                  <g id="gis-map-layer"></g>
-                </svg>
+              <div id="gis-map-viewport" class="gis-map-viewport" role="region" tabindex="0" aria-labelledby="gis-map-title" aria-describedby="gis-map-description gis-render-note" hidden>
+                <span id="gis-map-title" class="gis-map-a11y-copy">Warehouse aisle and bay schematic</span>
+                <span id="gis-map-description" class="gis-map-a11y-copy">A complete deterministic schematic based on real WMS aisle and bay ordering. It is not a measured floor plan. Use the bay browser for keyboard-accessible location details.</span>
+                <canvas id="gis-map-canvas" class="gis-map-canvas" aria-hidden="true"></canvas>
                 <div id="gis-map-tooltip" class="gis-map-tooltip" role="tooltip" hidden></div>
+                <div id="gis-map-palette" class="gis-map-palette" aria-hidden="true">
+                  <i data-gis-color="floor" class="floor"></i><i data-gis-color="lane" class="lane"></i><i data-gis-color="suppressed" class="suppressed"></i>
+                  <i data-gis-color="empty" class="empty"></i><i data-gis-color="occupied" class="occupied"></i><i data-gis-color="full" class="full"></i><i data-gis-color="mixed" class="mixed"></i><i data-gis-color="unknown" class="unknown"></i>
+                  <i data-gis-color="customer-0" class="customer-0"></i><i data-gis-color="customer-1" class="customer-1"></i><i data-gis-color="customer-2" class="customer-2"></i><i data-gis-color="customer-3" class="customer-3"></i><i data-gis-color="customer-4" class="customer-4"></i>
+                  <i data-gis-color="status-usable" class="status-usable"></i><i data-gis-color="status-disabled" class="status-disabled"></i><i data-gis-color="coverage" class="coverage"></i><i data-gis-color="shared" class="shared"></i><i data-gis-color="selected" class="selected"></i>
+                </div>
               </div>
             </div>
           </div>
