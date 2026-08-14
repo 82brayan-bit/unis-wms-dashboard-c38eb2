@@ -34,8 +34,10 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   assert.match(runtime, /gis:\{t:"GIS"/);
   assert.match(modules, /function initSchedulerForm/);
   assert.match(modules, /async function initGisView/);
+  assert.match(modules, /function gisRenderMapSvg/);
   assert.match(modules, /FacilityData\.load\(/);
   assert.match(html, /id="view-gis"/);
+  assert.match(html, /id="gis-map-svg"/);
   assert.match(html, /id="robot-sub"/);
   assert.match(html, /syncInitialNavigation\(\)/);
   assert.doesNotMatch(html, /Active Users|view-activeUsers|showView\(['"]activeUsers/i);
