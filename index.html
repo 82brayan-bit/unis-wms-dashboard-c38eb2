@@ -109,9 +109,14 @@
         <div class="sb-item" onclick="showView('countApproval')">Count Result Approval</div>
         <div class="sb-item" data-view="countCalendar" onclick="showView('countCalendar')">Count Calendar</div>
       </div>
-      <div class="sb-item" data-view="robots" onclick="showView('robots')">
+      <div class="sb-item" id="robot-menu-trigger" data-view-group="robot" role="button" tabindex="0" aria-expanded="false" aria-controls="robot-sub" onclick="toggleRobotGroup(event)" onkeydown="handleRobotGroupKeydown(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
         Robot Count <span class="sb-badge green">8</span>
+        <svg class="caret" id="robot-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sb-sub robot-sub" id="robot-sub" aria-label="Robot Count views">
+        <div class="sb-item" data-view="robots" role="link" tabindex="0" onclick="showView('robots')" onkeydown="handleRobotChildKeydown(event,'robots')">Overview</div>
+        <div class="sb-item" data-view="gis" role="link" tabindex="0" onclick="showView('gis')" onkeydown="handleRobotChildKeydown(event,'gis')">GIS</div>
       </div>
       <div class="sb-item" data-view="consolidation" onclick="showView('consolidation')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg>
@@ -923,6 +928,83 @@
               <div class="robot-row"><span class="l">Uptime</span><span class="v">99.0%</span></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ════ VIEW: GIS ════ -->
+      <div class="view" id="view-gis">
+        <div class="card gis-toolbar">
+          <div class="gis-heading-row">
+            <div>
+              <div class="card-ttl">Warehouse Location Topology</div>
+              <div class="scheduler-help">Explore real locations in the selected facility by aisle, bay, level, and slot.</div>
+            </div>
+            <button class="btn btn-primary gis-refresh" id="gis-refresh" type="button" onclick="refreshGisView()" aria-describedby="gis-status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8.1 8.1 0 1 0 2 5.3"/><polyline points="20 4 20 11 13 11"/></svg>
+              <span id="gis-refresh-label">Refresh</span>
+            </button>
+          </div>
+          <div class="gis-context" aria-label="Selected facility">
+            <span class="gis-context-label">Facility</span>
+            <strong id="gis-facility-name">Selected facility</strong>
+            <span id="gis-facility-id"></span>
+          </div>
+          <div class="gis-filter-grid">
+            <div class="cc-field">
+              <label class="cc-label" for="gis-customer">Customer</label>
+              <select class="cc-input" id="gis-customer" onchange="queueGisRender()"><option value="">All customers</option></select>
+            </div>
+            <div class="cc-field">
+              <label class="cc-label" for="gis-search">Location or aisle</label>
+              <input class="cc-input" id="gis-search" type="search" placeholder="Search locations" oninput="queueGisRender()"/>
+            </div>
+            <div class="cc-field">
+              <label class="cc-label" for="gis-occupancy">Occupancy</label>
+              <select class="cc-input" id="gis-occupancy" onchange="queueGisRender()"><option value="">All occupancy</option><option value="EMPTY">Empty</option><option value="OCCUPIED">Occupied</option><option value="FULL">Full</option></select>
+            </div>
+            <div class="cc-field">
+              <label class="cc-label" for="gis-type">Location type</label>
+              <select class="cc-input" id="gis-type" onchange="queueGisRender()"><option value="">All types</option></select>
+            </div>
+          </div>
+          <div id="gis-status" class="gis-status" role="status" aria-live="polite">Choose GIS from Robot Count to load facility locations.</div>
+        </div>
+
+        <div class="gis-metrics" aria-label="Location summary">
+          <div class="kpi"><div class="kpi-ico blue">L</div><div><div class="kpi-lbl">Locations</div><div class="kpi-val" id="gis-kpi-locations">—</div><div class="kpi-chg neutral">matching filters</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple">A</div><div><div class="kpi-lbl">Aisles</div><div class="kpi-val" id="gis-kpi-aisles">—</div><div class="kpi-chg neutral">represented</div></div></div>
+          <div class="kpi"><div class="kpi-ico green">E</div><div><div class="kpi-lbl">Empty</div><div class="kpi-val" id="gis-kpi-empty">—</div><div class="kpi-chg neutral">available locations</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber">O</div><div><div class="kpi-lbl">Occupied / Full</div><div class="kpi-val" id="gis-kpi-used">—</div><div class="kpi-chg neutral">locations in use</div></div></div>
+        </div>
+
+        <div class="gis-content-grid">
+          <div class="card gis-topology-card">
+            <div class="card-hdr">
+              <div>
+                <div class="card-ttl">Location Topology</div>
+                <div class="scheduler-help" id="gis-render-note">Locations are grouped by their recorded aisle coordinates.</div>
+              </div>
+              <div class="gis-legend" aria-label="Occupancy legend">
+                <span><i class="gis-legend-dot empty"></i>Empty</span>
+                <span><i class="gis-legend-dot occupied"></i>Occupied</span>
+                <span><i class="gis-legend-dot full"></i>Full</span>
+                <span><i class="gis-legend-dot unknown"></i>Not recorded</span>
+              </div>
+            </div>
+            <div id="gis-topology" class="gis-topology" aria-live="polite" aria-busy="false">
+              <div class="gis-state"><strong>Location topology is ready to load</strong><span>Select GIS or use Refresh.</span></div>
+            </div>
+          </div>
+          <aside class="card gis-availability" aria-label="Robot positioning availability">
+            <div class="gis-availability-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s6-4.4 6-11a6 6 0 1 0-12 0c0 6.6 6 11 6 11z"/><circle cx="12" cy="10" r="2"/></svg>
+            </div>
+            <div>
+              <div class="card-ttl">Robot Positions</div>
+              <p>Live robot positions are not available for this facility.</p>
+              <p class="scheduler-help">The topology shows recorded warehouse locations only.</p>
+            </div>
+          </aside>
         </div>
       </div>
 

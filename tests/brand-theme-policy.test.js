@@ -46,3 +46,14 @@ test('Active Users module stays removed while Employee Ownership remains', () =>
   assert.match(html, /Employee Ownership/);
   assert.match(html, /dashboard-employee-ownership-card/);
 });
+
+test('Robot Count dropdown and GIS view use the semantic theme surface', () => {
+  const html = read('index.html');
+  const css = read('public/assets/css/dashboard.css');
+  assert.match(html, /id="robot-menu-trigger"[^>]+aria-expanded="false"[^>]+aria-controls="robot-sub"/);
+  assert.match(html, /data-view="robots"[^>]+role="link"/);
+  assert.match(html, /data-view="gis"[^>]+role="link"/);
+  assert.match(html, /id="view-gis"/);
+  assert.match(css, /\.gis-location\.empty\{[^}]*var\(--chart-3\)/);
+  assert.match(css, /\.gis-location:focus-visible\{[^}]*var\(--ring\)/);
+});

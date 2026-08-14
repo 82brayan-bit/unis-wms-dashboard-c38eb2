@@ -151,6 +151,13 @@ async function main() {
       const rect = element.getBoundingClientRect();
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
     }
+    async function waitFor(predicate) {
+      for (let attempt = 0; attempt < 80; attempt++) {
+        if (predicate()) return;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      throw new Error('Timed out waiting for the GIS view');
+    }
     function themeState(theme, context) {
       ItemTheme.applyTheme(theme, {persist:true});
       const login = document.getElementById('login-screen');
@@ -195,7 +202,48 @@ async function main() {
       aisleOptions:document.getElementById('loc-aisle-list').options.length,
       bayOptions:document.getElementById('loc-bay-list').options.length
     };
-    const viewIds = ['dashboard','scheduler','cycle','robots','abcSlotting','locationTag','locTagReq','reports','alerts'];
+
+    setRobotGroupOpen(false);
+    document.getElementById('robot-menu-trigger').click();
+    const robotNavigation = {
+      expanded:document.getElementById('robot-menu-trigger').getAttribute('aria-expanded'),
+      submenuOpen:document.getElementById('robot-sub').classList.contains('open'),
+      overviewActive:document.querySelector('#robot-sub [data-view="robots"]').classList.contains('active'),
+      overviewVisible:visible(document.getElementById('view-robots'))
+    };
+    document.querySelector('#robot-sub [data-view="gis"]').click();
+    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const firstLocation = document.querySelector('.gis-location');
+    ItemTheme.applyTheme('light', {persist:true});
+    const lightTopology = firstLocation ? getComputedStyle(firstLocation).backgroundColor : '';
+    ItemTheme.applyTheme('dark', {persist:true});
+    const darkTopology = firstLocation ? getComputedStyle(firstLocation).backgroundColor : '';
+    const gisNavigation = {
+      title:document.getElementById('tb-title').textContent,
+      childActive:document.querySelector('#robot-sub [data-view="gis"]').classList.contains('active'),
+      parentActive:document.getElementById('robot-menu-trigger').classList.contains('active'),
+      facilityId:GIS.facilityId,
+      facilityText:document.getElementById('gis-facility-id').textContent,
+      locations:GIS.records.length,
+      rendered:document.querySelectorAll('.gis-location').length,
+      firstLabel:firstLocation ? firstLocation.getAttribute('aria-label') : '',
+      status:document.getElementById('gis-status').textContent,
+      limitation:document.querySelector('.gis-availability').textContent,
+      lightTopology,darkTopology
+    };
+
+    const gisF40Switch = switchFacility('LT_F40');
+    const gisF42Switch = switchFacility('LT_F42');
+    await Promise.all([gisF40Switch, gisF42Switch]);
+    await waitFor(() => GIS.facilityId === 'LT_F42' && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const gisSwitchState = {
+      facilityId:FACILITY_ID,
+      gisFacilityId:GIS.facilityId,
+      context:document.getElementById('gis-facility-id').textContent,
+      status:document.getElementById('gis-status').textContent
+    };
+
+    const viewIds = ['dashboard','scheduler','cycle','robots','gis','abcSlotting','locationTag','locTagReq','reports','alerts'];
     const views = {};
     for (const id of viewIds) {
       document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
@@ -208,7 +256,7 @@ async function main() {
       lightLogin,darkLogin,lightApp,darkApp,views,
       f40:{customers:f40.customers.length,groups:Object.keys(f40.locations).length,cached:f40.cached},
       f42:{customers:f42.customers.length,groups:Object.keys(f42.locations).length,cached:f42.cached},
-      switchState,
+      switchState,robotNavigation,gisNavigation,gisSwitchState,
       activeUsers:document.body.innerText.includes('Active Users'),
       employeeOwnership:document.body.innerText.includes('Employee Ownership')
     };
@@ -230,6 +278,15 @@ async function main() {
   assert(summary.switchState.customerOptions === 5 && summary.switchState.locationCustomerOptions === 5, 'Scheduler/location customer controls were not rebuilt from LT_F42');
   assert(summary.switchState.help.includes('LT_F42') && summary.switchState.help.includes('4 customers'), 'Facility help did not reflect LT_F42');
   assert(summary.switchState.aisleOptions > 0 || summary.switchState.bayOptions > 0, 'Location datalists did not use the selected facility chunk');
+  assert(summary.robotNavigation.expanded === 'true' && summary.robotNavigation.submenuOpen, 'Robot Count parent did not expand');
+  assert(summary.robotNavigation.overviewActive && summary.robotNavigation.overviewVisible, 'Robot Count overview child did not route');
+  assert(summary.gisNavigation.title === 'GIS' && summary.gisNavigation.childActive && summary.gisNavigation.parentActive, 'GIS child route or active state failed');
+  assert(summary.gisNavigation.facilityId === 'LT_F42' && summary.gisNavigation.facilityText.includes('LT_F42'), 'GIS did not use the selected facility');
+  assert(summary.gisNavigation.locations > 0 && summary.gisNavigation.rendered > 0 && summary.gisNavigation.rendered <= 600, 'GIS topology did not render real facility locations within its DOM cap');
+  assert(summary.gisNavigation.firstLabel && summary.gisNavigation.status.includes('recorded locations loaded'), 'GIS accessibility or success state is missing');
+  assert(summary.gisNavigation.limitation.includes('Live robot positions are not available'), 'GIS did not expose the robot-position unavailable state');
+  assert(summary.gisNavigation.lightTopology && summary.gisNavigation.darkTopology && summary.gisNavigation.lightTopology !== summary.gisNavigation.darkTopology, 'GIS topology did not respond to both themes');
+  assert(summary.gisSwitchState.facilityId === 'LT_F42' && summary.gisSwitchState.gisFacilityId === 'LT_F42' && summary.gisSwitchState.context.includes('LT_F42'), 'GIS rapid facility switching retained stale data');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');
   await delay(250);
   assert(consoleErrors.length === 0, 'Browser console errors: ' + consoleErrors.join(' | '));

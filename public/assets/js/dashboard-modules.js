@@ -2795,6 +2795,257 @@ function exportCountApprovalCsv() {
   const blob = new Blob([csv], {type:'text/csv'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='count-result-approval.csv'; a.click(); URL.revokeObjectURL(url);
 }
 
+// ═══ ROBOT COUNT GIS — facility location topology ═══
+// WMS location snapshots expose aisle/bay/level/slot, but no geographic
+// coordinates or robot positions. GIS therefore renders only recorded
+// facility locations and never infers robot markers.
+const GIS = {
+  requestToken: 0,
+  renderFrame: 0,
+  facilityId: '',
+  records: [],
+  customers: new Map(),
+};
+const GIS_RENDER_LIMIT = 600;
+
+function gisSetLoading(loading) {
+  const topology = document.getElementById('gis-topology');
+  const refresh = document.getElementById('gis-refresh');
+  const label = document.getElementById('gis-refresh-label');
+  if (topology) topology.setAttribute('aria-busy', String(loading));
+  if (refresh) refresh.disabled = loading;
+  if (label) label.textContent = loading ? 'Loading…' : 'Refresh';
+}
+
+function gisSetStatus(message) {
+  const status = document.getElementById('gis-status');
+  if (status) status.textContent = message;
+}
+
+function gisSetState(title, message) {
+  const topology = document.getElementById('gis-topology');
+  if (!topology) return;
+  topology.innerHTML = '';
+  const state = document.createElement('div');
+  state.className = 'gis-state';
+  const heading = document.createElement('strong');
+  heading.textContent = title;
+  const detail = document.createElement('span');
+  detail.textContent = message;
+  state.append(heading, detail);
+  topology.appendChild(state);
+}
+
+function gisUpdateMetric(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = Number(value || 0).toLocaleString();
+}
+
+function gisResetMetrics() {
+  ['gis-kpi-locations','gis-kpi-aisles','gis-kpi-empty','gis-kpi-used'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = '—';
+  });
+}
+
+function gisPopulateFilters(customers, records, resetSelections) {
+  const customerSelect = document.getElementById('gis-customer');
+  const typeSelect = document.getElementById('gis-type');
+  if (customerSelect) {
+    const prior = resetSelections ? '' : customerSelect.value;
+    customerSelect.innerHTML = '<option value="">All customers</option>';
+    customers.forEach(customer => {
+      const option = document.createElement('option');
+      option.value = customer.id;
+      option.textContent = customer.name || customer.id;
+      customerSelect.appendChild(option);
+    });
+    customerSelect.value = Array.from(customerSelect.options).some(option => option.value === prior) ? prior : '';
+  }
+  if (typeSelect) {
+    const prior = resetSelections ? '' : typeSelect.value;
+    const types = Array.from(new Set(records.map(record => record.type).filter(Boolean))).sort();
+    typeSelect.innerHTML = '<option value="">All types</option>';
+    types.forEach(type => {
+      const option = document.createElement('option');
+      option.value = type;
+      option.textContent = type.replaceAll('_', ' ');
+      typeSelect.appendChild(option);
+    });
+    typeSelect.value = types.includes(prior) ? prior : '';
+  }
+  if (resetSelections) {
+    const search = document.getElementById('gis-search');
+    const occupancy = document.getElementById('gis-occupancy');
+    if (search) search.value = '';
+    if (occupancy) occupancy.value = '';
+  }
+}
+
+function gisFlattenLocations(locations, customers) {
+  const customerNames = new Map(customers.map(customer => [String(customer.id), customer.name || customer.id]));
+  const records = [];
+  Object.entries(locations || {}).forEach(([customerId, tuples]) => {
+    (Array.isArray(tuples) ? tuples : []).forEach(tuple => {
+      const location = expandSlim(tuple);
+      if (!location || !location.name) return;
+      records.push(Object.assign({}, location, {
+        customerId: String(customerId),
+        customerName: customerNames.get(String(customerId)) || String(customerId),
+      }));
+    });
+  });
+  return {records, customerNames};
+}
+
+function gisLocationLabel(record) {
+  const coordinate = [record.aisle && 'aisle ' + record.aisle, record.bay && 'bay ' + record.bay, record.level != null && 'level ' + record.level, record.slot && 'slot ' + record.slot].filter(Boolean).join(', ');
+  const occupancy = record.occupancyStatus ? record.occupancyStatus.toLowerCase() : 'occupancy not recorded';
+  return record.name + ', ' + (coordinate || 'non-rack location') + ', ' + occupancy + ', ' + record.customerName;
+}
+
+function gisNaturalCompare(left, right) {
+  return String(left || '').localeCompare(String(right || ''), undefined, {numeric:true, sensitivity:'base'});
+}
+
+function renderGisTopology() {
+  if (!document.getElementById('view-gis')) return;
+  const customer = (document.getElementById('gis-customer') || {}).value || '';
+  const query = ((document.getElementById('gis-search') || {}).value || '').trim().toLowerCase();
+  const occupancy = (document.getElementById('gis-occupancy') || {}).value || '';
+  const type = (document.getElementById('gis-type') || {}).value || '';
+  const filtered = GIS.records.filter(record => {
+    if (customer && record.customerId !== customer) return false;
+    if (occupancy && record.occupancyStatus !== occupancy) return false;
+    if (type && record.type !== type) return false;
+    if (query && ![record.name, record.aisle, record.bay, record.customerName].some(value => String(value || '').toLowerCase().includes(query))) return false;
+    return true;
+  });
+  const aisleNames = new Set(filtered.map(record => record.aisle).filter(Boolean));
+  const empty = filtered.filter(record => record.occupancyStatus === 'EMPTY').length;
+  const used = filtered.filter(record => record.occupancyStatus === 'OCCUPIED' || record.occupancyStatus === 'FULL').length;
+  gisUpdateMetric('gis-kpi-locations', filtered.length);
+  gisUpdateMetric('gis-kpi-aisles', aisleNames.size);
+  gisUpdateMetric('gis-kpi-empty', empty);
+  gisUpdateMetric('gis-kpi-used', used);
+
+  const note = document.getElementById('gis-render-note');
+  if (!filtered.length) {
+    if (note) note.textContent = 'No locations match the current filters.';
+    gisSetState('No matching locations', 'Adjust the customer, occupancy, type, or search filters.');
+    return;
+  }
+
+  const ordered = filtered.slice().sort((a, b) => gisNaturalCompare(a.aisle, b.aisle) || gisNaturalCompare(a.bay, b.bay) || gisNaturalCompare(a.level, b.level) || gisNaturalCompare(a.slot, b.slot) || gisNaturalCompare(a.name, b.name));
+  const displayed = ordered.slice(0, GIS_RENDER_LIMIT);
+  if (note) note.textContent = displayed.length < filtered.length
+    ? 'Showing ' + displayed.length.toLocaleString() + ' of ' + filtered.length.toLocaleString() + ' matching locations. Refine filters to inspect a smaller area.'
+    : 'Showing all ' + filtered.length.toLocaleString() + ' matching locations grouped by recorded aisle.';
+
+  const groups = new Map();
+  displayed.forEach(record => {
+    const key = record.aisle || 'Other locations';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(record);
+  });
+  const topology = document.getElementById('gis-topology');
+  if (!topology) return;
+  topology.innerHTML = '';
+  const fragment = document.createDocumentFragment();
+  Array.from(groups.entries()).sort((a, b) => gisNaturalCompare(a[0], b[0])).forEach(([aisle, records]) => {
+    const lane = document.createElement('section');
+    lane.className = 'gis-aisle';
+    const heading = document.createElement('div');
+    heading.className = 'gis-aisle-heading';
+    const title = document.createElement('strong');
+    title.textContent = aisle === 'Other locations' ? aisle : 'Aisle ' + aisle;
+    const count = document.createElement('span');
+    count.textContent = records.length.toLocaleString() + (records.length === 1 ? ' location' : ' locations');
+    heading.append(title, count);
+    const cells = document.createElement('div');
+    cells.className = 'gis-location-grid';
+    records.forEach(record => {
+      const cell = document.createElement('div');
+      const occupancyClass = ['EMPTY','OCCUPIED','FULL'].includes(record.occupancyStatus) ? record.occupancyStatus.toLowerCase() : 'unknown';
+      cell.className = 'gis-location ' + occupancyClass;
+      cell.tabIndex = 0;
+      cell.setAttribute('role', 'group');
+      cell.setAttribute('aria-label', gisLocationLabel(record));
+      const name = document.createElement('strong');
+      name.textContent = record.name;
+      const detail = document.createElement('span');
+      detail.textContent = [record.bay && 'Bay ' + record.bay, record.level != null && 'L' + record.level, record.slot && 'S' + record.slot].filter(Boolean).join(' · ') || String(record.type || 'Location').replaceAll('_', ' ');
+      cell.append(name, detail);
+      cells.appendChild(cell);
+    });
+    lane.append(heading, cells);
+    fragment.appendChild(lane);
+  });
+  topology.appendChild(fragment);
+}
+
+function queueGisRender() {
+  if (GIS.renderFrame) cancelAnimationFrame(GIS.renderFrame);
+  GIS.renderFrame = requestAnimationFrame(() => {
+    GIS.renderFrame = 0;
+    renderGisTopology();
+  });
+}
+
+async function initGisView(options) {
+  const facilityId = String(FACILITY_ID || '');
+  const facilityName = FACILITY_NAME || facilityId;
+  const token = ++GIS.requestToken;
+  const changed = GIS.facilityId !== facilityId || (options && options.facilityChanged);
+  const name = document.getElementById('gis-facility-name');
+  const id = document.getElementById('gis-facility-id');
+  if (name) name.textContent = facilityName;
+  if (id) id.textContent = facilityId ? '(' + facilityId + ')' : '';
+  gisSetLoading(true);
+  gisSetStatus('Loading locations for ' + facilityName + '…');
+  gisSetState('Loading facility topology', 'Preparing recorded warehouse locations.');
+  gisResetMetrics();
+  try {
+    const result = await FacilityData.load(facilityId);
+    if (token !== GIS.requestToken || facilityId !== String(FACILITY_ID || '')) return {stale:true};
+    const customers = Array.isArray(result.customers) ? result.customers : [];
+    const flattened = gisFlattenLocations(result.locations, customers);
+    GIS.facilityId = facilityId;
+    GIS.records = flattened.records;
+    GIS.customers = flattened.customerNames;
+    gisPopulateFilters(customers, GIS.records, changed);
+    if (result.unavailable) {
+      gisSetStatus('Location topology is unavailable for ' + facilityName + '.');
+      gisSetState('Facility locations are unavailable', 'No location snapshot is available for this facility. Try Refresh after changing facilities.');
+      return {unavailable:true, facilityId};
+    }
+    if (!GIS.records.length) {
+      gisSetStatus('No recorded locations were found for ' + facilityName + '.');
+      gisSetState('No facility locations found', 'There are no recorded locations available for this facility.');
+      return {empty:true, facilityId};
+    }
+    gisSetStatus(GIS.records.length.toLocaleString() + ' recorded locations loaded for ' + facilityName + '.');
+    renderGisTopology();
+    return {facilityId, count:GIS.records.length};
+  } catch (error) {
+    if (token !== GIS.requestToken || facilityId !== String(FACILITY_ID || '')) return {stale:true};
+    console.warn('[gis] Facility topology unavailable for', facilityId, error);
+    GIS.facilityId = facilityId;
+    GIS.records = [];
+    GIS.customers = new Map();
+    gisPopulateFilters([], [], true);
+    gisSetStatus('Location topology could not be loaded for ' + facilityName + '.');
+    gisSetState('Facility topology could not be loaded', 'Check the selected facility and try Refresh.');
+    return {error:true, facilityId};
+  } finally {
+    if (token === GIS.requestToken) gisSetLoading(false);
+  }
+}
+
+function refreshGisView() {
+  return initGisView({refresh:true});
+}
+
 
 async function loadRobotWarehouseInventory() {
   const status = document.getElementById('robot-inventory-status');

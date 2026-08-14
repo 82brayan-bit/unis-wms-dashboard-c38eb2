@@ -233,6 +233,8 @@ async function switchFacility(newId) {
   } else if (activeName === 'robots') {
     refreshOntologyStatus();
     loadRobotKpisFromOntology();
+  } else if (activeName === 'gis') {
+    await initGisView({facilityChanged:true});
   } else if (activeName === 'scheduler') {
     loadExistingSchedules();
     renderTasksPanel();
@@ -334,6 +336,7 @@ const VIEW_META = {
   countApproval: {t:'Count Result Approve', s:'Review and approve cycle count results'},
   countCalendar: {t:'Count Schedule Calendar', s:'Confirmed Cycle Count and Physical Count schedules'},
   robots:    {t:'Robot Count', s:'Fleet status, battery, and throughput'},
+  gis:       {t:'GIS', s:'Facility location topology by aisle, bay, level, and slot'},
   abcSlotting: {t:'ABC Slotting', s:'Inventory slotting, ABC movement, trends, and re-slot recommendations'},
   reports:   {t:'Reports', s:'Saved and scheduled warehouse reports'},
   alerts:    {t:'Alerts', s:'Critical, warning, and info alerts across systems'},
@@ -360,9 +363,14 @@ function showView(name, sub) {
   if (target) target.classList.add('active');
 
   // sidebar active state
-  document.querySelectorAll('.sidebar > nav > .sb-item').forEach(i => i.classList.remove('active'));
-  const sbItem = document.querySelector('.sidebar > nav > .sb-item[data-view="' + name + '"]');
+  document.querySelectorAll('.sidebar nav .sb-item').forEach(i => i.classList.remove('active'));
+  const sbItem = document.querySelector('.sidebar nav .sb-item[data-view="' + name + '"]');
   if (sbItem) sbItem.classList.add('active');
+  if (name === 'robots' || name === 'gis') {
+    setRobotGroupOpen(true);
+    const robotTrigger = document.getElementById('robot-menu-trigger');
+    if (robotTrigger) robotTrigger.classList.add('active');
+  }
 
   // topbar title
   const meta = VIEW_META[name];
@@ -388,6 +396,7 @@ function showView(name, sub) {
   if (name === 'reports') rptInitReport();
   if (name === 'scheduler') initSchedulerForm();
   if (name === 'robots') { initRobotChart(); refreshOntologyStatus(); loadRobotKpisFromOntology(); loadRobotWarehouseInventory(); }
+  if (name === 'gis') initGisView();
   if (name === 'cycle') loadCycleCountView();
   if (name === 'countApproval') initCountApprovalView();
   if (name === 'countCalendar') loadCountCalendarView();
@@ -426,6 +435,57 @@ function toggleCycle(e) {
   if (sub) sub.classList.toggle('open');
   if (car && sub) car.classList.toggle('open', sub.classList.contains('open'));
   showView('cycle');
+}
+
+function setRobotGroupOpen(opened) {
+  const sub = document.getElementById('robot-sub');
+  const caret = document.getElementById('robot-caret');
+  const trigger = document.getElementById('robot-menu-trigger');
+  if (sub) sub.classList.toggle('open', opened);
+  if (caret) caret.classList.toggle('open', opened);
+  if (trigger) trigger.setAttribute('aria-expanded', String(opened));
+}
+
+function toggleRobotGroup(event) {
+  if (event) event.stopPropagation();
+  const sub = document.getElementById('robot-sub');
+  const opened = !(sub && sub.classList.contains('open'));
+  setRobotGroupOpen(opened);
+  const activeRobotView = document.querySelector('#view-robots.active, #view-gis.active');
+  if (opened && !activeRobotView) showView('robots');
+}
+
+function handleRobotGroupKeydown(event) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    toggleRobotGroup(event);
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    setRobotGroupOpen(true);
+    const first = document.querySelector('#robot-sub .sb-item');
+    if (first) first.focus();
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    setRobotGroupOpen(false);
+  }
+}
+
+function handleRobotChildKeydown(event, viewName) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    showView(viewName);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    setRobotGroupOpen(false);
+    const trigger = document.getElementById('robot-menu-trigger');
+    if (trigger) trigger.focus();
+  } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const items = Array.from(document.querySelectorAll('#robot-sub .sb-item'));
+    const current = items.indexOf(event.currentTarget);
+    const offset = event.key === 'ArrowDown' ? 1 : -1;
+    if (current >= 0 && items.length) items[(current + offset + items.length) % items.length].focus();
+  }
 }
 
 // ═══ CHARTS ═══

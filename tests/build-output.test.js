@@ -29,7 +29,13 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   const modules = fs.readFileSync(path.join(dist, manifest['/assets/js/dashboard-modules.js'].replace(/^\//, '')), 'utf8');
   assert.match(runtime, /function showView/);
   assert.match(runtime, /async function switchFacility/);
+  assert.match(runtime, /function toggleRobotGroup/);
+  assert.match(runtime, /gis:\{t:"GIS"/);
   assert.match(modules, /function initSchedulerForm/);
+  assert.match(modules, /async function initGisView/);
+  assert.match(modules, /FacilityData\.load\(/);
+  assert.match(html, /id="view-gis"/);
+  assert.match(html, /id="robot-sub"/);
   assert.doesNotMatch(html, /Active Users|view-activeUsers|showView\(['"]activeUsers/i);
   assert.match(html, /Employee Ownership/);
   const server = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
