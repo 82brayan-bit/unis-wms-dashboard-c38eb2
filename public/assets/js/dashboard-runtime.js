@@ -197,11 +197,16 @@ function updateSchedulerFacilityHelp(fac) {
 
 async function switchFacility(newId) {
   const selected = document.getElementById('facility-switcher');
+  if (selected && Array.from(selected.options).some(option => option.value === newId)) selected.value = newId;
   const selectedOption = selected && selected.options ? selected.options[selected.selectedIndex] : null;
   const fac = FACILITIES.find(f => f.id === newId) || {id:newId, name:selectedOption ? selectedOption.textContent.replace(/\s*\([^)]*\)\s*$/, '') : newId};
   FACILITY_ID = fac.id;
   FACILITY_NAME = fac.name;
   try { localStorage.setItem('facility_id', newId); } catch(_) {}
+
+  // The dashboard selector is the authoritative GIS context. Clear the old
+  // warehouse immediately, before the next lazy facility chunk can resolve.
+  if (typeof gisResetFacilityContext === 'function') gisResetFacilityContext();
 
   // Cancel any in-flight load + reset preview
   CC.loadToken = (CC.loadToken || 0) + 1;

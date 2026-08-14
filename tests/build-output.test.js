@@ -40,6 +40,8 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   assert.match(modules, /canvas\.dataset\.boundaryRendered/);
   assert.match(modules, /canvas\.dataset\.geometrySource/);
   assert.match(modules, /function gisHandleCustomerChange/);
+  assert.match(modules, /function gisDashboardFacilityContext/);
+  assert.match(modules, /function gisResetFacilityContext/);
   assert.match(modules, /FacilityData\.load\(/);
   assert.match(html, /id="view-gis"/);
   assert.match(html, /id="gis-map-canvas"/);

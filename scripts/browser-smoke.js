@@ -93,6 +93,7 @@ async function main() {
   const consoleErrors = [];
   const failedStaticRequests = [];
   const requests = [];
+  const mutatingRequests = [];
   const requestUrls = new Map();
 
   cdp.on('Runtime.exceptionThrown', event => consoleErrors.push(event.exceptionDetails.text || 'Uncaught exception'));
@@ -102,6 +103,9 @@ async function main() {
   cdp.on('Network.requestWillBeSent', event => {
     requests.push(event.request.url);
     requestUrls.set(event.requestId, event.request.url);
+    if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
+      mutatingRequests.push(event.request.method + ' ' + event.request.url);
+    }
   });
   cdp.on('Network.responseReceived', event => {
     const url = event.response.url;
@@ -156,7 +160,7 @@ async function main() {
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
     }
     async function waitFor(predicate) {
-      for (let attempt = 0; attempt < 80; attempt++) {
+      for (let attempt = 0; attempt < 200; attempt++) {
         if (predicate()) return;
         await new Promise(resolve => setTimeout(resolve, 25));
       }
@@ -214,11 +218,51 @@ async function main() {
     initialRobotNavigation.collapsed = initialTrigger.getAttribute('aria-expanded') === 'false' && !initialSubmenu.classList.contains('open') && !visible(initialSubmenu);
     initialTrigger.click();
     initialRobotNavigation.reopened = initialTrigger.getAttribute('aria-expanded') === 'true' && initialSubmenu.classList.contains('open') && visible(initialSubmenu);
+
+    await populateFacilitySwitcher();
+    await initGisView({facilityChanged:true});
+    await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const f1 = await FacilityData.load('LT_F1');
+    const initialF1Groups = gisBuildBayGroups(GIS.records).groups;
+    const initialGisFacility = {
+      selector:document.getElementById('facility-switcher').value,
+      facilityId:GIS.facilityId,
+      facilityName:document.getElementById('gis-facility-name').textContent,
+      facilityText:document.getElementById('gis-facility-id').textContent,
+      locations:GIS.records.length,
+      cells:Number(document.getElementById('gis-map-canvas').dataset.cellCount),
+      expectedCells:initialF1Groups.length,
+      customerOptions:document.getElementById('gis-customer').options.length,
+      status:document.getElementById('gis-status').textContent,
+      summary:document.getElementById('gis-customer-summary').textContent
+    };
+
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-    const f40Switch = switchFacility('LT_F40');
+    setRobotGroupOpen(false);
+    document.getElementById('robot-menu-trigger').click();
+    const robotNavigation = {
+      expanded:document.getElementById('robot-menu-trigger').getAttribute('aria-expanded'),
+      submenuOpen:document.getElementById('robot-sub').classList.contains('open'),
+      overviewActive:document.querySelector('#robot-sub [data-view="robots"]').classList.contains('active'),
+      overviewVisible:visible(document.getElementById('view-robots'))
+    };
+    document.querySelector('#robot-sub [data-view="gis"]').click();
+    await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length === initialGisFacility.locations);
+
     const f42Switch = switchFacility('LT_F42');
-    await Promise.all([f40Switch, f42Switch]);
-    const f40 = await FacilityData.load('LT_F40');
+    const immediateF42Reset = {
+      selector:document.getElementById('facility-switcher').value,
+      facilityId:GIS.facilityId,
+      records:GIS.records.length,
+      customer:document.getElementById('gis-customer').value,
+      search:document.getElementById('gis-search').value,
+      selectedKey:GIS.map.selectedKey,
+      tooltipHidden:document.getElementById('gis-map-tooltip').hidden,
+      cells:Number(document.getElementById('gis-map-canvas').dataset.cellCount),
+      busy:document.getElementById('gis-topology').getAttribute('aria-busy')
+    };
+    await f42Switch;
+    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
     const f42 = await FacilityData.load('LT_F42');
     const customerSelect = document.getElementById('cc-customer');
     const locationCustomerSelect = document.getElementById('loc-customer');
@@ -233,17 +277,6 @@ async function main() {
       aisleOptions:document.getElementById('loc-aisle-list').options.length,
       bayOptions:document.getElementById('loc-bay-list').options.length
     };
-
-    setRobotGroupOpen(false);
-    document.getElementById('robot-menu-trigger').click();
-    const robotNavigation = {
-      expanded:document.getElementById('robot-menu-trigger').getAttribute('aria-expanded'),
-      submenuOpen:document.getElementById('robot-sub').classList.contains('open'),
-      overviewActive:document.querySelector('#robot-sub [data-view="robots"]').classList.contains('active'),
-      overviewVisible:visible(document.getElementById('view-robots'))
-    };
-    document.querySelector('#robot-sub [data-view="gis"]').click();
-    await waitFor(() => GIS.facilityId === 'LT_F42' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
     function canvasHash() {
       const canvas = document.getElementById('gis-map-canvas');
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -382,15 +415,50 @@ async function main() {
     customerSelectGis.value = customerOption.value;
     gisHandleCustomerChange();
     await waitFor(() => document.getElementById('gis-customer').value === customerOption.value && Number(document.getElementById('gis-map-canvas').dataset.activeCellCount) === expectedCustomerGroups.length);
-    const gisF40Switch = switchFacility('LT_F40');
-    const gisF42Switch = switchFacility('LT_F42');
-    await Promise.all([gisF40Switch, gisF42Switch]);
-    await waitFor(() => GIS.facilityId === 'LT_F42' && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
-    const gisSwitchState = {
+    document.getElementById('gis-search').value = '01';
+    GIS.map.selectedKey = firstCell.key;
+    document.getElementById('gis-map-tooltip').hidden = false;
+    const backToF1 = switchFacility('LT_F1');
+    const immediateBackReset = {
+      selector:document.getElementById('facility-switcher').value,
+      facilityId:GIS.facilityId,
+      records:GIS.records.length,
+      customer:document.getElementById('gis-customer').value,
+      search:document.getElementById('gis-search').value,
+      selectedKey:GIS.map.selectedKey,
+      tooltipHidden:document.getElementById('gis-map-tooltip').hidden,
+      cells:Number(document.getElementById('gis-map-canvas').dataset.cellCount),
+      context:document.getElementById('gis-facility-id').textContent,
+      busy:document.getElementById('gis-topology').getAttribute('aria-busy')
+    };
+    await backToF1;
+    await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length === initialGisFacility.locations && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const backToF1State = {
       facilityId:FACILITY_ID,
       gisFacilityId:GIS.facilityId,
+      selector:document.getElementById('facility-switcher').value,
       context:document.getElementById('gis-facility-id').textContent,
+      name:document.getElementById('gis-facility-name').textContent,
       status:document.getElementById('gis-status').textContent,
+      summary:document.getElementById('gis-customer-summary').textContent,
+      customer:document.getElementById('gis-customer').value,
+      customerOptions:document.getElementById('gis-customer').options.length,
+      locations:GIS.records.length,
+      cells:Number(document.getElementById('gis-map-canvas').dataset.cellCount),
+      noAirportText:![document.getElementById('gis-facility-name').textContent,document.getElementById('gis-status').textContent,document.getElementById('gis-customer-summary').textContent,document.getElementById('gis-detail-content').textContent].join(' ').includes('Airport')
+    };
+
+    const staleF40Switch = switchFacility('LT_F40');
+    const latestF1Switch = switchFacility('LT_F1');
+    await Promise.all([staleF40Switch, latestF1Switch]);
+    await waitFor(() => GIS.facilityId === 'LT_F1' && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const f40 = await FacilityData.load('LT_F40');
+    const staleLoadState = {
+      facilityId:FACILITY_ID,
+      selector:document.getElementById('facility-switcher').value,
+      gisFacilityId:GIS.facilityId,
+      context:document.getElementById('gis-facility-id').textContent,
+      locations:GIS.records.length,
       customer:document.getElementById('gis-customer').value
     };
 
@@ -405,9 +473,11 @@ async function main() {
     document.getElementById('view-dashboard').classList.add('active');
     return {
       lightLogin,darkLogin,lightApp,darkApp,views,initialRobotNavigation,
+      initialGisFacility,immediateF42Reset,immediateBackReset,backToF1State,staleLoadState,
+      f1:{customers:f1.customers.length,presentCustomers:f1.customers.filter(customer => (f1.locations[customer.id] || []).length > 0).length,groups:Object.keys(f1.locations).length,cached:f1.cached},
       f40:{customers:f40.customers.length,groups:Object.keys(f40.locations).length,cached:f40.cached},
       f42:{customers:f42.customers.length,groups:Object.keys(f42.locations).length,cached:f42.cached},
-      switchState,robotNavigation,gisNavigation,gisSwitchState,
+      switchState,robotNavigation,gisNavigation,
       activeUsers:document.body.innerText.includes('Active Users'),
       employeeOwnership:document.body.innerText.includes('Employee Ownership')
     };
@@ -463,6 +533,10 @@ async function main() {
   assert(summary.initialRobotNavigation.caretVisible && summary.initialRobotNavigation.caretOpen, 'Initial Robot Count caret was not visible and open');
   assert(summary.initialRobotNavigation.caretInsideTrigger && summary.initialRobotNavigation.caretInsideSidebar && summary.initialRobotNavigation.sidebarWidth === 235, 'Robot Count caret escaped the 235px sidebar geometry');
   assert(summary.initialRobotNavigation.collapsed && summary.initialRobotNavigation.reopened, 'Robot Count group did not remain collapsible');
+  assert(summary.f1.customers === 93 && summary.f1.groups === 93 && summary.f1.cached, 'LT_F1 lazy data failed');
+  assert(summary.initialGisFacility.selector === 'LT_F1' && summary.initialGisFacility.facilityId === 'LT_F1' && summary.initialGisFacility.facilityName === 'Valley View' && summary.initialGisFacility.facilityText.includes('LT_F1'), 'Initial GIS did not bind to the dashboard-selected Valley View facility');
+  assert(summary.initialGisFacility.locations > 0 && summary.initialGisFacility.cells === summary.initialGisFacility.expectedCells && summary.initialGisFacility.customerOptions === summary.f1.presentCustomers + 1 && summary.initialGisFacility.status.includes('Valley View'), 'Initial LT_F1 GIS counts or customers are incorrect: ' + JSON.stringify({initial:summary.initialGisFacility,f1:summary.f1}));
+  assert(summary.immediateF42Reset.selector === 'LT_F42' && summary.immediateF42Reset.facilityId === 'LT_F42' && summary.immediateF42Reset.records === 0 && summary.immediateF42Reset.cells === 0 && summary.immediateF42Reset.customer === '' && summary.immediateF42Reset.search === '' && summary.immediateF42Reset.selectedKey === '' && summary.immediateF42Reset.tooltipHidden && summary.immediateF42Reset.busy === 'true', 'GIS did not clear LT_F1 state immediately when LT_F42 was selected');
   assert(summary.f40.customers === 11 && summary.f40.groups === 11 && summary.f40.cached, 'LT_F40 lazy data failed');
   assert(summary.f42.customers === 4 && summary.f42.groups === 4 && summary.f42.cached, 'LT_F42 lazy data failed');
   assert(summary.switchState.facilityId === 'LT_F42', 'Rapid switch did not retain the latest facility');
@@ -501,15 +575,21 @@ async function main() {
   assert(summary.gisNavigation.customer.detail.includes(summary.gisNavigation.customer.name) && summary.gisNavigation.customer.otherCustomerInformationHidden, 'GIS customer selection exposed unrelated customer detail');
   assert(summary.gisNavigation.customer.pickerOptions > 1 && summary.gisNavigation.customer.pickerOptions <= 101, 'GIS accessible bay picker is not bounded');
   assert(summary.gisNavigation.restoredCellCount === summary.gisNavigation.expectedCells && summary.gisNavigation.restoredActiveCount === summary.gisNavigation.expectedCells, 'Clearing the customer did not restore the full map');
+  assert(summary.initialGisFacility.locations !== summary.gisNavigation.locations && summary.initialGisFacility.cells !== summary.gisNavigation.rendered, 'GIS facility switch did not change the location data and map counts');
+  assert(summary.immediateBackReset.selector === 'LT_F1' && summary.immediateBackReset.facilityId === 'LT_F1' && summary.immediateBackReset.records === 0 && summary.immediateBackReset.cells === 0 && summary.immediateBackReset.customer === '' && summary.immediateBackReset.search === '' && summary.immediateBackReset.selectedKey === '' && summary.immediateBackReset.tooltipHidden && summary.immediateBackReset.context.includes('LT_F1') && summary.immediateBackReset.busy === 'true', 'GIS did not synchronously clear LT_F42 state when switching back to LT_F1');
+  assert(summary.backToF1State.facilityId === 'LT_F1' && summary.backToF1State.gisFacilityId === 'LT_F1' && summary.backToF1State.selector === 'LT_F1' && summary.backToF1State.context.includes('LT_F1') && summary.backToF1State.name === 'Valley View', 'GIS did not restore the dashboard-selected LT_F1 context');
+  assert(summary.backToF1State.locations === summary.initialGisFacility.locations && summary.backToF1State.cells === summary.initialGisFacility.cells && summary.backToF1State.customerOptions === summary.initialGisFacility.customerOptions && summary.backToF1State.customer === '' && summary.backToF1State.noAirportText, 'GIS retained stale Airport data after returning to LT_F1');
+  assert(summary.staleLoadState.facilityId === 'LT_F1' && summary.staleLoadState.selector === 'LT_F1' && summary.staleLoadState.gisFacilityId === 'LT_F1' && summary.staleLoadState.context.includes('LT_F1') && summary.staleLoadState.locations === summary.initialGisFacility.locations && summary.staleLoadState.customer === '', 'Late facility load overwrote the latest LT_F1 map');
   assert(summary.mobileGis.viewportWidth > 0 && summary.mobileGis.viewportWidth <= summary.mobileGis.innerWidth && [380,440].includes(summary.mobileGis.viewportHeight) && summary.mobileGis.bodyWidth <= summary.mobileGis.innerWidth, 'GIS mobile canvas overflowed its viewport: ' + JSON.stringify(summary.mobileGis));
   assert(summary.mobileGis.controlsInside && summary.mobileGis.headerStacked && summary.mobileGis.detailsStacked && summary.mobileGis.browserStacked, 'GIS mobile controls or detail regions overlap');
-  assert(summary.gisSwitchState.facilityId === 'LT_F42' && summary.gisSwitchState.gisFacilityId === 'LT_F42' && summary.gisSwitchState.context.includes('LT_F42') && summary.gisSwitchState.customer === '', 'GIS rapid facility switching retained stale data or customer selection');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');
   await delay(250);
   assert(consoleErrors.length === 0, 'Browser console errors: ' + consoleErrors.join(' | '));
   assert(failedStaticRequests.length === 0, 'Failed browser requests: ' + failedStaticRequests.join(' | '));
+  assert(mutatingRequests.length === 0, 'Unexpected operational mutation requests: ' + mutatingRequests.join(' | '));
 
   const facilityRequests = requests.filter(url => /\/assets\/data\/facilities\//.test(url));
+  assert(facilityRequests.filter(url => /lt-f1\./.test(url)).length === 1, 'LT_F1 chunk was not loaded exactly once');
   assert(facilityRequests.filter(url => /lt-f40\./.test(url)).length === 1, 'LT_F40 chunk was not deduplicated');
   assert(facilityRequests.filter(url => /lt-f42\./.test(url)).length === 1, 'LT_F42 chunk was not loaded exactly once');
   console.log(JSON.stringify({appUrl:initialAppUrl.href, requests:requests.length, facilityRequests, summary}, null, 2));

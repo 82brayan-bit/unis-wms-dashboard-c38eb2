@@ -9,7 +9,9 @@ const ROOT = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const runtime = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-runtime.js'), 'utf8');
 const modules = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-modules.js'), 'utf8');
+const facilityF1 = fs.readFileSync(path.join(ROOT, 'public/assets/data/facilities/lt-f1.js'), 'utf8');
 const facilityF42 = fs.readFileSync(path.join(ROOT, 'public/assets/data/facilities/lt-f42.js'), 'utf8');
+const gisSource = modules.slice(modules.indexOf('// ═══ ROBOT COUNT GIS'), modules.indexOf('async function loadRobotWarehouseInventory'));
 
 test('Robot Count is an accessible parent with overview and GIS routes', () => {
   assert.match(html, /id="robot-menu-trigger"[^>]+role="button"[^>]+tabindex="0"/);
@@ -44,11 +46,34 @@ test('GIS route is facility-scoped and wired to lazy real location data', () => 
   assert.match(runtime, /gis:\s*\{t:'GIS'/);
   assert.match(runtime, /name === 'gis'\) initGisView\(\)/);
   assert.match(runtime, /activeName === 'gis'[\s\S]*initGisView\(\{facilityChanged:true\}\)/);
-  assert.match(modules, /const facilityId = String\(FACILITY_ID \|\| ''\)/);
+  assert.match(modules, /function gisDashboardFacilityContext\(\)[\s\S]*facility-switcher[\s\S]*selector && selector\.value/);
+  assert.match(modules, /const facilityId = context\.facilityId/);
   assert.match(modules, /await FacilityData\.load\(facilityId\)/);
-  assert.match(modules, /token !== GIS\.requestToken \|\| facilityId !== String\(FACILITY_ID \|\| ''\)/);
+  assert.match(modules, /token !== GIS\.requestToken \|\| facilityId !== gisDashboardFacilityContext\(\)\.facilityId/);
   assert.match(modules, /Object\.entries\(locations \|\| \{\}\)/);
   assert.match(modules, /presentCustomerIds\.has\(String\(customer\.id\)\)/);
+});
+
+test('GIS binds to the dashboard facility and clears stale state before loading', () => {
+  assert.match(runtime, /let saved = 'LT_F1'/);
+  assert.match(runtime, /let FACILITY_ID\s*= 'LT_F1'/);
+  assert.match(runtime, /if \(selected && Array\.from\(selected\.options\)[\s\S]*selected\.value = newId/);
+  assert.match(runtime, /FACILITY_ID = fac\.id;[\s\S]*gisResetFacilityContext\(\);[\s\S]*FacilityData\.loadLatest\(fac\.id\)/);
+  assert.match(modules, /function gisResetFacilityContext\(\)/);
+  assert.match(modules, /GIS\.requestToken\+\+/);
+  assert.match(modules, /GIS\.records = \[\]/);
+  assert.match(modules, /GIS\.customers = new Map\(\)/);
+  assert.match(modules, /gisPopulateFilters\(\[\], \[\], true\)/);
+  assert.match(modules, /selectedKey:'',selectedLocationName:'',hoveredKey:''/);
+  assert.match(modules, /gisHideMapTooltip\(\)/);
+  assert.match(facilityF1, /ALL MARKET INC \/ VITA COCO/);
+  assert.doesNotMatch(gisSource, /LT_F42|Airport/);
+});
+
+test('GIS unavailable and empty states remain specific to the selected facility', () => {
+  assert.match(gisSource, /if \(result\.unavailable\)[\s\S]*Location topology is unavailable for ' \+ facilityName[\s\S]*No location snapshot is available for this facility/);
+  assert.match(gisSource, /if \(!GIS\.records\.length\)[\s\S]*No recorded locations were found for ' \+ facilityName[\s\S]*There are no recorded locations available for this facility/);
+  assert.doesNotMatch(gisSource, /fallback.*facility|default.*facility/i);
 });
 
 test('GIS renders every aisle and bay on one canvas with bounded keyboard access', () => {

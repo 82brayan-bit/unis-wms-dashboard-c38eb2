@@ -3710,11 +3710,62 @@ function queueGisRender() {
   });
 }
 
+function gisDashboardFacilityContext() {
+  const selector = document.getElementById('facility-switcher');
+  const facilityId = String((selector && selector.value) || FACILITY_ID || '');
+  const facility = FACILITIES.find(candidate => String(candidate.id) === facilityId);
+  const selectedOption = selector && selector.selectedIndex >= 0 ? selector.options[selector.selectedIndex] : null;
+  const optionName = selectedOption ? selectedOption.textContent.replace(/\s*\([^)]*\)\s*$/, '') : '';
+  return {
+    facilityId,
+    facilityName:(facility && facility.name) || (facilityId === String(FACILITY_ID || '') && FACILITY_NAME) || optionName || facilityId,
+  };
+}
+
+function gisResetFacilityContext() {
+  const context = gisDashboardFacilityContext();
+  GIS.requestToken++;
+  if (GIS.renderFrame) cancelAnimationFrame(GIS.renderFrame);
+  GIS.renderFrame = 0;
+  GIS.facilityId = context.facilityId;
+  GIS.records = [];
+  GIS.customers = new Map();
+  Object.assign(GIS.map, {
+    scale:1,x:0,y:0,groups:new Map(),allGroups:new Map(),cells:[],lanes:[],sections:[],blocks:[],travelAisles:[],
+    selectedKey:'',selectedLocationName:'',hoveredKey:'',dragging:false,pointerId:null,
+  });
+  gisHideMapTooltip();
+  gisPopulateFilters([], [], true);
+  gisPopulateBayPicker([]);
+  gisResetMetrics();
+  gisResetDetail('Loading location detail for ' + context.facilityName + '...');
+  const summary = document.getElementById('gis-customer-summary');
+  const legend = document.getElementById('gis-map-legend');
+  const name = document.getElementById('gis-facility-name');
+  const id = document.getElementById('gis-facility-id');
+  const canvas = document.getElementById('gis-map-canvas');
+  if (summary) summary.textContent = 'Loading overall facility information for ' + context.facilityName + '.';
+  if (legend) legend.innerHTML = '';
+  if (name) name.textContent = context.facilityName;
+  if (id) id.textContent = context.facilityId ? '(' + context.facilityId + ')' : '';
+  if (canvas) {
+    canvas.dataset.cellCount = '0';
+    canvas.dataset.activeCellCount = '0';
+    canvas.dataset.sharedCellCount = '0';
+  }
+  gisSetLoading(true);
+  gisSetStatus('Loading locations for ' + context.facilityName + '...');
+  gisSetState('Loading facility topology', 'Preparing recorded warehouse locations for ' + context.facilityName + '.');
+  return context;
+}
+
 async function initGisView(options) {
-  const facilityId = String(FACILITY_ID || '');
-  const facilityName = FACILITY_NAME || facilityId;
+  let context = gisDashboardFacilityContext();
+  const changed = GIS.facilityId !== context.facilityId || (options && options.facilityChanged);
+  if (changed) context = gisResetFacilityContext();
+  const facilityId = context.facilityId;
+  const facilityName = context.facilityName;
   const token = ++GIS.requestToken;
-  const changed = GIS.facilityId !== facilityId || (options && options.facilityChanged);
   const name = document.getElementById('gis-facility-name');
   const id = document.getElementById('gis-facility-id');
   if (name) name.textContent = facilityName;
@@ -3726,7 +3777,7 @@ async function initGisView(options) {
   gisResetMetrics();
   try {
     const result = await FacilityData.load(facilityId);
-    if (token !== GIS.requestToken || facilityId !== String(FACILITY_ID || '')) return {stale:true};
+    if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     const customers = Array.isArray(result.customers) ? result.customers : [];
     const flattened = gisFlattenLocations(result.locations, customers);
     GIS.facilityId = facilityId;
@@ -3753,7 +3804,7 @@ async function initGisView(options) {
     renderGisTopology();
     return {facilityId, count:GIS.records.length};
   } catch (error) {
-    if (token !== GIS.requestToken || facilityId !== String(FACILITY_ID || '')) return {stale:true};
+    if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     console.warn('[gis] Facility topology unavailable for', facilityId, error);
     GIS.facilityId = facilityId;
     GIS.records = [];
