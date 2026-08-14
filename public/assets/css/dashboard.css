@@ -65,7 +65,10 @@ html.dark [data-item-logo]{content:url("/assets/brand/item-logo-dark.svg")}
 .sb-sub .sb-item:hover{color:color-mix(in srgb,var(--sidebar-foreground) 75%,transparent)}
 .caret{margin-left:auto;width:13px;height:13px;transition:transform .2s}
 .caret.open{transform:rotate(180deg)}
-[data-view-group="robot"] .caret{margin-left:0}
+.robot-nav-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.robot-nav-actions{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;margin-left:auto}
+.robot-nav-actions .sb-badge{margin-left:0;flex:0 0 auto}
+.robot-nav-actions .caret{display:block;width:13px;height:13px;margin-left:0;flex:0 0 13px}
 .sb-footer{padding:14px;border-top:1px solid var(--sidebar-border)}
 .sb-qa-title{font-size:10px;font-weight:700;color:color-mix(in srgb,var(--sidebar-foreground) 62%,transparent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
 .qa-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;background:var(--sidebar-accent);color:var(--sidebar-foreground);font-size:12.5px;cursor:pointer;border:none;margin-bottom:5px;transition:all .15s;font-weight:500;text-align:left}

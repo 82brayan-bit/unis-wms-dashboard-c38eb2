@@ -109,12 +109,12 @@
         <div class="sb-item" onclick="showView('countApproval')">Count Result Approval</div>
         <div class="sb-item" data-view="countCalendar" onclick="showView('countCalendar')">Count Calendar</div>
       </div>
-      <div class="sb-item" id="robot-menu-trigger" data-view-group="robot" role="button" tabindex="0" aria-expanded="false" aria-controls="robot-sub" onclick="toggleRobotGroup(event)" onkeydown="handleRobotGroupKeydown(event)">
+      <div class="sb-item" id="robot-menu-trigger" data-view-group="robot" role="button" tabindex="0" aria-expanded="true" aria-controls="robot-sub" onclick="toggleRobotGroup(event)" onkeydown="handleRobotGroupKeydown(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
-        Robot Count <span class="sb-badge green">8</span>
-        <svg class="caret" id="robot-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        <span class="robot-nav-label">Robot Count</span>
+        <span class="robot-nav-actions"><span class="sb-badge green">8</span><svg class="caret open" id="robot-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
       </div>
-      <div class="sb-sub robot-sub" id="robot-sub" aria-label="Robot Count views">
+      <div class="sb-sub robot-sub open" id="robot-sub" aria-label="Robot Count views">
         <div class="sb-item" data-view="robots" role="link" tabindex="0" onclick="showView('robots')" onkeydown="handleRobotChildKeydown(event,'robots')">Overview</div>
         <div class="sb-item" data-view="gis" role="link" tabindex="0" onclick="showView('gis')" onkeydown="handleRobotChildKeydown(event,'gis')">GIS</div>
       </div>
@@ -1992,6 +1992,6 @@
 </div>
 
 <script src="/assets/js/assistant.js"></script>
-<script>ItemTheme.bind();</script>
+<script>syncInitialNavigation();ItemTheme.bind();</script>
 </body>
 </html>

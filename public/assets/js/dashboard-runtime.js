@@ -94,8 +94,10 @@ async function showDash() {
   // near (or past) expiry (e.g. tab was left open overnight).
   tickTokenRefresh();
   await populateFacilitySwitcher();
-  loadDashboardLiveData();
-  loadDashCycleCountKpi();
+  const initialActiveView = document.querySelector('.view.active');
+  const initialActiveName = initialActiveView ? initialActiveView.id.replace(/^view-/, '') : 'dashboard';
+  if (initialActiveName === 'robots' || initialActiveName === 'gis') showView(initialActiveName);
+  else { loadDashboardLiveData(); loadDashCycleCountKpi(); }
   // Sync chrome (top bar, user menu, settings) with whoever's logged in.
   // We pull user_name from the JWT when possible so this works even if
   // localStorage was pre-seeded (no fresh form input).
@@ -356,7 +358,7 @@ const INV_SUB_TITLES = {
   po: 'Purchase Orders'
 };
 
-function showView(name, sub) {
+function showView(name, sub, options) {
   // hide all views
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const target = document.getElementById('view-' + name);
@@ -386,24 +388,27 @@ function showView(name, sub) {
     if (el) el.textContent = t;
   }
 
-  // lazy-init view-specific content
-  if (name === 'dashboard') { loadDashboardLiveData(); loadDashCycleCountKpi(); }
-  if (name === 'consolidation') loadConsolidationView();
-  if (name === 'replenish') loadReplenishView();
-  if (name === 'replenSuggest') loadReplenSuggestView();
-  if (name === 'calendar') loadPhysicalInvCalendar();
-  if (name === 'abcSlotting') abcInit();
-  if (name === 'reports') rptInitReport();
-  if (name === 'scheduler') initSchedulerForm();
-  if (name === 'robots') { initRobotChart(); refreshOntologyStatus(); loadRobotKpisFromOntology(); loadRobotWarehouseInventory(); }
-  if (name === 'gis') initGisView();
-  if (name === 'cycle') loadCycleCountView();
-  if (name === 'countApproval') initCountApprovalView();
-  if (name === 'countCalendar') loadCountCalendarView();
-  if (name === 'vlg') loadVlgData();
-  if (name === 'locationTag') loadLocationTagData();
-  if (name === 'locTagReq') ltrInit();
-  if (name === 'settings') admInitSettings();
+  // lazy-init view-specific content. Initial hash routing may defer this work
+  // until showDash has established the authenticated facility context.
+  if (!(options && options.deferLoad)) {
+    if (name === 'dashboard') { loadDashboardLiveData(); loadDashCycleCountKpi(); }
+    if (name === 'consolidation') loadConsolidationView();
+    if (name === 'replenish') loadReplenishView();
+    if (name === 'replenSuggest') loadReplenSuggestView();
+    if (name === 'calendar') loadPhysicalInvCalendar();
+    if (name === 'abcSlotting') abcInit();
+    if (name === 'reports') rptInitReport();
+    if (name === 'scheduler') initSchedulerForm();
+    if (name === 'robots') { initRobotChart(); refreshOntologyStatus(); loadRobotKpisFromOntology(); loadRobotWarehouseInventory(); }
+    if (name === 'gis') initGisView();
+    if (name === 'cycle') loadCycleCountView();
+    if (name === 'countApproval') initCountApprovalView();
+    if (name === 'countCalendar') loadCountCalendarView();
+    if (name === 'vlg') loadVlgData();
+    if (name === 'locationTag') loadLocationTagData();
+    if (name === 'locTagReq') ltrInit();
+    if (name === 'settings') admInitSettings();
+  }
 
   // scroll to top of main
   window.scrollTo({top:0, behavior:'smooth'});
@@ -486,6 +491,31 @@ function handleRobotChildKeydown(event, viewName) {
     const offset = event.key === 'ArrowDown' ? 1 : -1;
     if (current >= 0 && items.length) items[(current + offset + items.length) % items.length].focus();
   }
+}
+
+function initialNavigationView() {
+  let requested = '';
+  try {
+    const queryView = new URLSearchParams(window.location.search).get('view');
+    const hashView = window.location.hash.replace(/^#/, '');
+    requested = queryView || hashView;
+  } catch (_) {}
+  return requested && document.getElementById('view-' + requested) ? requested : '';
+}
+
+function syncInitialNavigation() {
+  const requested = initialNavigationView();
+  const activeView = document.querySelector('.view.active');
+  const activeName = activeView ? activeView.id.replace(/^view-/, '') : 'dashboard';
+  const initialName = requested || activeName;
+  if (initialName === 'robots' || initialName === 'gis') {
+    showView(initialName, null, {deferLoad:true});
+  } else {
+    // The HTML fallback is expanded so Robot/GIS direct renders never flash a
+    // flat row. Close it once the normal non-Robot initial route is known.
+    setRobotGroupOpen(false);
+  }
+  return initialName;
 }
 
 // ═══ CHARTS ═══

@@ -20,6 +20,25 @@ test('Robot Count is an accessible parent with overview and GIS routes', () => {
   assert.match(runtime, /setAttribute\('aria-expanded', String\(opened\)\)/);
 });
 
+test('Robot Count static fallback exposes the caret and submenu on initial render', () => {
+  assert.match(html, /id="robot-menu-trigger"[^>]+aria-expanded="true"/);
+  assert.match(html, /class="robot-nav-actions"[^>]*>[\s\S]*class="sb-badge green"[\s\S]*class="caret open" id="robot-caret"/);
+  assert.match(html, /class="sb-sub robot-sub open" id="robot-sub"/);
+  const css = fs.readFileSync(path.join(ROOT, 'public/assets/css/dashboard.css'), 'utf8');
+  assert.match(css, /\.robot-nav-actions\{[^}]*flex:0 0 auto[^}]*margin-left:auto/);
+  assert.match(css, /\.robot-nav-actions \.sb-badge\{[^}]*margin-left:0/);
+  assert.match(css, /\.robot-nav-actions \.caret\{[^}]*flex:0 0 13px/);
+});
+
+test('initial Robot and GIS routes synchronize expanded parent and selected child state', () => {
+  assert.match(runtime, /function initialNavigationView\(\)/);
+  assert.match(runtime, /queryView \|\| hashView/);
+  assert.match(runtime, /initialName === 'robots' \|\| initialName === 'gis'/);
+  assert.match(runtime, /showView\(initialName, null, \{deferLoad:true\}\)/);
+  assert.match(runtime, /initialActiveName === 'robots' \|\| initialActiveName === 'gis'/);
+  assert.match(html, /syncInitialNavigation\(\);ItemTheme\.bind\(\)/);
+});
+
 test('GIS route is facility-scoped and wired to lazy real location data', () => {
   assert.match(runtime, /gis:\s*\{t:'GIS'/);
   assert.match(runtime, /name === 'gis'\) initGisView\(\)/);

@@ -6,6 +6,8 @@ const os = require('node:os');
 const path = require('node:path');
 
 const appUrl = process.argv[2] || 'http://127.0.0.1:4173/';
+const initialAppUrl = new URL(appUrl);
+initialAppUrl.hash = 'robots';
 const debuggingPort = Number(process.env.CHROME_DEBUG_PORT || 9223);
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -125,7 +127,7 @@ async function main() {
     cdp.send('Fetch.enable', {patterns:[{urlPattern:'*/api/*',requestStage:'Request'}]})
   ]);
   const loaded = new Promise(resolve => cdp.on('Page.loadEventFired', resolve));
-  await cdp.send('Page.navigate', {url:appUrl});
+  await cdp.send('Page.navigate', {url:initialAppUrl.href});
   await loaded;
   await retry(async () => {
     const ready = await cdp.send('Runtime.evaluate', {
@@ -183,6 +185,32 @@ async function main() {
     const darkLogin = themeState('dark', 'login');
     const lightApp = themeState('light', 'app');
     const darkApp = themeState('dark', 'app');
+    const initialTrigger = document.getElementById('robot-menu-trigger');
+    const initialSubmenu = document.getElementById('robot-sub');
+    const initialOverview = initialSubmenu.querySelector('[data-view="robots"]');
+    const initialGis = initialSubmenu.querySelector('[data-view="gis"]');
+    const initialCaret = document.getElementById('robot-caret');
+    const initialTriggerRect = initialTrigger.getBoundingClientRect();
+    const initialCaretRect = initialCaret.getBoundingClientRect();
+    const initialSidebarRect = document.querySelector('.sidebar').getBoundingClientRect();
+    const initialRobotNavigation = {
+      hash:location.hash,
+      activeView:document.querySelector('.view.active').id,
+      expanded:initialTrigger.getAttribute('aria-expanded'),
+      parentActive:initialTrigger.classList.contains('active'),
+      overviewActive:initialOverview.classList.contains('active'),
+      submenuOpen:initialSubmenu.classList.contains('open'),
+      submenuVisible:visible(initialSubmenu) && visible(initialOverview) && visible(initialGis),
+      caretVisible:visible(initialCaret),
+      caretOpen:initialCaret.classList.contains('open'),
+      caretInsideTrigger:initialCaretRect.left >= initialTriggerRect.left && initialCaretRect.right <= initialTriggerRect.right,
+      caretInsideSidebar:initialCaretRect.right <= initialSidebarRect.right,
+      sidebarWidth:Math.round(initialSidebarRect.width)
+    };
+    initialTrigger.click();
+    initialRobotNavigation.collapsed = initialTrigger.getAttribute('aria-expanded') === 'false' && !initialSubmenu.classList.contains('open') && !visible(initialSubmenu);
+    initialTrigger.click();
+    initialRobotNavigation.reopened = initialTrigger.getAttribute('aria-expanded') === 'true' && initialSubmenu.classList.contains('open') && visible(initialSubmenu);
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
     const f40Switch = switchFacility('LT_F40');
     const f42Switch = switchFacility('LT_F42');
@@ -253,7 +281,7 @@ async function main() {
     }
     document.getElementById('view-dashboard').classList.add('active');
     return {
-      lightLogin,darkLogin,lightApp,darkApp,views,
+      lightLogin,darkLogin,lightApp,darkApp,views,initialRobotNavigation,
       f40:{customers:f40.customers.length,groups:Object.keys(f40.locations).length,cached:f40.cached},
       f42:{customers:f42.customers.length,groups:Object.keys(f42.locations).length,cached:f42.cached},
       switchState,robotNavigation,gisNavigation,gisSwitchState,
@@ -271,6 +299,12 @@ async function main() {
     assert(state.background && state.foreground && state.background !== state.foreground, 'Theme tokens are missing');
   }
   assert(Object.values(summary.views).every(Boolean), 'A representative production view did not render: ' + JSON.stringify(summary.views));
+  assert(summary.initialRobotNavigation.hash === '#robots' && summary.initialRobotNavigation.activeView === 'view-robots', 'Smoke did not start directly in Robot Count');
+  assert(summary.initialRobotNavigation.expanded === 'true' && summary.initialRobotNavigation.parentActive && summary.initialRobotNavigation.overviewActive, 'Initial Robot Count active states were not synchronized');
+  assert(summary.initialRobotNavigation.submenuOpen && summary.initialRobotNavigation.submenuVisible, 'Initial Robot Count submenu was not visible');
+  assert(summary.initialRobotNavigation.caretVisible && summary.initialRobotNavigation.caretOpen, 'Initial Robot Count caret was not visible and open');
+  assert(summary.initialRobotNavigation.caretInsideTrigger && summary.initialRobotNavigation.caretInsideSidebar && summary.initialRobotNavigation.sidebarWidth === 235, 'Robot Count caret escaped the 235px sidebar geometry');
+  assert(summary.initialRobotNavigation.collapsed && summary.initialRobotNavigation.reopened, 'Robot Count group did not remain collapsible');
   assert(summary.f40.customers === 11 && summary.f40.groups === 11 && summary.f40.cached, 'LT_F40 lazy data failed');
   assert(summary.f42.customers === 4 && summary.f42.groups === 4 && summary.f42.cached, 'LT_F42 lazy data failed');
   assert(summary.switchState.facilityId === 'LT_F42', 'Rapid switch did not retain the latest facility');
@@ -295,7 +329,7 @@ async function main() {
   const facilityRequests = requests.filter(url => /\/assets\/data\/facilities\//.test(url));
   assert(facilityRequests.filter(url => /lt-f40\./.test(url)).length === 1, 'LT_F40 chunk was not deduplicated');
   assert(facilityRequests.filter(url => /lt-f42\./.test(url)).length === 1, 'LT_F42 chunk was not loaded exactly once');
-  console.log(JSON.stringify({appUrl, requests:requests.length, facilityRequests, summary}, null, 2));
+  console.log(JSON.stringify({appUrl:initialAppUrl.href, requests:requests.length, facilityRequests, summary}, null, 2));
   cdp.socket.close();
 }
 
