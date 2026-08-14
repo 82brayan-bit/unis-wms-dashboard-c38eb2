@@ -2826,11 +2826,18 @@ const GIS = {
 };
 const GIS_DETAIL_LIMIT = 120;
 const GIS_BAY_PICKER_LIMIT = 100;
-const GIS_CELL_WIDTH = 22;
-const GIS_CELL_HEIGHT = 24;
-const GIS_CELL_GAP = 4;
-const GIS_LANE_HEIGHT = 38;
-const GIS_LABEL_WIDTH = 68;
+const GIS_SECTION_COUNT = 3;
+const GIS_RACK_BLOCK_SIZE = 3;
+const GIS_FRAME_WIDTH = 28;
+const GIS_BOUNDARY_INSET = 12;
+const GIS_SECTION_GAP = 58;
+const GIS_CROSS_AISLE_GAP = 38;
+const GIS_SECTION_LABEL_HEIGHT = 22;
+const GIS_LABEL_WIDTH = 30;
+const GIS_LANE_STYLES = Object.freeze({
+  'rack-strip':Object.freeze({cellWidth:1.9,cellHeight:24,cellGap:0.25,laneGap:8}),
+  'bin-grid':Object.freeze({cellWidth:1.45,cellHeight:18,cellGap:0.5,laneGap:7}),
+});
 
 function gisSetLoading(loading) {
   const topology = document.getElementById('gis-topology');
@@ -3113,6 +3120,29 @@ function gisCanvasGeometry() {
   };
 }
 
+function gisPartitionLaneEntries(entries, sectionCount) {
+  const count = Math.max(1, Math.min(sectionCount, entries.length));
+  const sections = [];
+  let offset = 0;
+  for (let sectionIndex = 0; sectionIndex < count; sectionIndex++) {
+    const take = Math.ceil((entries.length - offset) / (count - sectionIndex));
+    sections.push(entries.slice(offset, offset + take));
+    offset += take;
+  }
+  return sections;
+}
+
+function gisLanePresentation(groups) {
+  let palletPick = 0;
+  let otherPick = 0;
+  groups.forEach(group => group.records.forEach(record => {
+    if (record.supportPickType === 'PALLET_PICK') palletPick++;
+    else if (record.supportPickType) otherPick++;
+  }));
+  const kind = palletPick > 0 && palletPick >= otherPick ? 'rack-strip' : 'bin-grid';
+  return Object.assign({kind}, GIS_LANE_STYLES[kind]);
+}
+
 function gisDrawMapCanvas() {
   const geometry = gisCanvasGeometry();
   if (!geometry || !geometry.context) return;
@@ -3120,38 +3150,67 @@ function gisDrawMapCanvas() {
   const palette = gisCanvasPalette();
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
   context.clearRect(0, 0, width, height);
-  context.fillStyle = (palette.floor || {}).fill;
+  context.fillStyle = (palette.canvas || palette.floor || {}).fill;
   context.fillRect(0, 0, width, height);
   context.save();
   context.translate(originX, originY);
   context.scale(scale, scale);
-  context.font = '600 11px Satoshi, sans-serif';
-  context.textBaseline = 'middle';
-  (GIS.map.lanes || []).forEach(lane => {
-    const laneColor = palette.lane || palette.floor;
+  const wall = palette.wall || palette.lane || palette.floor;
+  const floor = palette.floor || wall;
+  const boundary = palette.boundary || palette.selected || floor;
+  context.fillStyle = wall.fill;
+  context.strokeStyle = wall.stroke;
+  context.lineWidth = 2 / scale;
+  gisCanvasRect(context, 0, 0, GIS.map.width, GIS.map.height, 8);
+  context.fill();
+  context.stroke();
+  context.fillStyle = floor.fill;
+  context.strokeStyle = boundary.stroke;
+  context.lineWidth = 2 / scale;
+  gisCanvasRect(context, GIS.map.boundary.x, GIS.map.boundary.y, GIS.map.boundary.width, GIS.map.boundary.height, 1);
+  context.fill();
+  context.stroke();
+
+  const laneColor = palette.lane || floor;
+  (GIS.map.travelAisles || []).forEach(gap => {
     context.fillStyle = laneColor.fill;
-    context.strokeStyle = laneColor.stroke;
-    context.lineWidth = 1 / scale;
-    gisCanvasRect(context, GIS_LABEL_WIDTH - 8, lane.y - 5, lane.width, GIS_CELL_HEIGHT + 10, 5);
-    context.fill();
-    context.stroke();
+    context.fillRect(gap.x, gap.y, gap.width, gap.height);
+  });
+  const rackColor = palette.rack || laneColor;
+  (GIS.map.blocks || []).forEach(block => {
+    context.fillStyle = rackColor.fill;
+    context.strokeStyle = rackColor.stroke;
+    context.lineWidth = 0.8 / scale;
+    context.fillRect(block.x, block.y, block.width, block.height);
+    context.strokeRect(block.x, block.y, block.width, block.height);
+  });
+
+  context.font = '700 10px Satoshi, sans-serif';
+  context.textBaseline = 'middle';
+  context.textAlign = 'left';
+  if (scale >= 0.55) (GIS.map.sections || []).forEach(section => {
+    context.fillStyle = floor.text;
+    context.fillText(section.label, section.x, section.labelY);
+  });
+  if (scale >= 0.8) (GIS.map.lanes || []).forEach(lane => {
     context.fillStyle = laneColor.text;
-    context.fillText('Aisle ' + lane.aisle, 12, lane.y + GIS_CELL_HEIGHT / 2);
+    context.font = '700 7px Satoshi, sans-serif';
+    context.fillText(lane.aisle, lane.labelX, lane.y + lane.cellHeight / 2);
   });
   GIS.map.cells.forEach(cell => {
     const color = palette[cell.colorClass] || palette.unknown || palette.floor;
     context.fillStyle = color.fill;
     context.strokeStyle = color.stroke;
     context.lineWidth = 1.1 / scale;
-    gisCanvasRect(context, cell.x, cell.y, cell.width, cell.height, 3);
+    context.beginPath();
+    context.rect(cell.x, cell.y, cell.width, cell.height);
     context.fill();
     context.stroke();
     if (cell.active && cell.coverageClass) {
       const coverage = palette[cell.coverageClass] || palette.coverage;
       context.strokeStyle = coverage.stroke;
       context.lineWidth = 2.2 / scale;
-      gisCanvasRect(context, cell.x + 1.5, cell.y + 1.5, cell.width - 3, cell.height - 3, 2);
-      context.stroke();
+      context.strokeRect(cell.x + 0.4, cell.y + 0.8, Math.max(0.5, cell.width - 0.8), Math.max(1, cell.height - 1.6));
     }
     if (cell.active && cell.shared) {
       const shared = palette.shared || palette.coverage;
@@ -3159,28 +3218,27 @@ function gisDrawMapCanvas() {
       context.setLineDash([3 / scale, 2 / scale]);
       context.strokeStyle = shared.stroke;
       context.lineWidth = 2.6 / scale;
-      gisCanvasRect(context, cell.x + 3, cell.y + 3, cell.width - 6, cell.height - 6, 1);
-      context.stroke();
+      context.strokeRect(cell.x + 0.7, cell.y + 2, Math.max(0.4, cell.width - 1.4), Math.max(1, cell.height - 4));
       context.restore();
     }
     if (cell.key === GIS.map.selectedKey || cell.key === GIS.map.hoveredKey) {
       const selected = palette.selected || palette.coverage;
       context.strokeStyle = selected.stroke;
       context.lineWidth = (cell.key === GIS.map.selectedKey ? 3.2 : 2.2) / scale;
-      gisCanvasRect(context, cell.x - 1, cell.y - 1, cell.width + 2, cell.height + 2, 4);
-      context.stroke();
-    }
-    if (cell.active && scale >= 0.72) {
-      context.fillStyle = color.text;
-      context.font = '700 7px Satoshi, sans-serif';
-      context.textAlign = 'center';
-      context.fillText(cell.group.bay.length > 6 ? cell.group.bay.slice(0, 5) + '…' : cell.group.bay, cell.x + cell.width / 2, cell.y + cell.height / 2);
+      context.strokeRect(cell.x - 1, cell.y - 1, cell.width + 2, cell.height + 2);
     }
   });
   context.restore();
   canvas.dataset.cellCount = String(GIS.map.cells.length);
   canvas.dataset.activeCellCount = String(GIS.map.cells.filter(cell => cell.active).length);
   canvas.dataset.sharedCellCount = String(GIS.map.cells.filter(cell => cell.active && cell.shared).length);
+  canvas.dataset.sectionCount = String((GIS.map.sections || []).length);
+  canvas.dataset.rackBlockCount = String((GIS.map.blocks || []).length);
+  canvas.dataset.travelGapCount = String((GIS.map.travelAisles || []).length);
+  canvas.dataset.rackStripLanes = String((GIS.map.lanes || []).filter(lane => lane.kind === 'rack-strip').length);
+  canvas.dataset.binGridLanes = String((GIS.map.lanes || []).filter(lane => lane.kind === 'bin-grid').length);
+  canvas.dataset.boundaryRendered = String(!!GIS.map.boundary);
+  canvas.dataset.geometrySource = 'aisle-bay-order';
   canvas.dataset.renderedTheme = document.documentElement.dataset.theme || '';
 }
 
@@ -3192,29 +3250,70 @@ function gisRenderMapCanvas(allGroups, activeGroups, colorMode, customerId) {
   });
   const laneEntries = Array.from(lanes.entries()).sort((a, b) => gisNaturalCompare(a[0], b[0]));
   const activeMap = new Map(activeGroups.map(group => [group.key, group]));
-  const top = 24;
-  const maxBayCount = Math.max(1, ...laneEntries.map(entry => entry[1].length));
-  GIS.map.width = Math.max(760, GIS_LABEL_WIDTH + maxBayCount * (GIS_CELL_WIDTH + GIS_CELL_GAP) + 20);
-  GIS.map.height = Math.max(320, top + laneEntries.length * GIS_LANE_HEIGHT + 18);
+  const sectionEntries = gisPartitionLaneEntries(laneEntries, GIS_SECTION_COUNT);
+  const sectionLayouts = sectionEntries.map((entries, sectionIndex) => {
+    let y = 0;
+    const lanes = entries.map(([aisle, bays], laneIndex) => {
+      if (laneIndex && laneIndex % GIS_RACK_BLOCK_SIZE === 0) y += GIS_CROSS_AISLE_GAP;
+      const presentation = gisLanePresentation(bays);
+      const lane = Object.assign({aisle,bays,y,index:laneIndex,sectionIndex}, presentation);
+      y += presentation.cellHeight + presentation.laneGap;
+      return lane;
+    });
+    const width = Math.max(210, GIS_LABEL_WIDTH + Math.max(1, ...lanes.map(lane => lane.bays.length * (lane.cellWidth + lane.cellGap))));
+    const lastLane = lanes[lanes.length - 1] || {laneGap:0};
+    return {sectionIndex,entries,lanes,width,height:Math.max(1, y - lastLane.laneGap)};
+  });
+  const contentHeight = Math.max(1, ...sectionLayouts.map(section => section.height));
+  const floorWidth = GIS_BOUNDARY_INSET * 2 + sectionLayouts.reduce((sum, section) => sum + section.width, 0) + Math.max(0, sectionLayouts.length - 1) * GIS_SECTION_GAP;
+  const floorHeight = GIS_BOUNDARY_INSET * 2 + GIS_SECTION_LABEL_HEIGHT + contentHeight;
+  GIS.map.width = floorWidth + GIS_FRAME_WIDTH * 2;
+  GIS.map.height = floorHeight + GIS_FRAME_WIDTH * 2;
+  GIS.map.boundary = {x:GIS_FRAME_WIDTH,y:GIS_FRAME_WIDTH,width:floorWidth,height:floorHeight};
   GIS.map.groups = activeMap;
   GIS.map.allGroups = new Map(allGroups.map(group => [group.key, group]));
   GIS.map.cells = [];
   GIS.map.lanes = [];
-  laneEntries.forEach(([aisle, bays], laneIndex) => {
-    const y = top + laneIndex * GIS_LANE_HEIGHT;
-    GIS.map.lanes.push({aisle,y,width:Math.max(80, bays.length * (GIS_CELL_WIDTH + GIS_CELL_GAP) + 6)});
-    bays.sort((a, b) => gisNaturalCompare(a.bay, b.bay)).forEach((group, bayIndex) => {
-      const activeGroup = activeMap.get(group.key);
-      const allCustomers = gisDistinct(group.records.map(record => record.customerId));
-      const zones = activeGroup ? gisDistinct(activeGroup.records.map(gisStorageZone)) : [];
-      GIS.map.cells.push({
-        key:group.key,group:activeGroup || group,allGroup:group,active:!!activeGroup,
-        x:GIS_LABEL_WIDTH + bayIndex * (GIS_CELL_WIDTH + GIS_CELL_GAP),y,width:GIS_CELL_WIDTH,height:GIS_CELL_HEIGHT,
-        colorClass:activeGroup ? gisBayColorClass(activeGroup, colorMode) : 'suppressed',
-        coverageClass:customerId ? (zones.length === 1 ? 'customer-' + gisCustomerColorIndex(zones[0]) : 'coverage') : '',
-        shared:!!customerId && allCustomers.length > 1,
+  GIS.map.sections = [];
+  GIS.map.blocks = [];
+  GIS.map.travelAisles = [];
+  let sectionX = GIS_FRAME_WIDTH + GIS_BOUNDARY_INSET;
+  const contentY = GIS_FRAME_WIDTH + GIS_BOUNDARY_INSET + GIS_SECTION_LABEL_HEIGHT;
+  sectionLayouts.forEach((section, sectionIndex) => {
+    const firstAisle = section.entries[0] ? section.entries[0][0] : '';
+    const lastEntry = section.entries[section.entries.length - 1];
+    const lastAisle = lastEntry ? lastEntry[0] : '';
+    GIS.map.sections.push({index:sectionIndex,x:sectionX,y:contentY,width:section.width,height:section.height,labelY:contentY - 11,label:'Aisles ' + firstAisle + ' to ' + lastAisle});
+    if (sectionIndex) GIS.map.travelAisles.push({orientation:'vertical',x:sectionX - GIS_SECTION_GAP,y:contentY - GIS_SECTION_LABEL_HEIGHT,width:GIS_SECTION_GAP,height:contentHeight + GIS_SECTION_LABEL_HEIGHT});
+    section.lanes.forEach((lane, laneIndex) => {
+      const y = contentY + lane.y;
+      const orderedBays = lane.bays.slice().sort((a, b) => gisNaturalCompare(a.bay, b.bay));
+      const laneWidth = orderedBays.length * (lane.cellWidth + lane.cellGap);
+      GIS.map.lanes.push({aisle:lane.aisle,y,width:laneWidth,cellHeight:lane.cellHeight,kind:lane.kind,labelX:sectionX,sectionIndex});
+      if (laneIndex && laneIndex % GIS_RACK_BLOCK_SIZE === 0) {
+        GIS.map.travelAisles.push({orientation:'horizontal',x:sectionX,y:y - GIS_CROSS_AISLE_GAP,width:section.width,height:GIS_CROSS_AISLE_GAP});
+      }
+      orderedBays.forEach((group, bayIndex) => {
+        const activeGroup = activeMap.get(group.key);
+        const allCustomers = gisDistinct(group.records.map(record => record.customerId));
+        const zones = activeGroup ? gisDistinct(activeGroup.records.map(gisStorageZone)) : [];
+        GIS.map.cells.push({
+          key:group.key,group:activeGroup || group,allGroup:group,active:!!activeGroup,
+          x:sectionX + GIS_LABEL_WIDTH + bayIndex * (lane.cellWidth + lane.cellGap),y,width:lane.cellWidth,height:lane.cellHeight,
+          colorClass:activeGroup ? gisBayColorClass(activeGroup, colorMode) : 'suppressed',
+          coverageClass:customerId ? (zones.length === 1 ? 'customer-' + gisCustomerColorIndex(zones[0]) : 'coverage') : '',
+          shared:!!customerId && allCustomers.length > 1,sectionIndex,rackStyle:lane.kind,
+        });
       });
     });
+    for (let blockStart = 0; blockStart < section.lanes.length; blockStart += GIS_RACK_BLOCK_SIZE) {
+      const blockLanes = section.lanes.slice(blockStart, blockStart + GIS_RACK_BLOCK_SIZE);
+      const first = blockLanes[0];
+      const last = blockLanes[blockLanes.length - 1];
+      const maxWidth = Math.max(...blockLanes.map(lane => lane.bays.length * (lane.cellWidth + lane.cellGap)));
+      GIS.map.blocks.push({sectionIndex,x:sectionX + GIS_LABEL_WIDTH - 3,y:contentY + first.y - 3,width:maxWidth + 6,height:last.y + last.cellHeight - first.y + 6});
+    }
+    sectionX += section.width + GIS_SECTION_GAP;
   });
   gisBindMapInteractions();
   gisShowMap();
@@ -3588,9 +3687,10 @@ function renderGisTopology() {
   }
   const mappedLocations = built.groups.reduce((sum, group) => sum + group.records.length, 0);
   if (note) {
+    const layoutDisclosure = ' The outer frame and wide gaps organize the schematic only; they are not surveyed geometry or measured travel aisles.';
     note.textContent = customerId
-      ? 'Customer coverage: ' + built.groups.length.toLocaleString() + ' mapped aisle/bay cells and ' + mappedLocations.toLocaleString() + ' mapped locations. All ' + facilityBuilt.groups.length.toLocaleString() + ' facility cells retain their position; unrelated customer cells are suppressed.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' customer locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.'
-      : 'Complete map: all ' + facilityBuilt.groups.length.toLocaleString() + ' real facility aisle/bay cells are represented. ' + built.groups.length.toLocaleString() + ' cells and ' + mappedLocations.toLocaleString() + ' mapped locations match the current filters.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.';
+      ? 'Customer coverage: ' + built.groups.length.toLocaleString() + ' mapped aisle/bay cells and ' + mappedLocations.toLocaleString() + ' mapped locations. All ' + facilityBuilt.groups.length.toLocaleString() + ' facility cells retain their position; unrelated customer cells are suppressed.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' customer locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.' + layoutDisclosure
+      : 'Complete map: all ' + facilityBuilt.groups.length.toLocaleString() + ' real facility aisle/bay cells are represented. ' + built.groups.length.toLocaleString() + ' cells and ' + mappedLocations.toLocaleString() + ' mapped locations match the current filters.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.' + layoutDisclosure;
   }
   const colorMode = (document.getElementById('gis-color-mode') || {}).value || 'occupancy';
   gisRenderMapCanvas(facilityBuilt.groups, built.groups, colorMode, customerId);

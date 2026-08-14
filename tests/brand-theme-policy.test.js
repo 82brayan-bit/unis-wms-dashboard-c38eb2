@@ -54,7 +54,12 @@ test('Robot Count dropdown and GIS view use the semantic theme surface', () => {
   assert.match(html, /data-view="robots"[^>]+role="link"/);
   assert.match(html, /data-view="gis"[^>]+role="link"/);
   assert.match(html, /id="view-gis"/);
-  assert.match(css, /\.gis-map-palette \.empty\{[^}]*var\(--chart-3\)/);
+  assert.match(css, /\.gis-map-palette \.wall\{[^}]*var\(--sidebar\)[^}]*var\(--sidebar-border\)/);
+  assert.match(css, /\.gis-map-palette \.boundary\{[^}]*var\(--primary\)/);
+  assert.match(css, /\.gis-map-palette \.rack\{[^}]*var\(--muted\)[^}]*var\(--background\)/);
+  assert.match(css, /\.gis-map-palette \.empty\{[^}]*var\(--muted\)/);
+  assert.match(css, /\.gis-map-palette \.occupied\{[^}]*var\(--destructive\)/);
+  assert.match(css, /\.gis-map-palette \.full\{[^}]*var\(--destructive\)/);
   assert.match(css, /\.gis-map-viewport:focus-visible\{[^}]*var\(--ring\)/);
   assert.match(css, /\.gis-map-palette \.customer-0\{[^}]*var\(--primary\)/);
   assert.match(css, /\.gis-map-palette \.status-usable\{[^}]*var\(--chart-3\)/);

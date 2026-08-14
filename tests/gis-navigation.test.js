@@ -72,6 +72,24 @@ test('GIS renders every aisle and bay on one canvas with bounded keyboard access
   assert.doesNotMatch(modules, /GIS_MAP_CELL_LIMIT/);
 });
 
+test('GIS canvas uses deterministic sectioned rack blocks, wide separators and a framed boundary', () => {
+  assert.match(modules, /const GIS_SECTION_COUNT = 3/);
+  assert.match(modules, /const GIS_RACK_BLOCK_SIZE = 3/);
+  assert.match(modules, /const GIS_FRAME_WIDTH = 28/);
+  assert.match(modules, /const GIS_SECTION_GAP = 58/);
+  assert.match(modules, /const GIS_CROSS_AISLE_GAP = 38/);
+  assert.match(modules, /function gisPartitionLaneEntries/);
+  assert.match(modules, /function gisLanePresentation[\s\S]*supportPickType === 'PALLET_PICK'[\s\S]*'rack-strip'[\s\S]*'bin-grid'/);
+  assert.match(modules, /GIS\.map\.sections\.push/);
+  assert.match(modules, /GIS\.map\.blocks\.push/);
+  assert.match(modules, /GIS\.map\.travelAisles\.push/);
+  assert.match(modules, /GIS\.map\.boundary = \{x:GIS_FRAME_WIDTH/);
+  assert.match(modules, /canvas\.dataset\.sectionCount/);
+  assert.match(modules, /canvas\.dataset\.rackBlockCount/);
+  assert.match(modules, /canvas\.dataset\.geometrySource = 'aisle-bay-order'/);
+  assert.match(html, /outer frame and wide gaps organize the topology visually; they are not surveyed geometry or measured travel aisles/i);
+});
+
 test('GIS supports real occupancy, customer and status coloring', () => {
   assert.match(html, /id="gis-color-mode"[\s\S]*value="occupancy"[\s\S]*value="customer"[\s\S]*value="status"/);
   assert.match(modules, /function gisBayColorClass\(group, mode\)/);
@@ -100,4 +118,5 @@ test('GIS communicates schematic and robot-coordinate limitations without synthe
   assert.match(html, /schematic uses WMS aisle and bay topology only/i);
   assert.doesNotMatch(modules, /latitude|longitude|robotMarker|fakeMarker|sampleMarker/i);
   assert.doesNotMatch(modules, /syntheticZone|fakeZone|sampleZone/i);
+  assert.doesNotMatch(modules, /perimeterDevice|doorGeometry|robotCoordinate|surveyedOutline|greenIndicator/i);
 });

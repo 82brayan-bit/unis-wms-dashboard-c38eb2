@@ -472,12 +472,16 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 .gis-map-a11y-copy{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .gis-map-palette{position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none}
 .gis-map-palette i{display:block;background:var(--card);border:1px solid var(--border);color:var(--foreground)}
-.gis-map-palette .floor{background:var(--background);border-color:var(--border);color:var(--foreground)}
-.gis-map-palette .lane{background:var(--muted);border-color:var(--border);color:var(--foreground)}
+.gis-map-palette .canvas{background:var(--background);border-color:var(--border);color:var(--foreground)}
+.gis-map-palette .wall{background:var(--sidebar);border-color:var(--sidebar-border);color:var(--sidebar-foreground)}
+.gis-map-palette .floor{background:color-mix(in srgb,var(--background) 88%,var(--muted));border-color:var(--border);color:var(--foreground)}
+.gis-map-palette .boundary{background:var(--background);border-color:var(--primary);color:var(--foreground)}
+.gis-map-palette .rack{background:color-mix(in srgb,var(--muted) 72%,var(--background));border-color:color-mix(in srgb,var(--muted-foreground) 52%,var(--border));color:var(--foreground)}
+.gis-map-palette .lane{background:color-mix(in srgb,var(--background) 76%,var(--muted));border-color:var(--border);color:var(--muted-foreground)}
 .gis-map-palette .suppressed{background:color-mix(in srgb,var(--muted) 36%,var(--background));border-color:color-mix(in srgb,var(--border) 64%,var(--background));color:var(--muted-foreground)}
-.gis-map-palette .empty{background:color-mix(in srgb,var(--chart-3) 24%,var(--card));border-color:color-mix(in srgb,var(--chart-3) 70%,var(--border));color:var(--foreground)}
-.gis-map-palette .occupied{background:color-mix(in srgb,var(--primary) 26%,var(--card));border-color:color-mix(in srgb,var(--primary) 70%,var(--border));color:var(--foreground)}
-.gis-map-palette .full{background:color-mix(in srgb,var(--chart-2) 30%,var(--card));border-color:color-mix(in srgb,var(--chart-2) 75%,var(--border));color:var(--foreground)}
+.gis-map-palette .empty{background:color-mix(in srgb,var(--muted) 84%,var(--background));border-color:color-mix(in srgb,var(--muted-foreground) 58%,var(--border));color:var(--foreground)}
+.gis-map-palette .occupied{background:color-mix(in srgb,var(--destructive) 78%,var(--card));border-color:var(--destructive);color:var(--destructive-foreground)}
+.gis-map-palette .full{background:var(--destructive);border-color:color-mix(in srgb,var(--foreground) 72%,var(--destructive));color:var(--destructive-foreground)}
 .gis-map-palette .mixed{background:color-mix(in srgb,var(--chart-5) 25%,var(--card));border-color:color-mix(in srgb,var(--chart-5) 72%,var(--border));color:var(--foreground)}
 .gis-map-palette .unknown{background:var(--muted);border-color:var(--muted-foreground);color:var(--foreground)}
 .gis-map-palette .customer-0{background:color-mix(in srgb,var(--primary) 28%,var(--card));border-color:var(--primary);color:var(--foreground)}
