@@ -101,6 +101,25 @@ function gisMockResponse(requestUrl, postData) {
       .map(name => ({ planarName: name, customerId: 'CUST-1', customerName: 'Fixture Customer' }));
     return { success: true, data };
   }
+  if (gisPath.startsWith('/gis-bam/location-inventory/stat')) {
+    return { success: true, data: [
+      { planarName: 'RACK-0001', totalQty: 42 },
+      { planarName: '', totalQty: 5 },
+      { planarName: 'Sorting Staging Zone', totalQty: 3 },
+      { planarName: 'UNKNOWN-AREA', totalQty: 7 },
+    ] };
+  }
+  if (gisPath.startsWith('/gis-bam/location-inventory/detail')) {
+    const body = postData ? JSON.parse(postData) : {};
+    const page = Number(body.currentPage || 1);
+    const size = Number(body.pageSize || 50);
+    const rows = Array.from({ length: 65 }, (_, index) => ({
+      location: String(body.planarName || 'PLANAR') + '-A-' + String(index + 1).padStart(2, '0'),
+      lpId: 'LP-' + (100 + index),
+      qty: (index % 7) + 1,
+    }));
+    return { success: true, data: { list: rows.slice((page - 1) * size, page * size), totalCount: rows.length } };
+  }
   return { success: true, data: [] };
 }
 const screenshotPath = process.env.GIS_SMOKE_SCREENSHOT || '';
@@ -202,7 +221,7 @@ async function main() {
   cdp.on('Network.requestWillBeSent', event => {
     requests.push(event.request.url);
     requestUrls.set(event.requestId, event.request.url);
-    if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|facility-search|facility-type-data|customers-by-planars|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
+    if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|facility-search|facility-type-data|customers-by-planars|location-inventory\/stat|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
       mutatingRequests.push(event.request.method + ' ' + event.request.url);
     }
   });
@@ -214,6 +233,8 @@ async function main() {
     const url = requestUrls.get(event.requestId) || '';
     if (!event.canceled && !url.includes('/api/')) failedStaticRequests.push(event.errorText + ' ' + url);
   });
+  // 1x1 transparent PNG so basemap tiles never fail or hit the live network.
+  const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   cdp.on('Fetch.requestPaused', event => {
     if (event.request.url.includes('/api/')) {
       // The official GIS proxy reads are mocked with exact read-only responses
@@ -226,6 +247,14 @@ async function main() {
         responseHeaders:[{name:'Content-Type',value:'application/json'}],
         body:Buffer.from(JSON.stringify(payload)).toString('base64')
       }).catch(error => consoleErrors.push(error.message));
+    } else if (/basemaps\.cartocdn\.com|arcgisonline\.com/.test(event.request.url)) {
+      // Basemap tiles are fulfilled locally so the map renders without the
+      // live tile network and without failed-request noise.
+      cdp.send('Fetch.fulfillRequest', {
+        requestId:event.requestId, responseCode:200,
+        responseHeaders:[{name:'Content-Type',value:'image/png'}],
+        body:TILE_PNG.toString('base64')
+      }).catch(error => consoleErrors.push(error.message));
     } else {
       cdp.send('Fetch.continueRequest', {requestId:event.requestId}).catch(error => consoleErrors.push(error.message));
     }
@@ -233,7 +262,11 @@ async function main() {
 
   await Promise.all([
     cdp.send('Runtime.enable'), cdp.send('Network.enable'), cdp.send('Page.enable'),
-    cdp.send('Fetch.enable', {patterns:[{urlPattern:'*/api/*',requestStage:'Request'}]})
+    cdp.send('Fetch.enable', {patterns:[
+      {urlPattern:'*/api/*',requestStage:'Request'},
+      {urlPattern:'*://*.basemaps.cartocdn.com/*',requestStage:'Request'},
+      {urlPattern:'*://server.arcgisonline.com/*',requestStage:'Request'}
+    ]})
   ]);
   const loaded = new Promise(resolve => cdp.on('Page.loadEventFired', resolve));
   await cdp.send('Page.navigate', {url:initialAppUrl.href});
@@ -603,22 +636,24 @@ async function main() {
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
     document.getElementById('view-gis').classList.add('active');
     window.dispatchEvent(new Event('resize'));
-    await new Promise(resolve => setTimeout(resolve, 80));
-    const viewport = document.getElementById('gis-map-viewport').getBoundingClientRect();
-    const card = document.querySelector('.gis-topology-card').getBoundingClientRect();
-    const heading = document.querySelector('.gis-topology-card .card-hdr > div:first-child').getBoundingClientRect();
-    const actions = document.querySelector('.gis-map-actions').getBoundingClientRect();
-    const side = document.querySelector('.gis-side-stack').getBoundingClientRect();
-    const browserFields = Array.from(document.querySelectorAll('.gis-map-browser > *')).map(element => element.getBoundingClientRect());
+    await new Promise(resolve => setTimeout(resolve, 150));
+    const workspace = document.getElementById('gis-workspace').getBoundingClientRect();
+    const header = document.querySelector('.gis-ws-header').getBoundingClientRect();
+    const drawer = document.getElementById('gis-inventory-drawer').getBoundingClientRect();
+    const mapArea = document.getElementById('gis-ws-map').getBoundingClientRect();
+    const layerPanel = document.getElementById('gis-ws-layer-panel').getBoundingClientRect();
     return {
-      viewportWidth:viewport.width,
-      viewportHeight:viewport.height,
+      workspaceWidth:workspace.width,
+      headerHeight:header.height,
+      drawerWidth:drawer.width,
+      drawerLeft:drawer.left,
+      drawerCollapsed:document.getElementById('gis-inventory-drawer').classList.contains('collapsed'),
+      drawerOverlaysMap:drawer.left === 0 && drawer.width <= window.innerWidth,
+      mapFillsWorkspace:mapArea.width > 0 && mapArea.height > 0 && mapArea.right <= workspace.right + 1,
+      layerPanelInside:layerPanel.left >= mapArea.left && layerPanel.right <= mapArea.right + 1,
       bodyWidth:document.documentElement.scrollWidth,
       innerWidth:window.innerWidth,
-      controlsInside:actions.left >= card.left && actions.right <= card.right + 1,
-      headerStacked:actions.top >= heading.bottom,
-      detailsStacked:side.top >= card.bottom,
-      browserStacked:browserFields.length < 2 || browserFields[1].top >= browserFields[0].bottom
+      noHorizontalOverflow:document.documentElement.scrollWidth <= window.innerWidth
     };
   })()`);
 
@@ -632,20 +667,23 @@ async function main() {
         const tick = () => {
           attempts++;
           if (predicate()) return resolve();
-          if (attempts > 240) return reject(new Error('Timed out waiting for ' + (label || 'official GIS state') + ' | ' + JSON.stringify({officialActive:GIS.official.active, module:typeof GISOfficial, stateActive:typeof GISOfficial === 'object' && GISOfficial.state.active, canvas:!!document.getElementById('gis-official-canvas'), source:document.getElementById('gis-official-canvas') ? document.getElementById('gis-official-canvas').dataset.geometrySource : null, counts:typeof GISOfficial === 'object' ? GISOfficial.state.counts : null, fit:typeof GISOfficial === 'object' && GISOfficial.state.fit ? !!GISOfficial.state.fit.bounds : null, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), facility:GIS.facilityId, status:document.getElementById('gis-status').textContent, banner:document.getElementById('gis-mode-banner').hidden ? '(hidden)' : document.getElementById('gis-mode-banner').textContent})));
+          if (attempts > 240) return reject(new Error('Timed out waiting for ' + (label || 'official GIS state') + ' | ' + JSON.stringify({officialActive:GIS.official.active, module:typeof GISOfficial, stateActive:typeof GISOfficial === 'object' && GISOfficial.state.active, map:typeof GISOfficial === 'object' && GISOfficial.state.map ? !!GISOfficial.state.map : null, leafletHidden:document.getElementById('gis-ws-leaflet') ? document.getElementById('gis-ws-leaflet').hidden : null, source:document.getElementById('gis-ws-leaflet') ? document.getElementById('gis-ws-leaflet').dataset.geometrySource : null, counts:typeof GISOfficial === 'object' ? GISOfficial.state.counts : null, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), facility:GIS.facilityId, status:document.getElementById('gis-status').textContent, banner:document.getElementById('gis-mode-banner').hidden ? '(hidden)' : document.getElementById('gis-mode-banner').textContent})));
           setTimeout(tick, 25);
         };
         tick();
       });
     }
     async function waitForOfficial() {
-      await waitFor(() => GIS.official.active && typeof GISOfficial === 'object' && GISOfficial.state.active && document.getElementById('gis-official-canvas') && document.getElementById('gis-official-canvas').dataset.geometrySource === 'official-gis' && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false', 'official GIS state | ' + JSON.stringify({officialActive:GIS.official.active, module:typeof GISOfficial, stateActive:typeof GISOfficial === 'object' && GISOfficial.state.active, canvas:!!document.getElementById('gis-official-canvas'), source:document.getElementById('gis-official-canvas') ? document.getElementById('gis-official-canvas').dataset.geometrySource : null, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), facility:GIS.facilityId, status:document.getElementById('gis-status').textContent, banner:document.getElementById('gis-mode-banner').hidden ? '(hidden)' : document.getElementById('gis-mode-banner').textContent, err:GIS.official.moduleError}));
+      await waitFor(() => GIS.official.active && typeof GISOfficial === 'object' && GISOfficial.state.active && GISOfficial.state.map && document.getElementById('gis-ws-leaflet') && !document.getElementById('gis-ws-leaflet').hidden && document.getElementById('gis-ws-leaflet').classList.contains('leaflet-container') && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false', 'official GIS state');
     }
     function hashCanvas(canvas) {
+      if (!canvas) return { hash:'none', colors:0, width:0, height:0 };
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       let hash = 2166136261;
       const colors = new Set();
-      for (let index = 0; index < pixels.length; index += 388) {
+      // Sample every pixel so thin theme-dependent strokes (selection outline,
+      // dimmed planars) are never missed.
+      for (let index = 0; index < pixels.length; index += 4) {
         hash ^= pixels[index] + (pixels[index + 1] << 8) + (pixels[index + 2] << 16) + (pixels[index + 3] << 24);
         hash = Math.imul(hash, 16777619);
         colors.add(pixels[index] + ',' + pixels[index + 1] + ',' + pixels[index + 2] + ',' + pixels[index + 3]);
@@ -659,7 +697,7 @@ async function main() {
     document.getElementById('view-gis').classList.add('active');
     await switchFacility('LT_F1');
     await waitForOfficial();
-    const canvas = document.getElementById('gis-official-canvas');
+    const mapEl = document.getElementById('gis-ws-leaflet');
     const banner = document.getElementById('gis-mode-banner');
     const G = window.GISOfficial;
     const officialState = {
@@ -678,91 +716,133 @@ async function main() {
         aisles:document.getElementById('gis-kpi-used-lbl').textContent
       },
       kpiFooter:document.getElementById('gis-kpi-locations-chg').textContent,
-      features:Number(canvas.dataset.officialFeatureCount),
-      aisles:Number(canvas.dataset.officialAisleCount),
-      source:canvas.dataset.geometrySource,
-      warehouseId:canvas.dataset.warehouseId,
-      visibleLayers:canvas.dataset.visibleLayers,
+      features:Number(mapEl.dataset.officialFeatureCount),
+      aisles:Number(mapEl.dataset.officialAisleCount),
+      source:mapEl.dataset.geometrySource,
+      warehouseId:mapEl.dataset.warehouseId,
+      mapReady:!!G.state.map,
+      leafletContainer:document.getElementById('gis-ws-leaflet').classList.contains('leaflet-container'),
+      attribution:document.querySelector('.leaflet-control-attribution') ? document.querySelector('.leaflet-control-attribution').textContent : '',
+      basemapMode:G.state.basemapMode,
+      mapModeButton:document.getElementById('gis-map-mode').textContent,
+      mapModePressed:document.getElementById('gis-map-mode').getAttribute('aria-pressed'),
       layerControlsVisible:!document.getElementById('gis-layer-controls').hidden,
       browserHidden:document.getElementById('gis-map-browser').hidden,
       schematicCanvasHidden:document.getElementById('gis-map-canvas').hidden,
       legend:document.getElementById('gis-map-legend').textContent,
       note:document.getElementById('gis-render-note').textContent,
-      customerOptions:Array.from(document.getElementById('gis-customer').options).map(option => option.textContent),
-      customerTitle:document.getElementById('gis-customer').title,
+      facilityName:document.getElementById('gis-facility-name').textContent,
+      facilityText:document.getElementById('gis-facility-id').textContent,
+      titleDisabled:document.getElementById('gis-title').disabled,
+      itemDisabled:document.getElementById('gis-item').disabled,
       occupancyDisabled:document.getElementById('gis-occupancy').disabled,
       colorModeDisabled:document.getElementById('gis-color-mode').disabled,
       status:document.getElementById('gis-status').textContent
     };
     await waitFor(() => !document.getElementById('gis-customer').disabled && document.getElementById('gis-customer').options.length >= 2);
     officialState.customerOptions = Array.from(document.getElementById('gis-customer').options).map(option => option.textContent);
-    officialState.customerSummary = document.getElementById('gis-customer-summary').textContent;
 
-    // Hover + click on a real planar polygon (RACK-0001).
-    const viewport = document.getElementById('gis-map-viewport');
-    const entry = G.state.projected.find(candidate => candidate.feature.properties.name === 'RACK-0001');
-    const rect = viewport.getBoundingClientRect();
-    const scale = G.state.fit.fitScale * G.state.transform.scale;
-    const originX = G.state.fit.x + G.state.transform.x;
-    const originY = G.state.fit.y + G.state.transform.y;
-    // Use the polygon's center (a vertex would sit exactly on the boundary).
-    const worldX = (entry.bounds.minX + entry.bounds.maxX) / 2;
-    const worldY = (entry.bounds.minY + entry.bounds.maxY) / 2;
-    const pointerX = rect.left + originX + worldX * scale;
-    const pointerY = rect.top + originY + worldY * scale;
-    viewport.dispatchEvent(new PointerEvent('pointermove', {clientX:pointerX, clientY:pointerY, bubbles:true}));
-    await new Promise(resolve => setTimeout(resolve, 80));
-    const tooltip = document.getElementById('gis-map-tooltip');
-    officialState.tooltipText = tooltip.hidden ? '' : tooltip.textContent;
-    viewport.dispatchEvent(new MouseEvent('click', {clientX:pointerX, clientY:pointerY, bubbles:true}));
-    await new Promise(resolve => setTimeout(resolve, 80));
-    officialState.detailText = document.getElementById('gis-detail-content').textContent;
+    // Map/Satellite toggle switches the basemap layer and button state.
+    document.getElementById('gis-map-mode').click();
+    await new Promise(resolve => setTimeout(resolve, 150));
+    officialState.satellite = { mode:G.state.basemapMode, label:document.getElementById('gis-map-mode').textContent, pressed:document.getElementById('gis-map-mode').getAttribute('aria-pressed') };
+    document.getElementById('gis-map-mode').click();
+    await new Promise(resolve => setTimeout(resolve, 150));
+    officialState.backToMap = G.state.basemapMode;
 
-    // Layer toggle: hide bulk, verify render state + visible layers update.
+    // Inventory summary renders from the mocked stat endpoint with real classification.
+    await waitFor(() => document.querySelectorAll('#gis-inventory-rows tr').length >= 4);
+    officialState.summaryRows = Array.from(document.querySelectorAll('#gis-inventory-rows tr')).map(tr => tr.textContent);
+    officialState.summaryKinds = {
+      polygon:document.querySelectorAll('#gis-inventory-rows tr[data-gis-row-kind="polygon"]').length,
+      category:document.querySelectorAll('#gis-inventory-rows tr[data-gis-row-kind="category"]').length,
+      unmapped:document.querySelectorAll('#gis-inventory-rows tr[data-gis-row-kind="unmapped"]').length
+    };
+    officialState.summaryStatus = document.getElementById('gis-customer-summary').textContent;
+
+    // Highlight action focuses the exact planar polygon on the map.
+    document.querySelector('#gis-inventory-rows tr[data-gis-row-kind="polygon"] [data-gis-action="highlight"]').click();
+    await new Promise(resolve => setTimeout(resolve, 250));
+    officialState.highlight = {
+      selectedName:G.state.selectedFeature ? G.state.selectedFeature.feature.properties.name : null,
+      highlightedRow:document.querySelector('#gis-inventory-rows tr.highlighted') ? document.querySelector('#gis-inventory-rows tr.highlighted').textContent : ''
+    };
+
+    // Detail action opens real paginated inventory detail rows.
+    document.querySelector('#gis-inventory-rows tr[data-gis-row-kind="polygon"] [data-gis-action="detail"]').click();
+    await waitFor(() => document.getElementById('gis-detail-content').textContent.includes('LP-100'));
+    officialState.detail = {
+      title:document.getElementById('gis-inventory-detail-title').textContent,
+      content:document.getElementById('gis-detail-content').textContent.slice(0, 260),
+      backVisible:!document.getElementById('gis-inventory-detail').hidden,
+      summaryHidden:document.querySelector('.gis-inventory-table-wrap').hidden
+    };
+    document.getElementById('gis-inventory-back').click();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    officialState.backRestored = !document.querySelector('.gis-inventory-table-wrap').hidden;
+
+    // Right layer panel toggles still drive the official layers.
     const bulkCheckbox = document.querySelector('#gis-layer-controls input[data-gis-layer="bulk"]');
     bulkCheckbox.checked = false;
     gisToggleLayer('bulk', false);
     await new Promise(resolve => setTimeout(resolve, 80));
-    officialState.bulkOff = {
-      visibleLayers:document.getElementById('gis-official-canvas').dataset.visibleLayers,
-      stateVisible:G.state.visible.bulk === false,
-      kpiBulk:document.getElementById('gis-kpi-empty').textContent
-    };
+    officialState.bulkOff = G.state.visible.bulk === false;
     bulkCheckbox.checked = true;
     gisToggleLayer('bulk', true);
     await new Promise(resolve => setTimeout(resolve, 80));
 
-    // Search filter dims non-matching planars and updates KPIs.
-    document.getElementById('gis-search').value = 'BULK';
+    // Search re-filters the summary client-side and dims the map.
+    document.getElementById('gis-search').value = 'RACK-0001';
     queueGisRender();
-    await new Promise(resolve => setTimeout(resolve, 80));
+    await new Promise(resolve => setTimeout(resolve, 100));
     officialState.filtered = {
-      kpiPlanar:document.getElementById('gis-kpi-locations').textContent,
+      rows:document.querySelectorAll('#gis-inventory-rows tr').length,
       footer:document.getElementById('gis-kpi-locations-chg').textContent,
       summary:document.getElementById('gis-customer-summary').textContent
     };
     document.getElementById('gis-search').value = '';
     queueGisRender();
-    await new Promise(resolve => setTimeout(resolve, 80));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Zoom / pan / fit controls drive the official renderer.
-    const beforeZoom = G.state.transform.scale;
-    G.zoomBy(1.3);
-    const zoomed = G.state.transform.scale;
-    G.panBy(40, 20);
-    const panned = JSON.stringify(G.state.transform);
-    G.fitMap();
-    const fitted = JSON.stringify(G.state.transform);
+    // Header zoom/fit controls drive the Leaflet map.
+    const zoomBefore = G.state.map.getZoom();
+    document.getElementById('gis-zoom-in').click();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    const zoomAfter = G.state.map.getZoom();
+    document.getElementById('gis-fit-map').click();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    officialState.zoom = { before:zoomBefore, after:zoomAfter };
 
-    // Light and dark surfaces render the same geometry distinctly.
-    ItemTheme.applyTheme('light', {persist:true});
+    // Fullscreen control requests the workspace Fullscreen API (headless
+    // Chrome does not grant it without a trusted gesture, so the call itself
+    // is stubbed and the wiring is what gets verified).
+    const wsEl = document.getElementById('gis-workspace');
+    const origRequest = wsEl.requestFullscreen ? wsEl.requestFullscreen.bind(wsEl) : null;
+    let fullscreenCalled = false;
+    wsEl.requestFullscreen = () => { fullscreenCalled = true; return Promise.resolve(); };
+    document.getElementById('gis-ws-fullscreen').click();
+    await new Promise(resolve => setTimeout(resolve, 120));
+    officialState.fullscreenRequested = fullscreenCalled;
+    if (origRequest) wsEl.requestFullscreen = origRequest;
+
+    // Drawer collapse + reopen with a floating open control.
+    document.getElementById('gis-drawer-toggle').click();
+    await new Promise(resolve => setTimeout(resolve, 320));
+    officialState.drawerCollapsed = document.getElementById('gis-inventory-drawer').classList.contains('collapsed');
+    officialState.drawerOpenVisible = getComputedStyle(document.getElementById('gis-drawer-open')).display !== 'none';
+    document.getElementById('gis-drawer-toggle').click();
+    await new Promise(resolve => setTimeout(resolve, 320));
+    officialState.drawerReopened = !document.getElementById('gis-inventory-drawer').classList.contains('collapsed');
+
+    // Light/dark: the planar overlay and selection outline re-render per theme.
+    ItemTheme.applyTheme('light', {persist:true, notify:true});
     G.queueRender();
-    await new Promise(resolve => setTimeout(resolve, 80));
-    const lightTopology = hashCanvas(document.getElementById('gis-official-canvas'));
-    ItemTheme.applyTheme('dark', {persist:true});
+    await new Promise(resolve => setTimeout(resolve, 160));
+    const lightTopology = hashCanvas(document.querySelector('#gis-ws-leaflet canvas.gis-planar-canvas'));
+    ItemTheme.applyTheme('dark', {persist:true, notify:true});
     G.queueRender();
-    await new Promise(resolve => setTimeout(resolve, 80));
-    const darkTopology = hashCanvas(document.getElementById('gis-official-canvas'));
+    await new Promise(resolve => setTimeout(resolve, 160));
+    const darkTopology = hashCanvas(document.querySelector('#gis-ws-leaflet canvas.gis-planar-canvas'));
 
     // Facility switch with no official mapping → explicit WMS topology fallback.
     await switchFacility('LT_F42');
@@ -773,45 +853,67 @@ async function main() {
       source:document.getElementById('gis-map-canvas').dataset.geometrySource,
       note:document.getElementById('gis-render-note').textContent,
       canvasNodes:document.querySelectorAll('#gis-map-viewport canvas').length,
-      officialCanvasGone:!document.getElementById('gis-official-canvas')
+      leafletHidden:document.getElementById('gis-ws-leaflet').hidden,
+      inventoryEmpty:document.getElementById('gis-inventory-empty').textContent
     };
 
-    // Back to LT_F1 → official geometry again (module cached, no re-download).
+    // Back to LT_F1 → official basemap map again (module cached, no re-download).
     await switchFacility('LT_F1');
     await waitForOfficial();
     const restored = {
-      source:document.getElementById('gis-official-canvas').dataset.geometrySource,
+      source:document.getElementById('gis-ws-leaflet').dataset.geometrySource,
       schematicHidden:document.getElementById('gis-map-canvas').hidden,
-      officialVisible:!document.getElementById('gis-official-canvas').hidden,
       banner:document.getElementById('gis-mode-banner').textContent,
       theme:themeState()
     };
     ItemTheme.applyTheme('light', {persist:true});
-    return { officialState, hover:{tooltipText:officialState.tooltipText}, zoomed, beforeZoom, panned, fitted, lightTopology, darkTopology, fallback, restored };
+    return { officialState, lightTopology, darkTopology, fallback, restored };
   })()`);
 
   const gisModuleRequests = requests.filter(url => /gis-official-map\./.test(url));
+  const leafletRequests = requests.filter(url => /leaflet\.[0-9a-f]{10}\.(js|css)/.test(url));
   assert(summary.officialModuleNotLoaded, 'The official GIS module was loaded during login startup');
   assert(gisModuleRequests.length === 1, 'The official GIS module chunk must be fetched exactly once: ' + JSON.stringify(gisModuleRequests));
-  assert(summary.officialGis.officialState.source === 'official-gis' && summary.officialGis.officialState.warehouseId === '12', 'Official GIS geometry did not render for LT_F1');
-  assert(summary.officialGis.officialState.banner.includes('Official GIS layout') && summary.officialGis.officialState.bannerKind.includes('official'), 'Official mode banner is missing');
-  assert(summary.officialGis.officialState.features === 130 && summary.officialGis.officialState.aisles === 5, 'Official geometry counts are incorrect: ' + JSON.stringify({features:summary.officialGis.officialState.features, aisles:summary.officialGis.officialState.aisles}));
-  assert(summary.officialGis.officialState.kpi.planar === '9,141' && summary.officialGis.officialState.kpi.racks === '7,027' && summary.officialGis.officialState.kpi.bulk === '2,114' && summary.officialGis.officialState.kpi.aisles === '5', 'Authoritative LT_F1 KPIs are incorrect: ' + JSON.stringify(summary.officialGis.officialState.kpi));
-  assert(summary.officialGis.officialState.kpiLabels.planar === 'Planar objects' && summary.officialGis.officialState.kpiLabels.racks === 'Racks' && summary.officialGis.officialState.kpiLabels.bulk === 'Bulk' && summary.officialGis.officialState.kpiLabels.aisles === 'Aisles & roads', 'Official KPI labels were not swapped');
-  assert(summary.officialGis.officialState.kpiFooter === 'official GIS geometry', 'Official KPI footer is missing');
-  assert(summary.officialGis.officialState.layerControlsVisible && summary.officialGis.officialState.browserHidden && summary.officialGis.officialState.schematicCanvasHidden, 'Official layer controls, browser or canvas states are wrong');
-  assert(summary.officialGis.officialState.legend.includes('Racks') && summary.officialGis.officialState.legend.includes('Aisles & roads'), 'Official legend is missing');
-  assert(summary.officialGis.officialState.customerOptions.length === 2 && summary.officialGis.officialState.customerOptions[1] === 'Fixture Customer', 'Customer mapping was not populated from the official endpoint');
-  assert(summary.officialGis.officialState.occupancyDisabled === false && summary.officialGis.officialState.colorModeDisabled === true, 'Official filter availability is wrong');
-  assert(summary.officialGis.hover.tooltipText.includes('RACK-0001') && summary.officialGis.officialState.detailText.includes('RACK-0001'), 'Official hover/click detail did not render: ' + JSON.stringify({tooltip:summary.officialGis.hover.tooltipText, detail:summary.officialGis.officialState.detailText}));
-  assert(summary.officialGis.officialState.bulkOff.stateVisible === true && !summary.officialGis.officialState.bulkOff.visibleLayers.includes('bulk'), 'Bulk layer toggle did not apply');
-  assert(summary.officialGis.officialState.filtered.kpiPlanar === '30' && summary.officialGis.officialState.filtered.footer === 'matching filters', 'Official search filter did not narrow the map');
-  assert(summary.officialGis.zoomed > summary.officialGis.beforeZoom && summary.officialGis.panned !== summary.officialGis.fitted && summary.officialGis.fitted === '{"scale":1,"x":0,"y":0}', 'Official zoom/pan/fit controls failed');
-  assert(summary.officialGis.lightTopology.colors > 3 && summary.officialGis.darkTopology.colors > 3 && summary.officialGis.lightTopology.hash !== summary.officialGis.darkTopology.hash, 'Official map did not render distinctly in both themes');
-  assert(summary.officialGis.fallback.banner.includes('WMS topology fallback') && summary.officialGis.fallback.bannerKind.includes('fallback') && summary.officialGis.fallback.source === 'aisle-bay-order' && summary.officialGis.fallback.note.includes('Official GIS geometry is unavailable'), 'Facility switch did not fall back to the WMS topology schematic');
-  assert(summary.officialGis.fallback.canvasNodes === 1 && summary.officialGis.fallback.officialCanvasGone, 'Official canvas lingered during fallback');
-  assert(summary.officialGis.restored.source === 'official-gis' && summary.officialGis.restored.schematicHidden && summary.officialGis.restored.officialVisible && summary.officialGis.restored.banner.includes('Official GIS layout'), 'Switching back did not restore the official map: ' + JSON.stringify(summary.officialGis.restored));
+  assert(leafletRequests.length === 2, 'Leaflet JS + CSS must be lazy-loaded exactly once on the GIS route: ' + JSON.stringify(leafletRequests));
+  const og = summary.officialGis;
+  const os = og.officialState;
+  // Immersive workspace + basemap map with authoritative geometry.
+  assert(os.source === 'official-gis' && os.warehouseId === '12', 'Official GIS geometry did not render for LT_F1');
+  assert(os.mapReady && os.leafletContainer, 'The interactive basemap map did not initialize');
+  assert(os.attribution.includes('OpenStreetMap') && os.attribution.includes('CARTO'), 'Basemap attribution is missing: ' + os.attribution);
+  assert(os.basemapMode === 'map' && os.mapModeButton === 'Satellite' && os.mapModePressed === 'false', 'Map mode button state is wrong');
+  assert(os.satellite.mode === 'satellite' && os.satellite.label === 'Map' && os.satellite.pressed === 'true', 'Satellite toggle did not switch the basemap');
+  assert(os.backToMap === 'map', 'Map/Satellite toggle did not return to map mode');
+  assert(os.banner.includes('Official GIS layout') && os.bannerKind.includes('official'), 'Official mode banner is missing');
+  assert(os.features === 130 && os.aisles === 5, 'Official geometry counts are incorrect: ' + JSON.stringify({features:os.features, aisles:os.aisles}));
+  assert(os.kpi.planar === '9,141' && os.kpi.racks === '7,027' && os.kpi.bulk === '2,114' && os.kpi.aisles === '5', 'Authoritative LT_F1 KPIs are incorrect: ' + JSON.stringify(os.kpi));
+  assert(os.kpiLabels.planar === 'Planar objects' && os.kpiLabels.racks === 'Racks' && os.kpiLabels.bulk === 'Bulk' && os.kpiLabels.aisles === 'Aisles & roads', 'Official KPI labels were not swapped');
+  assert(os.kpiFooter === 'official GIS geometry', 'Official KPI footer is missing');
+  assert(os.layerControlsVisible && os.browserHidden && os.schematicCanvasHidden, 'Workspace layer panel, browser or canvas states are wrong');
+  assert(os.legend.includes('Racks') && os.legend.includes('Aisles & roads'), 'Official legend is missing');
+  assert(os.facilityName === 'Valley View' && os.facilityText.includes('LT_F1'), 'Facility chip does not show the dashboard-selected facility');
+  assert(os.titleDisabled && os.itemDisabled, 'Title/Item controls must stay disabled without an authoritative option source');
+  assert(os.occupancyDisabled === false && os.colorModeDisabled === true, 'Official filter availability is wrong');
+  // Inventory drawer: real summary classification + highlight + detail.
+  assert(os.summaryKinds.polygon === 1 && os.summaryKinds.category === 2 && os.summaryKinds.unmapped === 1, 'Summary classification is wrong: ' + JSON.stringify(os.summaryKinds));
+  assert(os.summaryRows.some(text => text.includes('RACK-0001')) && os.summaryRows.some(text => text.includes('Pending Location')) && os.summaryRows.some(text => text.includes('Staging')), 'Summary rows missing: ' + JSON.stringify(os.summaryRows));
+  assert(os.highlight.selectedName === 'RACK-0001' && os.highlight.highlightedRow.includes('RACK-0001'), 'Summary highlight did not focus the planar polygon');
+  assert(os.detail.title === 'RACK-0001' && os.detail.content.includes('LP-100') && os.detail.backVisible && os.detail.summaryHidden, 'Inventory detail did not open from the summary row');
+  assert(os.backRestored, 'Back to summary did not restore the summary table');
+  assert(os.bulkOff === true, 'Bulk layer toggle did not apply');
+  assert(os.filtered.rows === 1 && os.filtered.footer === 'matching filters', 'Search did not narrow the summary');
+  assert(os.zoom.after > os.zoom.before, 'Header zoom control did not zoom the basemap map');
+  assert(os.fullscreenRequested === true, 'Fullscreen control did not request the Fullscreen API');
+  assert(os.drawerCollapsed && os.drawerOpenVisible && os.drawerReopened, 'Inventory drawer collapse/reopen failed');
+  assert(og.lightTopology.colors > 3 && og.darkTopology.colors > 3 && og.lightTopology.hash !== og.darkTopology.hash, 'Planar overlay did not re-render distinctly in both themes: ' + JSON.stringify({light:og.lightTopology, dark:og.darkTopology, selected: og.officialState.highlight ? og.officialState.highlight.selectedName : null}));
+  // Facility switch → fallback → restore.
+  assert(og.fallback.banner.includes('WMS topology fallback') && og.fallback.bannerKind.includes('fallback') && og.fallback.source === 'aisle-bay-order' && og.fallback.note.includes('Official GIS geometry is unavailable'), 'Facility switch did not fall back to the WMS topology schematic');
+  assert(og.fallback.canvasNodes === 1 && og.fallback.leafletHidden, 'Leaflet map lingered during fallback');
+  assert(og.fallback.inventoryEmpty.includes('official GIS layout'), 'Fallback inventory state is not truthful');
+  assert(og.restored.source === 'official-gis' && og.restored.schematicHidden && og.restored.banner.includes('Official GIS layout'), 'Switching back did not restore the official map: ' + JSON.stringify(og.restored));
   officialMock.enabled = false;
+
+
 
   for (const state of [summary.lightLogin, summary.darkLogin, summary.lightApp, summary.darkApp]) {
     assert(state.logoCount === 1, state.theme + ' ' + state.logoCount + ' visible logos');
@@ -877,8 +979,9 @@ async function main() {
   assert(summary.backToF1State.facilityId === 'LT_F1' && summary.backToF1State.gisFacilityId === 'LT_F1' && summary.backToF1State.selector === 'LT_F1' && summary.backToF1State.context.includes('LT_F1') && summary.backToF1State.name === 'Valley View', 'GIS did not restore the dashboard-selected LT_F1 context');
   assert(summary.backToF1State.locations === summary.initialGisFacility.locations && summary.backToF1State.cells === summary.initialGisFacility.cells && summary.backToF1State.customerOptions === summary.initialGisFacility.customerOptions && summary.backToF1State.customer === '' && summary.backToF1State.noAirportText, 'GIS retained stale Airport data after returning to LT_F1');
   assert(summary.staleLoadState.facilityId === 'LT_F1' && summary.staleLoadState.selector === 'LT_F1' && summary.staleLoadState.gisFacilityId === 'LT_F1' && summary.staleLoadState.context.includes('LT_F1') && summary.staleLoadState.locations === summary.initialGisFacility.locations && summary.staleLoadState.customer === '', 'Late facility load overwrote the latest LT_F1 map');
-  assert(summary.mobileGis.viewportWidth > 0 && summary.mobileGis.viewportWidth <= summary.mobileGis.innerWidth && [380,440].includes(summary.mobileGis.viewportHeight) && summary.mobileGis.bodyWidth <= summary.mobileGis.innerWidth, 'GIS mobile canvas overflowed its viewport: ' + JSON.stringify(summary.mobileGis));
-  assert(summary.mobileGis.controlsInside && summary.mobileGis.headerStacked && summary.mobileGis.detailsStacked && summary.mobileGis.browserStacked, 'GIS mobile controls or detail regions overlap');
+  assert(summary.mobileGis.noHorizontalOverflow && summary.mobileGis.workspaceWidth > 0, 'GIS workspace overflowed the mobile viewport: ' + JSON.stringify(summary.mobileGis));
+  assert(summary.mobileGis.mapFillsWorkspace && summary.mobileGis.drawerOverlaysMap && summary.mobileGis.drawerWidth <= summary.mobileGis.innerWidth, 'GIS mobile map or drawer layout is wrong: ' + JSON.stringify(summary.mobileGis));
+  assert(summary.mobileGis.layerPanelInside, 'GIS mobile layer panel escaped the map area');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');
   await delay(250);
   assert(consoleErrors.length === 0, 'Browser console errors: ' + consoleErrors.join(' | '));

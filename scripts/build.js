@@ -76,6 +76,28 @@ async function main() {
     }
   }
 
+  // Vendored third-party assets (Leaflet): JS/CSS are hashed for long-lived
+  // caching, images are copied verbatim so the stylesheet's relative url()
+  // references keep resolving. The GIS renderer loads them lazily via the
+  // manifest-resolved hashed names.
+  const vendorDir = path.join(PUBLIC, 'assets/vendor');
+  function copyVendor(relative) {
+    const full = path.join(vendorDir, relative);
+    for (const entry of fs.readdirSync(full, {withFileTypes:true})) {
+      const rel = path.join(relative, entry.name);
+      if (entry.isDirectory()) { copyVendor(rel); continue; }
+      const sourcePath = '/assets/vendor/' + rel.replaceAll(path.sep, '/');
+      const buffer = fs.readFileSync(path.join(vendorDir, rel));
+      if (entry.name.endsWith('.js') || entry.name.endsWith('.css')) {
+        write(hashedName('assets/vendor/' + rel.replaceAll(path.sep, '/'), buffer), buffer, manifest, sourcePath);
+      } else {
+        write('assets/vendor/' + rel.replaceAll(path.sep, '/'), buffer, manifest, sourcePath);
+      }
+    }
+  }
+  if (fs.existsSync(vendorDir)) copyVendor('.');
+
+
   const jsDir = path.join(PUBLIC, 'assets/js');
   const jsFiles = fs.readdirSync(jsDir).filter(name => name.endsWith('.js') && name !== 'facility-customer-locations.js').sort();
   // Pass 1: minify every JS file and register its hashed name so cross-file
@@ -88,10 +110,32 @@ async function main() {
     const output = Buffer.from(await minifyJavaScript(fs.readFileSync(path.join(jsDir, filename), 'utf8'), sourcePath, minifyIdentifiersFor(filename)));
     nameMap[sourcePath] = hashedName('assets/js/' + filename, output);
   }
-  // Pass 2: rewrite manifest paths, minify again, and write the final files.
+  // Pass 2: rewrite manifest paths, minify again, and settle cross-file
+  // references on their FINAL hashed names. Two iterations are enough: a
+  // chunk that references another chunk (dashboard-modules.js → the lazy
+  // gis-official-map.js) changes hash when the referenced name settles, but
+  // the referenced chunk itself only depends on stable vendor/assets names.
+  const finalNames = Object.assign({}, nameMap);
+  for (let iteration = 0; iteration < 2; iteration++) {
+    const resolutionManifest = Object.assign({}, manifest, finalNames);
+    const next = {};
+    for (const filename of jsFiles) {
+      const sourcePath = '/assets/js/' + filename;
+      let source = replacePaths(fs.readFileSync(path.join(jsDir, filename), 'utf8'), resolutionManifest);
+      if (filename === 'facility-data-loader.js') {
+        for (const [input, output] of Object.entries(resolutionManifest)) {
+          if (input.startsWith('/assets/data/facilities/')) source = source.replaceAll(input.split('/').pop(), output.split('/').pop());
+        }
+      }
+      const output = Buffer.from(await minifyJavaScript(source, sourcePath, minifyIdentifiersFor(filename)));
+      next[sourcePath] = hashedName('assets/js/' + filename, output);
+    }
+    Object.assign(finalNames, next);
+  }
+  // Write the final files with the settled names.
   for (const filename of jsFiles) {
     const sourcePath = '/assets/js/' + filename;
-    const resolutionManifest = Object.assign({}, manifest, nameMap);
+    const resolutionManifest = Object.assign({}, manifest, finalNames);
     let source = replacePaths(fs.readFileSync(path.join(jsDir, filename), 'utf8'), resolutionManifest);
     if (filename === 'facility-data-loader.js') {
       for (const [input, output] of Object.entries(resolutionManifest)) {

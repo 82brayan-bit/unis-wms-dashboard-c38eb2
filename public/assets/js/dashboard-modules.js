@@ -2868,7 +2868,9 @@ function gisSetStatus(message) {
 function gisSetState(title, message) {
   const state = document.getElementById('gis-map-state');
   const viewport = document.getElementById('gis-map-viewport');
+  const leaflet = document.getElementById('gis-ws-leaflet');
   if (viewport) viewport.hidden = true;
+  if (leaflet) leaflet.hidden = true;
   if (!state) return;
   state.hidden = false;
   const heading = state.querySelector('strong');
@@ -2881,7 +2883,16 @@ function gisSetState(title, message) {
 function gisShowMap() {
   const state = document.getElementById('gis-map-state');
   const viewport = document.getElementById('gis-map-viewport');
+  const leaflet = document.getElementById('gis-ws-leaflet');
   if (state) state.hidden = true;
+  if (GIS.official.active && leaflet) {
+    // Official mode renders on the basemap container; keep the schematic
+    // viewport hidden so the two map surfaces never overlap.
+    if (viewport) viewport.hidden = true;
+    leaflet.hidden = false;
+    if (window.GISOfficial) window.GISOfficial.invalidateSize();
+    return;
+  }
   if (viewport) viewport.hidden = false;
 }
 
@@ -3005,6 +3016,7 @@ function gisHandleCustomerChange() {
   GIS.map.selectedLocationName = '';
   gisHideMapTooltip();
   queueGisRender();
+  gisWsRefreshInventory();
 }
 
 function gisDistinct(values) {
@@ -3725,6 +3737,7 @@ function queueGisRender() {
     window.GISOfficial.rebuildFilterState();
     window.GISOfficial.queueRender();
     gisRenderOfficialMetrics();
+    gisRenderInventorySummaryTable();
     return;
   }
   if (GIS.renderFrame) cancelAnimationFrame(GIS.renderFrame);
@@ -3798,6 +3811,7 @@ function gisClearOfficialMode() {
   GIS.official.result = null;
   GIS.official.fallbackNote = false;
   if (window.GISOfficial) window.GISOfficial.reset();
+  gisClearInventoryDrawer();
   const banner = document.getElementById('gis-mode-banner');
   if (banner) banner.hidden = true;
   const controls = document.getElementById('gis-layer-controls');
@@ -3987,11 +4001,261 @@ function gisRenderOfficialMode(result, context) {
   gisResetDetail('Select a planar object on the map to inspect its official GIS details.');
   gisRenderOfficialMetrics();
   gisSetStatus('Official GIS layout loaded for ' + context.facilityName + '.');
+  gisWsRefreshInventory();
 }
 
 function gisToggleLayer(layerKey, checked) {
   if (window.GISOfficial) window.GISOfficial.setLayerVisible(layerKey, checked);
   gisRenderOfficialMetrics();
+}
+
+// ── Immersive GIS workspace controls ──
+
+function gisWsHome() {
+  // Return to the normal dashboard / Robot Count navigation.
+  showView('robots');
+}
+
+function gisWsToggleMapMode() {
+  const G = window.GISOfficial;
+  if (!G) return;
+  const mode = G.state.basemapMode === 'satellite' ? 'map' : 'satellite';
+  G.setBasemapMode(mode);
+}
+
+function gisWsToggleFullscreen() {
+  const workspace = document.getElementById('gis-workspace');
+  if (!workspace) return;
+  if (document.fullscreenElement) {
+    if (document.exitFullscreen) document.exitFullscreen();
+  } else if (workspace.requestFullscreen) {
+    workspace.requestFullscreen().catch(() => {});
+  }
+  if (window.GISOfficial) window.GISOfficial.invalidateSize();
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('fullscreenchange', () => {
+    const btn = document.getElementById('gis-ws-fullscreen');
+    if (btn) btn.setAttribute('aria-pressed', String(!!document.fullscreenElement));
+    if (window.GISOfficial) window.GISOfficial.invalidateSize();
+  });
+}
+
+function gisWsToggleDrawer() {
+  const drawer = document.getElementById('gis-inventory-drawer');
+  const body = document.querySelector('.gis-ws-body');
+  const toggle = document.getElementById('gis-drawer-toggle');
+  if (!drawer) return;
+  const collapsed = drawer.classList.toggle('collapsed');
+  if (body) body.classList.toggle('drawer-collapsed', collapsed);
+  if (toggle) toggle.setAttribute('aria-pressed', String(collapsed));
+  setTimeout(() => { if (window.GISOfficial) window.GISOfficial.invalidateSize(); }, 280);
+}
+
+function gisWsToggleLayerPanel() {
+  const panel = document.getElementById('gis-ws-layer-panel');
+  const toggle = document.getElementById('gis-layer-panel-toggle');
+  if (!panel) return;
+  const collapsed = panel.classList.toggle('collapsed');
+  if (toggle) toggle.setAttribute('aria-pressed', String(collapsed));
+}
+
+// ── Inventory drawer (official GIS layout) ──
+
+function gisInventoryFilters() {
+  return {
+    customerId: (document.getElementById('gis-customer') || {}).value || '',
+    titleId: (document.getElementById('gis-title') || {}).value || '',
+    itemId: (document.getElementById('gis-item') || {}).value || '',
+  };
+}
+
+function gisSetInventoryEmpty(message) {
+  const empty = document.getElementById('gis-inventory-empty');
+  if (!empty) return;
+  empty.hidden = false;
+  empty.textContent = message;
+}
+
+function gisRenderInventorySummaryTable() {
+  const G = window.GISOfficial;
+  const table = document.getElementById('gis-inventory-rows');
+  const empty = document.getElementById('gis-inventory-empty');
+  if (!G || !table) return;
+  const query = ((document.getElementById('gis-search') || {}).value || '').trim().toLowerCase();
+  const rows = (G.state.inventory.summary || []).filter(row => {
+    if (!query) return true;
+    return String(row.name || '').toLowerCase().includes(query) || String(row.sourceName || '').toLowerCase().includes(query);
+  });
+  const totalQty = rows.reduce((sum, row) => sum + row.qty, 0);
+  const status = document.getElementById('gis-customer-summary');
+  if (status) {
+    status.textContent = rows.length.toLocaleString() + ' summary rows · ' + totalQty.toLocaleString() + ' total qty' + (query ? ' matching search' : '') + '.';
+  }
+  if (empty) empty.hidden = true;
+  if (!rows.length) {
+    table.innerHTML = '';
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent = G.state.inventory.summary.length ? 'No summary rows match the current search.' : 'No inventory summary is available for this warehouse.';
+    }
+    return;
+  }
+  table.innerHTML = rows.map(row => {
+    const kindLabel = row.kind === 'polygon' ? 'Planar' : (row.kind === 'category' ? 'Area' : 'Other');
+    const actions = [];
+    if (row.kind === 'polygon') {
+      actions.push('<button type="button" class="gis-ws-text-btn" data-gis-action="highlight" data-gis-name="' + esc(row.name) + '">Highlight</button>');
+    }
+    actions.push('<button type="button" class="gis-ws-text-btn" data-gis-action="detail" data-gis-name="' + esc(row.name) + '">Detail</button>');
+    return '<tr data-gis-row-kind="' + row.kind + '"><td><span class="gis-inventory-row-kind ' + row.kind + '">' + kindLabel + '</span>' + esc(row.name) + '</td><td class="num">' + Number(row.qty).toLocaleString() + '</td><td class="num gis-inventory-row-actions">' + actions.join('') + '</td></tr>';
+  }).join('');
+}
+
+async function gisWsRefreshInventory() {
+  const G = window.GISOfficial;
+  if (!G || !GIS.official.active) return;
+  const refreshBtn = document.getElementById('gis-inventory-refresh');
+  if (refreshBtn) refreshBtn.disabled = true;
+  if (refreshBtn) refreshBtn.textContent = 'Loading…';
+  gisSetInventoryEmpty('Loading inventory summary…');
+  try {
+    const rows = await G.loadInventoryStat(gisInventoryFilters());
+    if (!GIS.official.active) return;
+    G.state.inventory.summary = rows.map(row => G.pure.gisClassifySummaryRow(row, G.state.featureByName));
+    gisRenderInventorySummaryTable();
+  } catch (error) {
+    console.warn('[gis] Inventory summary unavailable', error);
+    if (GIS.official.active) gisSetInventoryEmpty('The inventory summary could not be loaded.');
+  } finally {
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '↻ Refresh'; }
+  }
+}
+
+function gisWsInventoryFilterChange() {
+  gisWsRefreshInventory();
+}
+
+function gisRenderInventoryDetailRows(result) {
+  const content = document.getElementById('gis-detail-content');
+  if (!content) return;
+  const rows = Array.isArray(result.rows) ? result.rows : [];
+  const total = Number(result.total) || 0;
+  const page = Number(result.page) || 1;
+  const pageSize = Number(result.pageSize) || 50;
+  if (!rows.length) {
+    content.innerHTML = '<div class="gis-detail-empty">No inventory detail rows are available for this planar.</div>';
+    return;
+  }
+  const skipKeys = new Set(['id', 'planarName', 'warehouseId', 'facilityId']);
+  const renderRow = row => {
+    const fields = Object.entries(row || {}).filter(([key]) => !skipKeys.has(key) && row[key] != null && row[key] !== '').slice(0, 6);
+    const pairs = fields.map(([key, value]) => {
+      const label = String(key).replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return '<div class="gis-detail-field"><span>' + esc(label) + '</span><strong>' + esc(String(value)) + '</strong></div>';
+    }).join('');
+    return '<div class="gis-detail-bay">' + esc(row.locationName || row.location || row.lpId || row.licensePlate || ('Row ' + (rows.indexOf(row) + 1))) + '</div><div class="gis-detail-summary">' + pairs + '</div>';
+  };
+  const pager = total > pageSize
+    ? '<div class="gis-detail-limit">Page ' + page + ' · ' + total.toLocaleString() + ' rows total · <button type="button" class="gis-ws-text-btn" ' + (page <= 1 ? 'disabled' : '') + ' onclick="gisWsInventoryPage(-1)">Prev</button> <button type="button" class="gis-ws-text-btn" ' + (page * pageSize >= total ? 'disabled' : '') + ' onclick="gisWsInventoryPage(1)">Next</button></div>'
+    : '<div class="gis-detail-limit">' + rows.length.toLocaleString() + ' row(s) · ' + total.toLocaleString() + ' total</div>';
+  content.innerHTML = rows.map(renderRow).join('') + pager;
+}
+
+async function gisWsInventoryDetail(name) {
+  const G = window.GISOfficial;
+  const content = document.getElementById('gis-detail-content');
+  const title = document.getElementById('gis-inventory-detail-title');
+  const detail = document.getElementById('gis-inventory-detail');
+  const tableWrap = document.querySelector('.gis-inventory-table-wrap');
+  const head = document.querySelector('.gis-inventory-head');
+  if (!G || !content) return;
+  G.state.inventory.detailPlanar = name;
+  G.state.inventory.detailPage = 1;
+  if (detail) detail.hidden = false;
+  if (tableWrap) tableWrap.hidden = true;
+  if (head) head.hidden = true;
+  if (title) title.textContent = name;
+  content.innerHTML = '<div class="gis-detail-empty">Loading inventory detail…</div>';
+  try {
+    const result = await G.loadInventoryDetail(name, gisInventoryFilters(), 1, 50);
+    if (!GIS.official.active || G.state.inventory.detailPlanar !== name) return;
+    gisRenderInventoryDetailRows(result);
+  } catch (error) {
+    console.warn('[gis] Inventory detail unavailable', error);
+    content.innerHTML = '<div class="gis-detail-empty">Inventory detail could not be loaded.</div>';
+  }
+}
+
+function gisWsInventoryPage(direction) {
+  const G = window.GISOfficial;
+  const name = G && G.state.inventory.detailPlanar;
+  if (!G || !name) return;
+  const page = Math.max(1, G.state.inventory.detailPage + direction);
+  G.state.inventory.detailPage = page;
+  const content = document.getElementById('gis-detail-content');
+  if (content) content.innerHTML = '<div class="gis-detail-empty">Loading inventory detail…</div>';
+  G.loadInventoryDetail(name, gisInventoryFilters(), page, 50).then(result => {
+    if (GIS.official.active) gisRenderInventoryDetailRows(result);
+  }).catch(() => {});
+}
+
+function gisWsInventoryBack() {
+  const G = window.GISOfficial;
+  const detail = document.getElementById('gis-inventory-detail');
+  const tableWrap = document.querySelector('.gis-inventory-table-wrap');
+  const head = document.querySelector('.gis-inventory-head');
+  if (G) G.state.inventory.detailPlanar = '';
+  if (detail) detail.hidden = true;
+  if (tableWrap) tableWrap.hidden = false;
+  if (head) head.hidden = false;
+  gisRenderInventorySummaryTable();
+}
+
+function gisWsInventoryHighlight(name) {
+  const G = window.GISOfficial;
+  if (!G) return;
+  const ok = G.focusPlanarByName(name);
+  const summary = document.getElementById('gis-customer-summary');
+  if (!ok) {
+    if (summary) summary.textContent = 'Planar ' + name + ' has no matching polygon on the official layout.';
+    return;
+  }
+  document.querySelectorAll('#gis-inventory-rows tr').forEach(row => {
+    const cell = row.querySelector('td');
+    row.classList.toggle('highlighted', !!cell && cell.textContent.includes(name));
+  });
+  if (summary) summary.textContent = 'Highlighted planar ' + name + ' on the map.';
+}
+
+function gisClearInventoryDrawer() {
+  const G = window.GISOfficial;
+  const table = document.getElementById('gis-inventory-rows');
+  const detail = document.getElementById('gis-inventory-detail');
+  const tableWrap = document.querySelector('.gis-inventory-table-wrap');
+  const head = document.querySelector('.gis-inventory-head');
+  const empty = document.getElementById('gis-inventory-empty');
+  if (G && G.state.inventory) G.state.inventory.summary = [];
+  if (table) table.innerHTML = '';
+  if (detail) detail.hidden = true;
+  if (tableWrap) tableWrap.hidden = false;
+  if (head) head.hidden = false;
+  if (empty) {
+    empty.hidden = false;
+    empty.textContent = 'Inventory summary is available with the official GIS layout.';
+  }
+}
+
+// Delegated actions for the inventory summary table (Highlight / Detail).
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('click', event => {
+    const actionBtn = event.target && event.target.closest ? event.target.closest('[data-gis-action]') : null;
+    if (!actionBtn || !GIS.official.active) return;
+    const name = actionBtn.dataset.gisName;
+    if (!name) return;
+    if (actionBtn.dataset.gisAction === 'highlight') gisWsInventoryHighlight(name);
+    else if (actionBtn.dataset.gisAction === 'detail') gisWsInventoryDetail(name);
+  });
 }
 
 function gisDashboardFacilityContext() {

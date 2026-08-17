@@ -23,6 +23,15 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   assert.doesNotMatch(html, /gis-official-map\.js/, 'official GIS renderer must not be a static page script');
   assert.match(html, /id="gis-layer-controls"/);
   assert.match(html, /id="gis-mode-banner"/);
+  // Vendored Leaflet ships as hashed lazy assets, never static page scripts.
+  assert.match(manifest['/assets/vendor/leaflet/leaflet.js'], /leaflet\.[0-9a-f]{10}\.js$/);
+  assert.match(manifest['/assets/vendor/leaflet/leaflet.css'], /leaflet\.[0-9a-f]{10}\.css$/);
+  assert.equal(manifest['/assets/vendor/leaflet/images/layers.png'], '/assets/vendor/leaflet/images/layers.png', 'vendor images stay verbatim for css url() refs');
+  assert.doesNotMatch(html, /leaflet\./, 'no static Leaflet assets in the page');
+  assert.match(html, /id="gis-inventory-drawer"/);
+  assert.match(html, /id="gis-ws-leaflet"/);
+  assert.match(html, /id="gis-ws-layer-panel"/);
+  assert.match(html, /id="gis-map-mode"/);
   for (const output of Object.values(manifest)) {
     const full = path.join(dist, output.replace(/^\//, ''));
     assert.equal(fs.existsSync(full), true, output);

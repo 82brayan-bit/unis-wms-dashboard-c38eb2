@@ -931,132 +931,189 @@
         </div>
       </div>
 
-      <!-- ════ VIEW: GIS ════ -->
+      <!-- ════ VIEW: GIS — immersive official workspace ════ -->
       <div class="view" id="view-gis">
-        <div class="card gis-toolbar">
-          <div class="gis-heading-row">
-            <div>
-              <div class="card-ttl">Warehouse Floor Map</div>
-              <div class="scheduler-help">A schematic, not-to-scale layout derived from real WMS aisle and bay topology.</div>
-            </div>
-            <button class="btn btn-primary gis-refresh" id="gis-refresh" type="button" onclick="refreshGisView()" aria-describedby="gis-status">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8.1 8.1 0 1 0 2 5.3"/><polyline points="20 4 20 11 13 11"/></svg>
-              <span id="gis-refresh-label">Refresh</span>
-            </button>
-          </div>
-          <div id="gis-mode-banner" class="gis-mode-banner" hidden>
-            <strong></strong><span></span>
-          </div>
-          <div class="gis-context" aria-label="Selected facility">
-            <span class="gis-context-label">Facility</span>
-            <strong id="gis-facility-name">Selected facility</strong>
-            <span id="gis-facility-id"></span>
-          </div>
-          <div class="gis-filter-grid">
-            <div class="cc-field">
-              <label class="cc-label" for="gis-customer">Customer</label>
-              <select class="cc-input" id="gis-customer" onchange="gisHandleCustomerChange()"><option value="">All customers</option></select>
-            </div>
-            <div class="cc-field">
-              <label class="cc-label" for="gis-search">Location or aisle</label>
-              <input class="cc-input" id="gis-search" type="search" placeholder="Search locations" oninput="queueGisRender()"/>
-            </div>
-            <div class="cc-field">
-              <label class="cc-label" for="gis-occupancy">Occupancy</label>
-              <select class="cc-input" id="gis-occupancy" onchange="queueGisRender()"><option value="">All occupancy</option><option value="EMPTY">Empty</option><option value="OCCUPIED">Occupied</option><option value="FULL">Full</option></select>
-            </div>
-            <div class="cc-field">
-              <label class="cc-label" for="gis-type">Location type</label>
-              <select class="cc-input" id="gis-type" onchange="queueGisRender()"><option value="">All types</option></select>
-            </div>
-            <div class="cc-field">
-              <label class="cc-label" for="gis-color-mode">Color by</label>
-              <select class="cc-input" id="gis-color-mode" onchange="queueGisRender()"><option value="occupancy">Occupancy</option><option value="customer">Customer</option><option value="status">Location status</option></select>
-            </div>
-          </div>
-          <div id="gis-status" class="gis-status" role="status" aria-live="polite">Choose GIS from Robot Count to load facility locations.</div>
-          <div id="gis-customer-summary" class="gis-customer-summary" role="status" aria-live="polite">Showing overall facility information.</div>
-        </div>
-
-        <div class="gis-metrics" aria-label="Location summary">
-          <div class="kpi"><div class="kpi-ico blue">L</div><div><div class="kpi-lbl" id="gis-kpi-locations-lbl">Locations</div><div class="kpi-val" id="gis-kpi-locations">—</div><div class="kpi-chg neutral" id="gis-kpi-locations-chg">matching filters</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple">A</div><div><div class="kpi-lbl" id="gis-kpi-aisles-lbl">Aisles</div><div class="kpi-val" id="gis-kpi-aisles">—</div><div class="kpi-chg neutral" id="gis-kpi-aisles-chg">represented</div></div></div>
-          <div class="kpi"><div class="kpi-ico green">E</div><div><div class="kpi-lbl" id="gis-kpi-empty-lbl">Empty</div><div class="kpi-val" id="gis-kpi-empty">—</div><div class="kpi-chg neutral" id="gis-kpi-empty-chg">available locations</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber">O</div><div><div class="kpi-lbl" id="gis-kpi-used-lbl">Occupied / Full</div><div class="kpi-val" id="gis-kpi-used">—</div><div class="kpi-chg neutral" id="gis-kpi-used-chg">locations in use</div></div></div>
-        </div>
-
-        <div class="gis-content-grid">
-          <div class="card gis-topology-card">
-            <div class="card-hdr">
-              <div>
-                <div class="card-ttl">Complete Facility Floor Schematic</div>
-                <div class="scheduler-help" id="gis-render-note">Sectioned rack blocks represent recorded aisles and ordered bays. Wide gaps are visual separators, not measured travel aisles.</div>
+        <div class="gis-workspace" id="gis-workspace">
+          <header class="gis-ws-header">
+            <div class="gis-ws-header-left">
+              <button class="gis-ws-icon-btn" id="gis-ws-home" type="button" onclick="gisWsHome()" aria-label="Back to dashboard navigation" title="Back to dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              </button>
+              <div class="gis-ws-title-block">
+                <div class="gis-ws-title">Warehouse GIS</div>
+                <div class="gis-ws-subtitle">Official warehouse layout · Inventory</div>
               </div>
-              <div class="gis-map-actions">
-                <div class="gis-map-controls" role="group" aria-label="Map controls">
-                  <button class="gis-map-btn" id="gis-zoom-out" type="button" onclick="gisZoomMap(-1)" aria-label="Zoom out" title="Zoom out">−</button>
-                  <span id="gis-zoom-label" class="gis-zoom-label" aria-live="polite">100%</span>
-                  <button class="gis-map-btn" id="gis-zoom-in" type="button" onclick="gisZoomMap(1)" aria-label="Zoom in" title="Zoom in">+</button>
-                  <button class="gis-map-btn" id="gis-fit-map" type="button" onclick="gisFitMap()" aria-label="Fit map to view" title="Fit map to view">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+            </div>
+            <div class="gis-ws-header-center">
+              <div class="gis-ws-facility" id="gis-ws-facility" aria-label="Selected facility">
+                <span class="gis-context-label">Facility</span>
+                <strong id="gis-facility-name">Selected facility</strong>
+                <span id="gis-facility-id"></span>
+              </div>
+            </div>
+            <div class="gis-ws-header-actions">
+              <button class="gis-ws-icon-btn gis-map-mode-btn" id="gis-map-mode" type="button" onclick="gisWsToggleMapMode()" aria-label="Switch to satellite map" aria-pressed="false">Satellite</button>
+              <button class="gis-ws-icon-btn" id="gis-ws-fullscreen" type="button" onclick="gisWsToggleFullscreen()" aria-label="Toggle fullscreen" aria-pressed="false" title="Fullscreen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+              </button>
+              <div class="gis-map-controls" role="group" aria-label="Map controls">
+                <button class="gis-map-btn" id="gis-zoom-out" type="button" onclick="gisZoomMap(-1)" aria-label="Zoom out" title="Zoom out">−</button>
+                <span id="gis-zoom-label" class="gis-zoom-label" aria-live="polite">100%</span>
+                <button class="gis-map-btn" id="gis-zoom-in" type="button" onclick="gisZoomMap(1)" aria-label="Zoom in" title="Zoom in">+</button>
+                <button class="gis-map-btn" id="gis-fit-map" type="button" onclick="gisFitMap()" aria-label="Fit map to view" title="Fit map to view">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+                </button>
+              </div>
+              <button class="btn btn-primary gis-refresh" id="gis-refresh" type="button" onclick="refreshGisView()" aria-describedby="gis-status">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8.1 8.1 0 1 0 2 5.3"/><polyline points="20 4 20 11 13 11"/></svg>
+                <span id="gis-refresh-label">Refresh</span>
+              </button>
+            </div>
+            <div id="gis-mode-banner" class="gis-mode-banner" hidden>
+              <strong></strong><span></span>
+            </div>
+            <div id="gis-status" class="gis-status" role="status" aria-live="polite">Choose GIS from Robot Count to load facility locations.</div>
+          </header>
+
+          <div class="gis-ws-body">
+            <aside class="gis-inventory-drawer" id="gis-inventory-drawer" aria-label="Inventory">
+              <div class="gis-drawer-head">
+                <div class="gis-drawer-title">Inventory</div>
+                <button class="gis-ws-icon-btn" id="gis-drawer-toggle" type="button" onclick="gisWsToggleDrawer()" aria-label="Collapse inventory panel" aria-pressed="false" title="Collapse panel">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+              </div>
+              <div class="gis-drawer-body" id="gis-drawer-body">
+                <div class="gis-filter-grid">
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-customer">Customer</label>
+                    <select class="cc-input" id="gis-customer" onchange="gisHandleCustomerChange()"><option value="">All customers</option></select>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-title">Title</label>
+                    <select class="cc-input" id="gis-title" disabled onchange="gisWsInventoryFilterChange()"><option value="">Title options unavailable</option></select>
+                    <div class="scheduler-help gis-filter-helper">Title options are not available for the official GIS layout.</div>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-item">Item</label>
+                    <select class="cc-input" id="gis-item" disabled onchange="gisWsInventoryFilterChange()"><option value="">Item options unavailable</option></select>
+                    <div class="scheduler-help gis-filter-helper">Item options are not available for the official GIS layout.</div>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-search">Search</label>
+                    <input class="cc-input" id="gis-search" type="search" placeholder="Search locations" oninput="queueGisRender()"/>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-occupancy">Occupancy</label>
+                    <select class="cc-input" id="gis-occupancy" onchange="queueGisRender()"><option value="">All occupancy</option><option value="EMPTY">Empty</option><option value="OCCUPIED">Occupied</option><option value="FULL">Full</option></select>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-type">Location type</label>
+                    <select class="cc-input" id="gis-type" onchange="queueGisRender()"><option value="">All types</option></select>
+                  </div>
+                  <div class="cc-field">
+                    <label class="cc-label" for="gis-color-mode">Color by</label>
+                    <select class="cc-input" id="gis-color-mode" onchange="queueGisRender()"><option value="occupancy">Occupancy</option><option value="customer">Customer</option><option value="status">Location status</option></select>
+                  </div>
+                </div>
+                <div class="gis-metrics" aria-label="Location summary">
+                  <div class="kpi"><div class="kpi-ico blue">L</div><div><div class="kpi-lbl" id="gis-kpi-locations-lbl">Locations</div><div class="kpi-val" id="gis-kpi-locations">—</div><div class="kpi-chg neutral" id="gis-kpi-locations-chg">matching filters</div></div></div>
+                  <div class="kpi"><div class="kpi-ico purple">A</div><div><div class="kpi-lbl" id="gis-kpi-aisles-lbl">Aisles</div><div class="kpi-val" id="gis-kpi-aisles">—</div><div class="kpi-chg neutral" id="gis-kpi-aisles-chg">represented</div></div></div>
+                  <div class="kpi"><div class="kpi-ico green">E</div><div><div class="kpi-lbl" id="gis-kpi-empty-lbl">Empty</div><div class="kpi-val" id="gis-kpi-empty">—</div><div class="kpi-chg neutral" id="gis-kpi-empty-chg">available locations</div></div></div>
+                  <div class="kpi"><div class="kpi-ico amber">O</div><div><div class="kpi-lbl" id="gis-kpi-used-lbl">Occupied / Full</div><div class="kpi-val" id="gis-kpi-used">—</div><div class="kpi-chg neutral" id="gis-kpi-used-chg">locations in use</div></div></div>
+                </div>
+                <div id="gis-customer-summary" class="gis-customer-summary" role="status" aria-live="polite">Showing overall facility information.</div>
+                <div class="gis-inventory-section">
+                  <div class="gis-inventory-head">
+                    <span>Inventory Summary</span>
+                    <button class="gis-ws-text-btn" id="gis-inventory-refresh" type="button" onclick="gisWsRefreshInventory()" aria-label="Refresh inventory summary">↻ Refresh</button>
+                  </div>
+                  <div class="gis-inventory-table-wrap">
+                    <table class="gis-inventory-table" id="gis-inventory-table">
+                      <thead><tr><th>Planar / Location</th><th class="num">Total Qty</th><th class="num"></th></tr></thead>
+                      <tbody id="gis-inventory-rows"></tbody>
+                    </table>
+                  </div>
+                  <div id="gis-inventory-empty" class="gis-inventory-empty" hidden></div>
+                  <div id="gis-inventory-detail" class="gis-inventory-detail" hidden>
+                    <button class="gis-ws-text-btn" id="gis-inventory-back" type="button" onclick="gisWsInventoryBack()">← Back to summary</button>
+                    <div class="card gis-detail" id="gis-detail" aria-label="Selected location detail">
+                      <div class="card-ttl" id="gis-inventory-detail-title">Location Detail</div>
+                      <div id="gis-detail-content" class="gis-detail-content" aria-live="polite">
+                        <div class="gis-detail-empty">Select a planar object on the map to inspect its official GIS details.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <main class="gis-ws-map" id="gis-ws-map" aria-label="Warehouse map">
+              <button class="gis-ws-icon-btn gis-drawer-open" id="gis-drawer-open" type="button" onclick="gisWsToggleDrawer()" aria-label="Open inventory panel" title="Open inventory panel" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+              <div id="gis-ws-leaflet" class="gis-ws-leaflet" hidden aria-label="Official warehouse map"></div>
+              <div id="gis-map-state" class="gis-state"><strong>Warehouse map is ready to load</strong><span>Select GIS or use Refresh.</span></div>
+              <div id="gis-topology" class="gis-topology" aria-live="polite" aria-busy="false">
+                <div id="gis-map-viewport" class="gis-map-viewport" role="region" tabindex="0" aria-labelledby="gis-map-title" aria-describedby="gis-map-description gis-render-note" hidden>
+                  <span id="gis-map-title" class="gis-map-a11y-copy">Warehouse aisle and bay schematic</span>
+                  <span id="gis-map-description" class="gis-map-a11y-copy">A complete deterministic schematic based on real WMS aisle and bay ordering. The outer frame and wide gaps organize the topology visually; they are not surveyed geometry or measured travel aisles. Use the bay browser for keyboard-accessible location details.</span>
+                  <canvas id="gis-map-canvas" class="gis-map-canvas" aria-hidden="true"></canvas>
+                  <div id="gis-map-palette" class="gis-map-palette" aria-hidden="true">
+                    <i data-gis-color="canvas" class="canvas"></i><i data-gis-color="wall" class="wall"></i><i data-gis-color="floor" class="floor"></i><i data-gis-color="boundary" class="boundary"></i><i data-gis-color="rack" class="rack"></i><i data-gis-color="lane" class="lane"></i><i data-gis-color="suppressed" class="suppressed"></i>
+                    <i data-gis-color="empty" class="empty"></i><i data-gis-color="occupied" class="occupied"></i><i data-gis-color="full" class="full"></i><i data-gis-color="mixed" class="mixed"></i><i data-gis-color="unknown" class="unknown"></i>
+                    <i data-gis-color="customer-0" class="customer-0"></i><i data-gis-color="customer-1" class="customer-1"></i><i data-gis-color="customer-2" class="customer-2"></i><i data-gis-color="customer-3" class="customer-3"></i><i data-gis-color="customer-4" class="customer-4"></i>
+                    <i data-gis-color="status-usable" class="status-usable"></i><i data-gis-color="status-disabled" class="status-disabled"></i><i data-gis-color="coverage" class="coverage"></i><i data-gis-color="shared" class="shared"></i><i data-gis-color="selected" class="selected"></i>
+                  </div>
+                </div>
+              </div>
+              <div class="gis-map-browser" id="gis-map-browser">
+                <div class="cc-field">
+                  <label class="cc-label" for="gis-bay-picker">Browse mapped aisle / bay</label>
+                  <select class="cc-input" id="gis-bay-picker" onchange="gisSelectBayFromPicker()"><option value="">Select a mapped bay</option></select>
+                </div>
+                <div id="gis-bay-picker-note" class="scheduler-help">Use search or customer filters to narrow the accessible bay list.</div>
+              </div>
+              <div id="gis-render-note" class="gis-render-note">A schematic, not-to-scale layout derived from real WMS aisle and bay topology. Sectioned rack blocks represent recorded aisles and ordered bays. Wide gaps are visual separators, not measured travel aisles.</div>
+              <div class="gis-availability" aria-label="Robot positioning availability">
+                <div class="gis-availability-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s6-4.4 6-11a6 6 0 1 0-12 0c0 6.6 6 11 6 11z"/><circle cx="12" cy="10" r="2"/></svg>
+                </div>
+                <div>
+                  <div class="card-ttl">Robot Positions</div>
+                  <p>Live robot coordinates are unavailable for this facility.</p>
+                  <p class="scheduler-help">This schematic uses WMS aisle and bay topology only.</p>
+                </div>
+              </div>
+              <div id="gis-map-tooltip" class="gis-map-tooltip" role="tooltip" hidden></div>
+              <aside class="gis-ws-layer-panel" id="gis-ws-layer-panel" aria-label="Layer control">
+                <div class="gis-layer-panel-head">
+                  <span>Layers</span>
+                  <button class="gis-ws-icon-btn" id="gis-layer-panel-toggle" type="button" onclick="gisWsToggleLayerPanel()" aria-label="Collapse layer panel" aria-pressed="false" title="Collapse panel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
                   </button>
                 </div>
-                <div class="gis-legend" id="gis-map-legend" aria-label="Map legend">
-                  <span><i class="gis-legend-dot empty"></i>Empty</span>
-                  <span><i class="gis-legend-dot occupied"></i>Occupied</span>
-                  <span><i class="gis-legend-dot full"></i>Full</span>
-                  <span><i class="gis-legend-dot mixed"></i>Mixed</span>
+                <div class="gis-layer-panel-body" id="gis-layer-panel-body">
+                  <div class="gis-layer-controls" id="gis-layer-controls" role="group" aria-label="Official GIS layers" hidden>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="rack" checked onchange="gisToggleLayer('rack', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="rack"></i>Rack</label>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="bulk" checked onchange="gisToggleLayer('bulk', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="bulk"></i>Bulk</label>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="zone" checked onchange="gisToggleLayer('zone', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="zone"></i>Zone</label>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="dock" checked onchange="gisToggleLayer('dock', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="dock"></i>Dock</label>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="aisles" checked onchange="gisToggleLayer('aisles', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="aisles"></i>Aisles &amp; roads</label>
+                    <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="grid" onchange="gisToggleLayer('grid', this.checked)"/><i class="gis-layer-swatch gis-layer-swatch-grid" aria-hidden="true"></i>Cell grid</label>
+                  </div>
+                  <div class="gis-inventory-legend">
+                    <div class="gis-inventory-legend-title">Inventory Legend</div>
+                    <div class="gis-legend" id="gis-map-legend" aria-label="Map legend">
+                      <span><i class="gis-legend-dot empty"></i>Empty</span>
+                      <span><i class="gis-legend-dot occupied"></i>Occupied</span>
+                      <span><i class="gis-legend-dot full"></i>Full</span>
+                      <span><i class="gis-legend-dot mixed"></i>Mixed</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="gis-layer-controls" id="gis-layer-controls" role="group" aria-label="Official GIS layers" hidden>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="rack" checked onchange="gisToggleLayer('rack', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="rack"></i>Rack</label>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="bulk" checked onchange="gisToggleLayer('bulk', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="bulk"></i>Bulk</label>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="zone" checked onchange="gisToggleLayer('zone', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="zone"></i>Zone</label>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="dock" checked onchange="gisToggleLayer('dock', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="dock"></i>Dock</label>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="aisles" checked onchange="gisToggleLayer('aisles', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="aisles"></i>Aisles &amp; roads</label>
-                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="grid" onchange="gisToggleLayer('grid', this.checked)"/><i class="gis-layer-swatch gis-layer-swatch-grid" aria-hidden="true"></i>Cell grid</label>
-                </div>
-              </div>
-            </div>
-            <div class="gis-map-browser" id="gis-map-browser">
-              <div class="cc-field">
-                <label class="cc-label" for="gis-bay-picker">Browse mapped aisle / bay</label>
-                <select class="cc-input" id="gis-bay-picker" onchange="gisSelectBayFromPicker()"><option value="">Select a mapped bay</option></select>
-              </div>
-              <div id="gis-bay-picker-note" class="scheduler-help">Use search or customer filters to narrow the accessible bay list.</div>
-            </div>
-            <div id="gis-topology" class="gis-topology" aria-live="polite" aria-busy="false">
-              <div id="gis-map-state" class="gis-state"><strong>Warehouse map is ready to load</strong><span>Select GIS or use Refresh.</span></div>
-              <div id="gis-map-viewport" class="gis-map-viewport" role="region" tabindex="0" aria-labelledby="gis-map-title" aria-describedby="gis-map-description gis-render-note" hidden>
-                <span id="gis-map-title" class="gis-map-a11y-copy">Warehouse aisle and bay schematic</span>
-                <span id="gis-map-description" class="gis-map-a11y-copy">A complete deterministic schematic based on real WMS aisle and bay ordering. The outer frame and wide gaps organize the topology visually; they are not surveyed geometry or measured travel aisles. Use the bay browser for keyboard-accessible location details.</span>
-                <canvas id="gis-map-canvas" class="gis-map-canvas" aria-hidden="true"></canvas>
-                <div id="gis-map-tooltip" class="gis-map-tooltip" role="tooltip" hidden></div>
-                <div id="gis-map-palette" class="gis-map-palette" aria-hidden="true">
-                  <i data-gis-color="canvas" class="canvas"></i><i data-gis-color="wall" class="wall"></i><i data-gis-color="floor" class="floor"></i><i data-gis-color="boundary" class="boundary"></i><i data-gis-color="rack" class="rack"></i><i data-gis-color="lane" class="lane"></i><i data-gis-color="suppressed" class="suppressed"></i>
-                  <i data-gis-color="empty" class="empty"></i><i data-gis-color="occupied" class="occupied"></i><i data-gis-color="full" class="full"></i><i data-gis-color="mixed" class="mixed"></i><i data-gis-color="unknown" class="unknown"></i>
-                  <i data-gis-color="customer-0" class="customer-0"></i><i data-gis-color="customer-1" class="customer-1"></i><i data-gis-color="customer-2" class="customer-2"></i><i data-gis-color="customer-3" class="customer-3"></i><i data-gis-color="customer-4" class="customer-4"></i>
-                  <i data-gis-color="status-usable" class="status-usable"></i><i data-gis-color="status-disabled" class="status-disabled"></i><i data-gis-color="coverage" class="coverage"></i><i data-gis-color="shared" class="shared"></i><i data-gis-color="selected" class="selected"></i>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="gis-side-stack">
-            <aside class="card gis-availability" aria-label="Robot positioning availability">
-              <div class="gis-availability-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s6-4.4 6-11a6 6 0 1 0-12 0c0 6.6 6 11 6 11z"/><circle cx="12" cy="10" r="2"/></svg>
-              </div>
-              <div>
-                <div class="card-ttl">Robot Positions</div>
-                <p>Live robot coordinates are unavailable for this facility.</p>
-                <p class="scheduler-help">This schematic uses WMS aisle and bay topology only.</p>
-              </div>
-            </aside>
-            <aside class="card gis-detail" id="gis-detail" aria-label="Selected location detail">
-              <div class="card-ttl">Selected Location</div>
-              <div id="gis-detail-content" class="gis-detail-content" aria-live="polite">
-                <div class="gis-detail-empty">Select a bay on the map to inspect its real levels and slots.</div>
-              </div>
-            </aside>
+              </aside>
+            </main>
           </div>
         </div>
       </div>

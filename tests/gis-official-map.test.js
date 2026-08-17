@@ -111,6 +111,25 @@ function buildFetchStub(options = {}) {
         .map(name => ({ planarName: name, customerId: 'CUST-1', customerName: 'Fixture Customer' }));
       return respond({ success: true, data });
     }
+    if (url.includes('/gis-bam/location-inventory/stat')) {
+      const statRows = options.statRows !== undefined ? options.statRows : [
+        { planarName: 'RACK-0001', totalQty: 42 },
+        { planarName: '', totalQty: 5 },
+        { planarName: 'Sorting Staging Zone', totalQty: 3 },
+        { planarName: 'UNKNOWN-AREA', totalQty: 7 },
+      ];
+      return respond({ success: true, data: statRows });
+    }
+    if (url.includes('/gis-bam/location-inventory/detail')) {
+      const detailRows = options.detailRows !== undefined ? options.detailRows : [
+        { location: 'RACK-0001-A-01', lpId: 'LP-100', qty: 12 },
+        { location: 'RACK-0001-A-02', lpId: 'LP-101', qty: 30 },
+      ];
+      const body = JSON.parse(fetchOptions.body);
+      const page = Number(body.currentPage) || 1;
+      const size = Number(body.pageSize) || 50;
+      return respond({ success: true, data: { list: detailRows.slice((page - 1) * size, page * size), totalCount: detailRows.length } });
+    }
     return Promise.reject(new Error('unexpected fetch: ' + url));
   };
 }
@@ -322,4 +341,91 @@ test('official mode chrome and layer controls exist in the GIS view', () => {
   assert.match(modules, /function gisRenderOfficialMetrics\(\)/);
   assert.match(modules, /function gisPopulateOfficialFilters\(\)/);
   assert.match(modules, /function gisRenderOfficialLegend\(\)/);
+});
+
+
+// ── Immersive workspace: inventory summary, focus, basemap, map engine ──
+
+test('inventory summary rows classify against real geometry only', async () => {
+  const G = loadOfficial(buildFetchStub());
+  await G.loadForFacility('LT_F1', 'Valley View');
+  const rows = await G.loadInventoryStat({ customerId: 'CUST-1' });
+  assert.equal(rows.length, 4);
+  const p = G.pure;
+  const classified = rows.map(row => p.gisClassifySummaryRow(row, G.state.featureByName));
+  assert.equal(classified[0].kind, 'polygon', 'RACK-0001 matches its polygon');
+  assert.equal(classified[0].name, 'RACK-0001');
+  assert.equal(classified[0].qty, 42);
+  assert.equal(classified[1].kind, 'category', 'blank value is a category, never a polygon');
+  assert.equal(classified[1].name, 'Pending Location');
+  assert.equal(classified[2].kind, 'category', 'staging area is a category');
+  assert.equal(classified[2].name, 'Staging');
+  assert.equal(classified[3].kind, 'unmapped', 'unknown planar stays unmapped');
+  G.reset();
+});
+
+test('inventory detail loads paginated rows through the read-only proxy', async () => {
+  const G = loadOfficial(buildFetchStub({ detailRows: Array.from({ length: 60 }, (_, i) => ({ location: 'R-' + i, lpId: 'LP-' + i, qty: i })) }));
+  await G.loadForFacility('LT_F1', 'Valley View');
+  const page1 = await G.loadInventoryDetail('RACK-0001', {}, 1, 50);
+  assert.equal(page1.rows.length, 50);
+  assert.equal(page1.total, 60);
+  assert.equal(page1.page, 1);
+  const page2 = await G.loadInventoryDetail('RACK-0001', {}, 2, 50);
+  assert.equal(page2.rows.length, 10);
+  G.reset();
+});
+
+test('focusPlanarByName highlights only exact official planar names', async () => {
+  const G = loadOfficial(buildFetchStub());
+  await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(G.state.featureByName.has('RACK-0001'), true);
+  assert.equal(G.focusPlanarByName('RACK-0001'), true);
+  assert.equal(G.state.selectedFeature.feature.properties.name, 'RACK-0001');
+  assert.equal(G.focusPlanarByName('RACK-NOT-A-REAL-PLANAR'), false, 'unknown planar is never focused');
+  assert.equal(G.focusPlanarByName(''), false);
+  G.reset();
+});
+
+test('basemap mode selection is keyless and follows the theme', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+  assert.equal(p.gisBasemapUrl('map', 'light').includes('light_all'), true);
+  assert.equal(p.gisBasemapUrl('map', 'dark').includes('dark_all'), true);
+  assert.equal(p.gisBasemapUrl('satellite', 'dark').includes('arcgisonline.com'), true);
+  assert.match(p.gisBasemapAttribution('map'), /OpenStreetMap/);
+  assert.match(p.gisBasemapAttribution('map'), /CARTO/);
+  assert.match(p.gisBasemapAttribution('satellite'), /Esri/);
+  assert.doesNotMatch(p.gisBasemapUrl('map', 'light') + p.gisBasemapAttribution('map'), /key=|api[_-]?key/i);
+});
+
+test('map engine failure falls back truthfully without geometry loss', async () => {
+  // window.L missing with a real DOM-capable document → unavailable map-engine.
+  const sandbox = {
+    window: {},
+    document: { getElementById: () => null, documentElement: { classList: { contains: () => false } }, createElement: () => ({ setAttribute() {}, appendChild() {} }) },
+    fetch: buildFetchStub(),
+    requestAnimationFrame: () => 0,
+    cancelAnimationFrame: () => {},
+    Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const G = sandbox.window.GISOfficial;
+  G.state.leafletLoading = Promise.resolve(null); // script load failed
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'map-engine');
+});
+
+test('DOM-less sandbox still reports official geometry without a map', async () => {
+  const G = loadOfficial(buildFetchStub());
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(G.state.mapReady, false, 'no Leaflet in the sandbox, geometry still authoritative');
+  assert.equal(G.state.featureByName.size, 130, 'rack + bulk planars indexed by exact name');
 });

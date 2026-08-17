@@ -231,7 +231,26 @@ function gisResolveProxyRoute(method, url) {
     return { upstreamPath: suffix, method, query: '', body: null, planarNamesBody: true };
   }
 
+  // POST /gis-bam/location-inventory/stat — read-only inventory summary rows.
+  if (suffix === '/gis-bam/location-inventory/stat') {
+    if (method !== 'POST') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: suffix, method, query: '', body: null, inventoryStatBody: true };
+  }
+
+  // POST /gis-bam/location-inventory/detail — read-only paginated inventory rows.
+  if (suffix === '/gis-bam/location-inventory/detail') {
+    if (method !== 'POST') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: suffix, method, query: '', body: null, inventoryDetailBody: true };
+  }
+
   return { reject: { code: 404, msg: 'Unknown GIS proxy route' } };
+}
+
+// Optional inventory filter id: null/empty is allowed, otherwise a bounded string.
+function gisInventoryFilterValue(value) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' || value.length > 128) return false;
+  return value;
 }
 
 async function handleGisProxy(req, res, url) {
@@ -239,7 +258,7 @@ async function handleGisProxy(req, res, url) {
   if (resolved.reject) return send(res, resolved.reject.code, { success: false, msg: resolved.reject.msg });
 
   let body = null;
-  if (resolved.forwardBody || resolved.body !== null || resolved.planarNamesBody) {
+  if (resolved.forwardBody || resolved.body !== null || resolved.planarNamesBody || resolved.inventoryStatBody || resolved.inventoryDetailBody) {
     const raw = await readBody(req);
     if (raw.length > 1_000_000) return send(res, 413, { success: false, msg: 'GIS proxy body too large' });
     let parsed;
@@ -254,6 +273,35 @@ async function handleGisProxy(req, res, url) {
         return send(res, 400, { success: false, msg: 'Invalid planarNames entry' });
       }
       body = JSON.stringify({ planarNames: names });
+    } else if (resolved.inventoryStatBody) {
+      // Whitelist-rebuilt body: only customerId/titleId/itemId may be sent.
+      const clean = {};
+      for (const key of ['customerId', 'titleId', 'itemId']) {
+        const value = gisInventoryFilterValue(parsed[key]);
+        if (value === false) return send(res, 400, { success: false, msg: 'Invalid ' + key });
+        if (value !== null) clean[key] = value;
+      }
+      body = JSON.stringify(clean);
+    } else if (resolved.inventoryDetailBody) {
+      const planarName = parsed.planarName;
+      if (typeof planarName !== 'string' || !planarName.trim() || planarName.length > 128) {
+        return send(res, 400, { success: false, msg: 'Invalid planarName' });
+      }
+      const page = parsed.currentPage == null ? 1 : Number(parsed.currentPage);
+      const pageSize = parsed.pageSize == null ? 50 : Number(parsed.pageSize);
+      if (!Number.isSafeInteger(page) || page < 1 || page > GIS_MAX_PAGE) {
+        return send(res, 400, { success: false, msg: 'Invalid currentPage' });
+      }
+      if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > GIS_MAX_PAGE) {
+        return send(res, 400, { success: false, msg: 'Invalid pageSize' });
+      }
+      const clean = { planarName, currentPage: page, pageSize };
+      for (const key of ['customerId', 'titleId', 'itemId']) {
+        const value = gisInventoryFilterValue(parsed[key]);
+        if (value === false) return send(res, 400, { success: false, msg: 'Invalid ' + key });
+        if (value !== null) clean[key] = value;
+      }
+      body = JSON.stringify(clean);
     } else if (resolved.forwardBody) {
       // Facility-search: forward the caller's read-only body verbatim.
       body = raw || '{}';

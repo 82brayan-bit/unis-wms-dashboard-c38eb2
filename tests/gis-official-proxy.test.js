@@ -100,6 +100,21 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
     assert.equal(forwarded.at(-1).url, '/gis-bam/location-inventory/customers-by-planars');
     assert.deepEqual(JSON.parse(forwarded.at(-1).body).planarNames, ['R-001', 'R-002']);
 
+    // Inventory stat: whitelisted filters only; empty filters forward an empty body.
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'POST', JSON.stringify({ customerId: 'CUST-1', titleId: 'T-1', itemId: 'I-1' }), authHeaders);
+    assert.equal(response.status, 200);
+    assert.equal(forwarded.at(-1).url, '/gis-bam/location-inventory/stat');
+    assert.deepEqual(JSON.parse(forwarded.at(-1).body), { customerId: 'CUST-1', titleId: 'T-1', itemId: 'I-1' });
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'POST', '{}', authHeaders);
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse(forwarded.at(-1).body), {}, 'stat with no filters forwards an empty object');
+
+    // Inventory detail: planarName + bounded pagination + optional filters.
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-0001', currentPage: 2, pageSize: 25, customerId: 'CUST-1' }), authHeaders);
+    assert.equal(response.status, 200);
+    assert.equal(forwarded.at(-1).url, '/gis-bam/location-inventory/detail');
+    assert.deepEqual(JSON.parse(forwarded.at(-1).body), { planarName: 'RACK-0001', currentPage: 2, pageSize: 25, customerId: 'CUST-1' });
+
     // ── Validation rejections ──
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/planar-model/facility-type-data?warehouseId=abc&type=RACK', 'GET');
     assert.equal(response.status, 400, 'non-numeric warehouseId rejected');
@@ -116,6 +131,29 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
     const tooMany = Array.from({ length: 2001 }, (_, index) => 'p' + index);
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/customers-by-planars', 'POST', JSON.stringify({ planarNames: tooMany }));
     assert.equal(response.status, 400, 'planarNames over limit rejected');
+
+    // Inventory stat/detail strict body validation.
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'POST', JSON.stringify({ customerId: 12345 }));
+    assert.equal(response.status, 400, 'non-string customerId rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'POST', JSON.stringify({ titleId: 'x'.repeat(200) }));
+    assert.equal(response.status, 400, 'oversized titleId rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'GET');
+    assert.equal(response.status, 405, 'GET stat refused');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: '' }));
+    assert.equal(response.status, 400, 'empty planarName rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', currentPage: 0 }));
+    assert.equal(response.status, 400, 'detail currentPage below 1 rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', pageSize: 99999 }));
+    assert.equal(response.status, 400, 'detail pageSize over bound rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', pageSize: 'many' }));
+    assert.equal(response.status, 400, 'non-numeric pageSize rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'DELETE');
+    assert.equal(response.status, 405, 'DELETE detail refused');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'PUT', '{}');
+    assert.equal(response.status, 405, 'PUT stat refused');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', currentPage: 1, pageSize: 50, write: true }));
+    assert.equal(response.status, 200, 'extra unknown keys are stripped, never forwarded');
+    assert.equal(JSON.parse(forwarded.at(-1).body).write, undefined, 'unknown keys stripped from the forwarded body');
 
     // ── No GIS writes: mutating methods and unlisted routes are refused ──
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'POST', '{}');
@@ -137,7 +175,7 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
     assert.equal(forwarded.some(entry => !['GET', 'POST'].includes(entry.method)), false, 'a non-read method reached the GIS upstream');
     const seenUrls = new Set(forwarded.map(entry => entry.url));
     for (const url of seenUrls) {
-      assert.match(url, /^(\/gis-bam\/facility-search|\/gis-app\/warehouse|\/gis-app\/warehouse\/\d+|\/gis-bam\/planar-model\/facility-type-data\?warehouseId=\d+&type=(RACK|BULK|ZONE|DOCK)|\/gis-app\/warehouse-aisles\/warehouse\/\d+|\/gis-bam\/location-inventory\/customers-by-planars)$/,
+      assert.match(url, /^(\/gis-bam\/facility-search|\/gis-app\/warehouse|\/gis-app\/warehouse\/\d+|\/gis-bam\/planar-model\/facility-type-data\?warehouseId=\d+&type=(RACK|BULK|ZONE|DOCK)|\/gis-app\/warehouse-aisles\/warehouse\/\d+|\/gis-bam\/location-inventory\/customers-by-planars|\/gis-bam\/location-inventory\/stat|\/gis-bam\/location-inventory\/detail)$/,
         'unexpected upstream URL reached the mock: ' + url);
     }
   } finally {

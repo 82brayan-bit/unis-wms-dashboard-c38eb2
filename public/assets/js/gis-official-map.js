@@ -1,11 +1,13 @@
 // ═══ OFFICIAL GIS WAREHOUSE MAP — lazy chunk, loaded only on the GIS route ═══
 // Renders the surveyed warehouse geometry from the official GIS service
 // (gis.item.com) through the read-only /api/proxy/gis/ allow list, matching
-// the official gis.item.com/gis/warehouse map experience: full fitted
-// geometry, layer toggles, hover/click details, zoom/pan/fit and
-// dark/light surfaces. Records without real latlng coordinates are never
-// placed synthetically; when official geometry is unavailable the dashboard
-// keeps the WMS aisle/bay topology schematic as an explicit fallback.
+// the official gis.item.com/gis/warehouse map experience: an interactive
+// street basemap (dark/light + satellite), the authoritative planar geometry
+// at its real coordinates, layer toggles, hover/click details, and read-only
+// inventory stat/detail summaries. Records without real latlng coordinates
+// are never placed synthetically; when official geometry is unavailable the
+// dashboard keeps the WMS aisle/bay topology schematic as an explicit
+// fallback. Leaflet and the basemap tiles are loaded lazily on this route.
 (function () {
   'use strict';
 
@@ -21,6 +23,25 @@
   });
   var AISLE_STYLE = Object.freeze({ label: 'Aisles & roads', stroke: '#1E40AF', strokeWeight: 4, strokeOpacity: 0.8, zIndex: 1000 });
   var GRID_CELL_FEET = 3; // official cell grid step (turf squareGrid, "feet")
+
+  // Production-safe raster basemaps with required attribution (no API keys).
+  // Map mode follows the Item theme (CARTO light/dark); satellite is Esri
+  // World Imagery regardless of theme.
+  function gisBasemapUrl(mode, theme) {
+    if (mode === 'satellite') {
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    }
+    return theme === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  }
+
+  function gisBasemapAttribution(mode) {
+    if (mode === 'satellite') {
+      return 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community';
+    }
+    return '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  }
 
   function normalizeKey(value) {
     return String(value == null ? '' : value).toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -64,7 +85,6 @@
       var value = item[field];
       return value == null ? '' : String(value);
     }
-    // 1) Facility-search candidates that reference the dashboard facility.
     var candidates = Array.isArray(facilityCandidates) ? facilityCandidates : [];
     for (var i = 0; i < candidates.length; i++) {
       var candidate = candidates[i];
@@ -78,14 +98,11 @@
         var warehouseId = candidateValue(candidate, idFields[w]);
         if (/^\d+$/.test(warehouseId)) return { warehouseId: Number(warehouseId), warehouse: null, source: 'facility-search', matchedOn: idFields[w] };
       }
-      // Some search payloads nest the warehouse object itself.
       var nested = candidate.warehouse || candidate.warehouseInfo;
       if (nested && /^\d+$/.test(candidateValue(nested, 'id'))) {
         return { warehouseId: Number(nested.id), warehouse: nested, source: 'facility-search', matchedOn: 'warehouse.id' };
       }
     }
-    // 2) Warehouse list by facilityId (exact normalized identity only — never
-    //    inferred mappings between facility id shapes).
     var list = Array.isArray(warehouses) ? warehouses : [];
     for (var j = 0; j < list.length; j++) {
       var warehouse = list[j];
@@ -94,7 +111,6 @@
         return { warehouseId: Number(warehouse.id), warehouse: warehouse, source: 'warehouse.facilityId', matchedOn: 'facilityId' };
       }
     }
-    // 3) Name match against warehouse names.
     if (facilityNameKey) {
       for (var m = 0; m < list.length; m++) {
         var named = list[m];
@@ -173,12 +189,48 @@
     return map;
   }
 
+  // Inventory summary categorization: blank / Pending Location / staging /
+  // pack / dock values are business categories, never mapped onto polygons.
+  function gisCategorizeSummaryName(name) {
+    var trimmed = String(name == null ? '' : name).trim();
+    if (!trimmed || /^pending location$/i.test(trimmed)) return 'Pending Location';
+    if (/staging|暂存/i.test(trimmed)) return 'Staging';
+    if (/pack|分拣|包装/i.test(trimmed)) return 'Pack';
+    if (/dock|码头/i.test(trimmed)) return 'Dock';
+    return '';
+  }
+
+  // Classify one inventory stat row against the loaded planar geometry.
+  // polygon → exact planarName match (highlightable); category → non-geometry
+  // business area (blank/Pending Location/staging/pack/dock); unmapped → other.
+  function gisClassifySummaryRow(row, featureByName) {
+    var name = String(row && row.planarName != null ? row.planarName : '').trim();
+    var qty = Number(row && row.totalQty) || 0;
+    if (featureByName && featureByName.has(name)) {
+      return { kind: 'polygon', name: name, qty: qty };
+    }
+    var category = gisCategorizeSummaryName(name);
+    if (category) {
+      return { kind: 'category', name: category, qty: qty, sourceName: name || 'Pending Location' };
+    }
+    return { kind: 'unmapped', name: name || 'Unknown', qty: qty };
+  }
+
   // ─────────────────────────── IO (read-only via proxy) ───────────────────────────
 
   function apiFetch(pathAndQuery, options) {
     return fetch('/api/proxy/gis' + pathAndQuery, options).then(function (response) {
       return response.json().catch(function () { return null; });
     });
+  }
+
+  function inventoryFilterPayload(filters) {
+    var payload = {};
+    ['customerId', 'titleId', 'itemId'].forEach(function (key) {
+      var value = filters && filters[key];
+      if (value != null && String(value) !== '') payload[key] = String(value);
+    });
+    return payload;
   }
 
   // Loads the facility/warehouse mapping lists and resolves the warehouse id.
@@ -204,8 +256,6 @@
 
     return Promise.all([facilitySearchPromise, warehouseListPromise]).then(function (results) {
       var resolved = gisResolveWarehouse(facilityId, facilityName, results[0], results[1]);
-      // When the facility-search candidate resolves an id but the warehouse
-      // list holds the full record, attach it so authoritative stats are real.
       if (resolved && !resolved.warehouse) {
         var warehouseList = Array.isArray(results[1]) ? results[1] : [];
         for (var i = 0; i < warehouseList.length; i++) {
@@ -228,7 +278,6 @@
       if (!data || typeof data !== 'object') return { type: type, records: [], totalCount: 0, totalPage: 1 };
       if (Array.isArray(data)) return { type: type, records: data, totalCount: data.length, totalPage: 1 };
       if (!Array.isArray(data.list)) {
-        // Single-object response (e.g. a zone) → wrap it.
         return { type: type, records: [data], totalCount: 1, totalPage: 1 };
       }
       var pageSize = Math.max(1, data.list.length || 1);
@@ -279,6 +328,41 @@
     }).catch(function () { return []; });
   }
 
+  // Read-only inventory summary: POST stat with optional customer/title/item.
+  function loadInventoryStat(filters) {
+    return apiFetch('/gis-bam/location-inventory/stat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(inventoryFilterPayload(filters)),
+    }).then(function (json) {
+      var rows = Array.isArray(json) ? json : (json && json.data !== undefined ? json.data : null);
+      if (rows && Array.isArray(rows.list)) rows = rows.list;
+      return Array.isArray(rows) ? rows : [];
+    });
+  }
+
+  // Read-only paginated inventory detail for one planar.
+  function loadInventoryDetail(planarName, filters, page, pageSize) {
+    var payload = inventoryFilterPayload(filters);
+    payload.planarName = String(planarName);
+    payload.currentPage = Math.max(1, Number(page) || 1);
+    payload.pageSize = Math.max(1, Math.min(500, Number(pageSize) || 50));
+    return apiFetch('/gis-bam/location-inventory/detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(function (json) {
+      var data = json && json.data !== undefined ? json.data : json;
+      var list = data && Array.isArray(data.list) ? data.list : (Array.isArray(data) ? data : []);
+      return {
+        rows: list,
+        total: Number(data && data.totalCount) || 0,
+        page: payload.currentPage,
+        pageSize: payload.pageSize,
+      };
+    });
+  }
+
   // ─────────────────────────── Projection + spatial index ───────────────────────────
 
   var METERS_PER_DEG_LAT = 110540;
@@ -292,7 +376,8 @@
     };
   }
 
-  // Project every feature into local meters once per load.
+  // Project every feature into local meters once per load. The inverse map
+  // (world → latlng) keeps the Leaflet overlay aligned to the basemap.
   function projectFeatures(features, project) {
     var projected = [];
     for (var i = 0; i < features.length; i++) {
@@ -406,6 +491,7 @@
   var state = {
     ready: false,
     active: false,
+    mapReady: false,
     facilityId: '',
     facilityName: '',
     warehouse: null,
@@ -423,19 +509,28 @@
     outlineProjected: null,
     spatial: null,
     gridLines: [],
+    featureByName: new Map(),
     visible: { zone: true, rack: true, bulk: true, dock: true, aisles: true, grid: false },
     selectedFeature: null,
     hoveredFeature: null,
-    fit: null,
-    transform: { scale: 1, x: 0, y: 0 },
+    fitBounds: null,
     requestToken: 0,
-    canvas: null,
-    mapViewport: null,
-    pixelRatio: 1,
-    renderFrame: 0,
-    interactionsBound: false,
-    resizeBound: false,
+    centerLng: -118.24,
+    centerLat: 33.94,
     theme: 'light',
+    basemapMode: 'map',
+    map: null,
+    tileLayer: null,
+    planarLayer: null,
+    leafletLoading: null,
+    inventory: {
+      filters: { customerId: '', titleId: '', itemId: '' },
+      summary: [],
+      detailPlanar: '',
+      detail: null,
+      detailPage: 1,
+      detailPageSize: 50,
+    },
     customerFilterActive: false,
     searchFilterActive: false,
     occupancyFilterActive: false,
@@ -464,7 +559,14 @@
       ring.push([project.x(pair[0]), project.y(pair[1])]);
     }
     if (ring.length < 3) return null;
-    return { rings: [ring], bounds: { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity } };
+    var bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    for (var q = 0; q < ring.length; q++) {
+      if (ring[q][0] < bounds.minX) bounds.minX = ring[q][0];
+      if (ring[q][1] < bounds.minY) bounds.minY = ring[q][1];
+      if (ring[q][0] > bounds.maxX) bounds.maxX = ring[q][0];
+      if (ring[q][1] > bounds.maxY) bounds.maxY = ring[q][1];
+    }
+    return { rings: [ring], bounds: bounds };
   }
 
   function extendBounds(target, bounds) {
@@ -484,31 +586,7 @@
     return bounds;
   }
 
-  function fitMap() {
-    if (!state.fit) return;
-    var rect = state.mapViewport ? state.mapViewport.getBoundingClientRect() : null;
-    if (!rect || !rect.width || !rect.height) return;
-    var spanX = Math.max(1, state.fit.bounds.maxX - state.fit.bounds.minX);
-    var spanY = Math.max(1, state.fit.bounds.maxY - state.fit.bounds.minY);
-    state.fit.fitScale = Math.min((rect.width - 16) / spanX, (rect.height - 16) / spanY, 400);
-    state.transform.scale = 1;
-    state.transform.x = 0;
-    state.transform.y = 0;
-    queueRender();
-  }
-
-  function zoomBy(factor) {
-    state.transform.scale = Math.max(0.25, Math.min(40, state.transform.scale * factor));
-    queueRender();
-  }
-
-  function panBy(deltaX, deltaY) {
-    state.transform.x += deltaX;
-    state.transform.y += deltaY;
-    queueRender();
-  }
-
-  // ─────────────────────────── Rendering ───────────────────────────
+  // ─────────────────────────── Leaflet integration ───────────────────────────
 
   function el(id) { return document.getElementById(id); }
 
@@ -522,203 +600,309 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
   }
 
-  function themeColors() {
-    var dark = document.documentElement.classList.contains('dark');
-    state.theme = dark ? 'dark' : 'light';
-    return dark
-      ? { surface: '#12161d', grid: 'rgba(255,255,255,0.09)', dim: 'rgba(0,0,0,0.55)', label: '#c7ccd6' }
-      : { surface: '#e8eaed', grid: 'rgba(0,0,0,0.14)', dim: 'rgba(255,255,255,0.62)', label: '#3c4043' };
+  function currentTheme() {
+    state.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    return state.theme;
   }
 
-  function resizeCanvas() {
-    if (!state.canvas || !state.mapViewport) return;
-    var rect = state.mapViewport.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    state.pixelRatio = Math.min(2, window.devicePixelRatio || 1);
-    var width = Math.max(1, Math.round(rect.width));
-    var height = Math.max(1, Math.round(rect.height));
-    if (state.canvas.width !== Math.round(width * state.pixelRatio) || state.canvas.height !== Math.round(height * state.pixelRatio)) {
-      state.canvas.width = Math.round(width * state.pixelRatio);
-      state.canvas.height = Math.round(height * state.pixelRatio);
-    }
+  function dimColor() {
+    return state.theme === 'dark' ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.62)';
   }
 
-  function canvasGeometry() {
-    if (!state.canvas || !state.mapViewport || !state.fit) return null;
-    var rect = state.mapViewport.getBoundingClientRect();
-    if (!rect.width || !rect.height) return null;
-    var scale = state.fit.fitScale * state.transform.scale;
-    return {
-      scale: scale,
-      originX: state.fit.x + state.transform.x,
-      originY: state.fit.y + state.transform.y,
-      rect: rect,
-    };
+  function outlineColor() {
+    return state.theme === 'dark' ? '#ffffff' : '#202124';
   }
 
-  function draw() {
-    if (!state.canvas || !state.active || !state.fit) return;
-    var mapViewport = state.mapViewport;
-    if (!mapViewport) return;
-    var rect = mapViewport.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    var pixelRatio = state.pixelRatio;
-    var width = state.canvas.width / pixelRatio;
-    var height = state.canvas.height / pixelRatio;
-    var context = state.canvas.getContext('2d');
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    context.clearRect(0, 0, width, height);
-    var colors = themeColors();
-    context.fillStyle = colors.surface;
-    context.fillRect(0, 0, width, height);
+  function gridColor() {
+    return state.theme === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.16)';
+  }
 
-    var fit = state.fit;
-    var scale = fit.fitScale * state.transform.scale;
-    var originX = fit.x + state.transform.x;
-    var originY = fit.y + state.transform.y;
-    var geometry = { scale: scale, originX: originX, originY: originY, width: width, height: height };
-    var viewMinX = -originX / scale, viewMinY = -originY / scale;
-    var viewMaxX = (width - originX) / scale, viewMaxY = (height - originY) / scale;
-
-    context.save();
-    context.translate(originX, originY);
-    context.scale(scale, scale);
-
-    // Aisle/road overlays first (beneath the planar fills, as in the official app).
-    if (state.visible.aisles) {
-      context.strokeStyle = AISLE_STYLE.stroke;
-      context.globalAlpha = AISLE_STYLE.strokeOpacity;
-      context.lineWidth = AISLE_STYLE.strokeWeight / scale;
-      context.lineCap = 'round';
-      var aisles = state.aisleProjected;
-      for (var a = 0; a < aisles.length; a++) {
-        var aisle = aisles[a];
-        if (aisle.bounds.maxX < viewMinX || aisle.bounds.minX > viewMaxX || aisle.bounds.maxY < viewMinY || aisle.bounds.minY > viewMaxY) continue;
-        var ring = aisle.rings[0];
-        if (!ring || ring.length < 2) continue;
-        context.beginPath();
-        context.moveTo(ring[0][0], ring[0][1]);
-        for (var p = 1; p < ring.length; p++) context.lineTo(ring[p][0], ring[p][1]);
-        context.stroke();
+  // Lazily load the vendored Leaflet library + stylesheet (GIS route only).
+  function gisLoadLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (state.leafletLoading) return state.leafletLoading;
+    state.leafletLoading = new Promise(function (resolve) {
+      if (!document || typeof document.createElement !== 'function') {
+        state.leafletLoading = null;
+        resolve(null);
+        return;
       }
-      context.globalAlpha = 1;
-      context.lineCap = 'butt';
-    }
+      var css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = '/assets/vendor/leaflet/leaflet.css';
+      document.head.appendChild(css);
+      var script = document.createElement('script');
+      script.src = '/assets/vendor/leaflet/leaflet.js';
+      script.async = true;
+      var settled = false;
+      var finish = function (ok) {
+        if (settled) return;
+        settled = true;
+        state.leafletLoading = null;
+        resolve(ok && window.L ? window.L : null);
+      };
+      script.onload = function () { finish(true); };
+      script.onerror = function () { finish(false); };
+      setTimeout(function () { finish(false); }, 15000);
+      document.head.appendChild(script);
+    });
+    return state.leafletLoading;
+  }
 
-    var filtersActive = state.customerFilterActive || state.searchFilterActive || state.occupancyFilterActive || state.typeFilterActive;
-    var dimmedColor = colors.dim;
-    var layerKeys = layerOrder();
-    for (var li = 0; li < layerKeys.length; li++) {
-      var layerKey = layerKeys[li];
-      if (!state.visible[layerKey]) continue;
-      var def = LAYER_DEFS[layerKey];
-      context.fillStyle = rgba(def.fill, def.fillOpacity);
-      context.strokeStyle = rgba(def.stroke, 1);
-      context.lineWidth = def.strokeWeight / scale;
-      var layerFeatures = state.layerProjected[layerKey] || [];
-      for (var i = 0; i < layerFeatures.length; i++) {
-        var entry = layerFeatures[i];
-        var bounds = entry.bounds;
-        if (bounds.maxX < viewMinX || bounds.minX > viewMaxX || bounds.maxY < viewMinY || bounds.minY > viewMaxY) continue;
-        if (filtersActive && entry.dimmed) {
-          if (entry.dimmedColorDrawn) continue;
-          context.fillStyle = dimmedColor;
-          context.strokeStyle = 'rgba(128,128,128,0.4)';
-          context.lineWidth = Math.max(0.5, def.strokeWeight / scale);
-          entry.dimmedColorDrawn = true;
-        } else {
-          entry.dimmedColorDrawn = false;
-          context.fillStyle = rgba(def.fill, def.fillOpacity);
-          context.strokeStyle = rgba(def.stroke, 1);
-          context.lineWidth = def.strokeWeight / scale;
+  function worldToLatLng(worldX, worldY) {
+    var lngScale = METERS_PER_DEG_LNG * Math.cos((state.centerLat * Math.PI) / 180);
+    return [state.centerLat + worldY / METERS_PER_DEG_LAT, state.centerLng + worldX / lngScale];
+  }
+
+  function latLngToWorld(latlng) {
+    var lngScale = METERS_PER_DEG_LNG * Math.cos((state.centerLat * Math.PI) / 180);
+    return { worldX: (latlng.lng - state.centerLng) * lngScale, worldY: (latlng.lat - state.centerLat) * METERS_PER_DEG_LAT };
+  }
+
+  function applyBasemap() {
+    if (!state.map || !window.L) return;
+    if (state.tileLayer) {
+      state.map.removeLayer(state.tileLayer);
+      state.tileLayer = null;
+    }
+    var mode = state.basemapMode;
+    var theme = currentTheme();
+    state.tileLayer = L.tileLayer(gisBasemapUrl(mode, theme), {
+      maxZoom: 19,
+      attribution: gisBasemapAttribution(mode),
+      subdomains: 'abcd',
+    });
+    state.tileLayer.addTo(state.map);
+    if (state.planarLayer) state.planarLayer.redraw();
+  }
+
+  function setBasemapMode(mode) {
+    state.basemapMode = mode === 'satellite' ? 'satellite' : 'map';
+    applyBasemap();
+    var toggle = el('gis-map-mode');
+    if (toggle) {
+      toggle.textContent = state.basemapMode === 'satellite' ? 'Map' : 'Satellite';
+      toggle.setAttribute('aria-pressed', String(state.basemapMode === 'satellite'));
+    }
+    return state.basemapMode;
+  }
+
+  // Custom Leaflet layer drawing the official planar geometry onto a canvas
+  // that tracks the map view (exact Mercator alignment via latLng conversion).
+  var GisPlanarLayer = null;
+  function makePlanarLayer() {
+    if (GisPlanarLayer) return GisPlanarLayer;
+    GisPlanarLayer = L.Layer.extend({
+      onAdd: function (map) {
+        this._ownMap = map;
+        this._canvas = L.DomUtil.create('canvas', 'gis-planar-canvas');
+        this._canvas.setAttribute('aria-hidden', 'true');
+        map.getPane('overlayPane').appendChild(this._canvas);
+        this._reset();
+        map.on('resize', this._reset, this);
+        map.on('moveend zoomend', this.redraw, this);
+      },
+      onRemove: function (map) {
+        map.off('resize', this._reset, this);
+        map.off('moveend zoomend', this.redraw, this);
+        if (this._canvas && this._canvas.parentNode) this._canvas.parentNode.removeChild(this._canvas);
+        this._canvas = null;
+      },
+      _reset: function () {
+        if (!this._ownMap || !this._canvas) return;
+        var size = this._ownMap.getSize();
+        this._canvas.width = Math.max(1, size.x);
+        this._canvas.height = Math.max(1, size.y);
+        this.redraw();
+      },
+      redraw: function () {
+        if (this._ownMap && this._canvas) this._draw();
+      },
+      _draw: function () {
+        var map = this._ownMap;
+        var canvas = this._canvas;
+        var context = canvas.getContext('2d');
+        var size = map.getSize();
+        context.clearRect(0, 0, size.x, size.y);
+        // Read the live theme every frame so light/dark re-renders never rely
+        // on event delivery timing.
+        currentTheme();
+        var containerPoint = function (worldX, worldY) {
+          return map.latLngToContainerPoint(worldToLatLng(worldX, worldY));
+        };
+        var visible = function (bounds) {
+          return bounds.maxX >= state.viewMinX && bounds.minX <= state.viewMaxX && bounds.maxY >= state.viewMinY && bounds.minY <= state.viewMaxY;
+        };
+        var viewBounds = map.getBounds();
+        var northEast = latLngToWorld(viewBounds.getNorthEast());
+        var southWest = latLngToWorld(viewBounds.getSouthWest());
+        state.viewMinX = southWest.worldX;
+        state.viewMaxX = northEast.worldX;
+        state.viewMinY = southWest.worldY;
+        state.viewMaxY = northEast.worldY;
+
+        // Aisles & roads beneath the planar fills.
+        if (state.visible.aisles) {
+          context.strokeStyle = AISLE_STYLE.stroke;
+          context.globalAlpha = AISLE_STYLE.strokeOpacity;
+          context.lineWidth = Math.max(1.5, AISLE_STYLE.strokeWeight / Math.pow(2, Math.max(0, map.getZoom() - 14)));
+          context.lineCap = 'round';
+          var aisles = state.aisleProjected;
+          for (var a = 0; a < aisles.length; a++) {
+            var aisle = aisles[a];
+            if (!visible(aisle.bounds)) continue;
+            var ring = aisle.rings[0];
+            if (!ring || ring.length < 2) continue;
+            context.beginPath();
+            var first = containerPoint(ring[0][0], ring[0][1]);
+            context.moveTo(first.x, first.y);
+            for (var p = 1; p < ring.length; p++) {
+              var next = containerPoint(ring[p][0], ring[p][1]);
+              context.lineTo(next.x, next.y);
+            }
+            context.stroke();
+          }
+          context.globalAlpha = 1;
+          context.lineCap = 'butt';
         }
-        context.beginPath();
-        for (var r = 0; r < entry.rings.length; r++) {
-          var featureRing = entry.rings[r];
-          if (!featureRing.length) continue;
-          context.moveTo(featureRing[0][0], featureRing[0][1]);
-          for (var q = 1; q < featureRing.length; q++) context.lineTo(featureRing[q][0], featureRing[q][1]);
-          context.closePath();
+
+        var filtersActive = state.customerFilterActive || state.searchFilterActive || state.occupancyFilterActive || state.typeFilterActive;
+        var dimmed = dimColor();
+        var layerKeys = layerOrder();
+        for (var li = 0; li < layerKeys.length; li++) {
+          var layerKey = layerKeys[li];
+          if (!state.visible[layerKey]) continue;
+          var def = LAYER_DEFS[layerKey];
+          var fill = rgba(def.fill, def.fillOpacity);
+          var stroke = rgba(def.stroke, 1);
+          var layerFeatures = state.layerProjected[layerKey] || [];
+          for (var i = 0; i < layerFeatures.length; i++) {
+            var entry = layerFeatures[i];
+            if (!visible(entry.bounds)) continue;
+            if (filtersActive && entry.dimmed) {
+              context.fillStyle = dimmed;
+              context.strokeStyle = 'rgba(128,128,128,0.4)';
+            } else {
+              context.fillStyle = fill;
+              context.strokeStyle = stroke;
+            }
+            context.lineWidth = Math.max(0.6, def.strokeWeight / Math.pow(2, Math.max(0, map.getZoom() - 14)));
+            context.beginPath();
+            for (var r = 0; r < entry.rings.length; r++) {
+              var featureRing = entry.rings[r];
+              if (!featureRing.length) continue;
+              var start = containerPoint(featureRing[0][0], featureRing[0][1]);
+              context.moveTo(start.x, start.y);
+              for (var q = 1; q < featureRing.length; q++) {
+                var pt = containerPoint(featureRing[q][0], featureRing[q][1]);
+                context.lineTo(pt.x, pt.y);
+              }
+              context.closePath();
+            }
+            context.fill();
+            if (map.getZoom() > 11) context.stroke();
+          }
         }
-        context.fill();
-        if (def.strokeWeight > 0 && scale > 0.9) context.stroke();
-      }
-    }
 
-    // Optional cell grid (official: 3 ft squares over the warehouse outline).
-    if (state.visible.grid && state.gridLines.length && scale >= 1.2) {
-      context.strokeStyle = colors.grid;
-      context.lineWidth = 1 / scale;
-      context.beginPath();
-      for (var g = 0; g < state.gridLines.length; g++) {
-        var line = state.gridLines[g];
-        context.moveTo(line[0].x, line[0].y);
-        context.lineTo(line[1].x, line[1].y);
-      }
-      context.stroke();
-    }
-
-    // Selected feature outline.
-    if (state.selectedFeature) {
-      var sel = state.selectedFeature;
-      if (sel.bounds.maxX >= viewMinX && sel.bounds.minX <= viewMaxX && sel.bounds.maxY >= viewMinY && sel.bounds.minY <= viewMaxY) {
-        context.strokeStyle = colors.label;
-        context.lineWidth = 3 / scale;
-        context.beginPath();
-        for (var sr = 0; sr < sel.rings.length; sr++) {
-          var sring = sel.rings[sr];
-          if (!sring.length) continue;
-          context.moveTo(sring[0][0], sring[0][1]);
-          for (var sp = 1; sp < sring.length; sp++) context.lineTo(sring[sp][0], sring[sp][1]);
-          context.closePath();
+        // Optional cell grid (3 ft squares over the warehouse outline).
+        if (state.visible.grid && state.gridLines.length && map.getZoom() >= 16) {
+          context.strokeStyle = gridColor();
+          context.lineWidth = 1;
+          context.beginPath();
+          for (var g = 0; g < state.gridLines.length; g++) {
+            var line = state.gridLines[g];
+            var from = containerPoint(line[0].x, line[0].y);
+            var to = containerPoint(line[1].x, line[1].y);
+            context.moveTo(from.x, from.y);
+            context.lineTo(to.x, to.y);
+          }
+          context.stroke();
         }
-        context.stroke();
-      }
-    }
-    context.restore();
 
-    // Warehouse name label at readable zoom (as on the official map).
-    if (state.warehouse && state.warehouse.name && scale >= 0.8) {
-      var labelX = ((fit.bounds.maxX + fit.bounds.minX) / 2) * scale + originX;
-      var labelY = fit.bounds.minY * scale + originY - 8;
-      context.font = '700 13px Satoshi, sans-serif';
-      context.textAlign = 'center';
-      context.textBaseline = 'bottom';
-      context.fillStyle = colors.label;
-      if (state.theme === 'dark') {
-        context.shadowColor = 'rgba(0,0,0,0.8)';
-        context.shadowBlur = 4;
-      }
-      context.fillText(state.warehouse.name, labelX, labelY);
-      context.shadowBlur = 0;
-    }
-
-    state.canvas.dataset.officialFeatureCount = String(state.projected.length);
-    state.canvas.dataset.officialAisleCount = String(state.aisleProjected.length);
-    state.canvas.dataset.geometrySource = 'official-gis';
-    state.canvas.dataset.renderedTheme = state.theme;
-    state.canvas.dataset.warehouseId = String(state.warehouseId);
-    state.canvas.dataset.visibleLayers = layerKeys.filter(function (key) { return state.visible[key]; }).join(',');
+        // Selected feature outline.
+        if (state.selectedFeature && visible(state.selectedFeature.bounds)) {
+          var sel = state.selectedFeature;
+          context.strokeStyle = outlineColor();
+          context.lineWidth = 3;
+          context.beginPath();
+          for (var sr = 0; sr < sel.rings.length; sr++) {
+            var sring = sel.rings[sr];
+            if (!sring.length) continue;
+            var sstart = containerPoint(sring[0][0], sring[0][1]);
+            context.moveTo(sstart.x, sstart.y);
+            for (var sp = 1; sp < sring.length; sp++) {
+              var spt = containerPoint(sring[sp][0], sring[sp][1]);
+              context.lineTo(spt.x, spt.y);
+            }
+            context.closePath();
+          }
+          context.stroke();
+        }
+      },
+    });
+    return GisPlanarLayer;
   }
 
-  function queueRender() {
-    if (state.renderFrame) cancelAnimationFrame(state.renderFrame);
-    state.renderFrame = requestAnimationFrame(function () {
-      state.renderFrame = 0;
-      draw();
+  function ensureMap() {
+    var container = el('gis-ws-leaflet');
+    if (!container || !window.L) return null;
+    if (state.map) {
+      if (state.map._container && state.map._container.parentNode) state.map.invalidateSize();
+      return state.map;
+    }
+    state.map = L.map(container, {
+      zoomControl: false,
+      attributionControl: true,
+      minZoom: 3,
+      maxZoom: 19,
+      worldCopyJump: true,
+    });
+    state.map.attributionControl.setPrefix('Leaflet');
+    applyBasemap();
+    var LayerCtor = makePlanarLayer();
+    state.planarLayer = new LayerCtor();
+    state.planarLayer.addTo(state.map);
+    state.map.on('click', onMapClick);
+    state.map.on('mousemove', onMapMouseMove);
+    state.map.on('mouseout', function () {
+      state.hoveredFeature = null;
+      hideTooltip();
+    });
+    return state.map;
+  }
+
+  function eventToWorld(mapEvent) {
+    return latLngToWorld(mapEvent.latlng);
+  }
+
+  function featureAtLatLng(latlng) {
+    if (!state.spatial) return null;
+    var world = latLngToWorld(latlng);
+    return hitTest(state.spatial, world.worldX, world.worldY, function (feature) {
+      return state.visible[feature.properties.layerType] === true;
     });
   }
 
-  // Re-size and re-fit after the viewport becomes visible (the dashboard glue
-  // shows the map viewport only after the geometry has finished loading).
-  function refresh() {
+  function onMapClick(event) {
     if (!state.active) return;
-    resizeCanvas();
-    fitMap();
-    queueRender();
+    var entry = featureAtLatLng(event.latlng);
+    state.selectedFeature = entry;
+    if (entry) selectFeature(entry.feature);
+    else selectFeature(null);
+    if (state.planarLayer) state.planarLayer.redraw();
   }
 
-  // ─────────────────────────── Hover / click / interactions ───────────────────────────
+  function onMapMouseMove(event) {
+    if (!state.active) return;
+    if (state.map.dragging().enabled()) return; // skip hover while dragging
+    var entry = featureAtLatLng(event.latlng);
+    if (entry !== state.hoveredFeature) {
+      state.hoveredFeature = entry;
+      if (entry) showTooltip(event, entry.feature);
+      else hideTooltip();
+      if (state.planarLayer) state.planarLayer.redraw();
+    }
+  }
 
   function showTooltip(event, feature) {
     var tooltip = el('gis-map-tooltip');
@@ -728,9 +912,11 @@
     var layer = (LAYER_DEFS[props.layerType] || {}).label || '';
     tooltip.textContent = name ? String(name) + (layer ? ' · ' + layer : '') : 'Official GIS location';
     tooltip.hidden = false;
-    var rect = state.mapViewport.getBoundingClientRect();
-    tooltip.style.left = (event.clientX - rect.left + 12) + 'px';
-    tooltip.style.top = (event.clientY - rect.top + 12) + 'px';
+    var container = el('gis-ws-leaflet');
+    if (container) {
+      tooltip.style.left = (event.containerPoint.x + 12) + 'px';
+      tooltip.style.top = (event.containerPoint.y + 12) + 'px';
+    }
   }
 
   function hideTooltip() {
@@ -738,86 +924,35 @@
     if (tooltip) tooltip.hidden = true;
   }
 
-  function featureAt(clientX, clientY) {
-    var geometry = canvasGeometry();
-    if (!geometry || !state.spatial) return null;
-    var worldX = (clientX - geometry.rect.left - geometry.originX) / geometry.scale;
-    var worldY = (clientY - geometry.rect.top - geometry.originY) / geometry.scale;
-    return hitTest(state.spatial, worldX, worldY, function (feature) {
-      return state.visible[feature.properties.layerType] === true;
-    });
+  function fitMap() {
+    if (!state.map || !state.fitBounds || !window.L) return;
+    state.map.fitBounds(state.fitBounds, { padding: [28, 28], maxZoom: 19 });
   }
 
-  var boundInteractions = null;
-
-  function bindMapInteractions() {
-    if (!state.mapViewport || state.interactionsBound) return;
-    var pointerId = null;
-    var lastX = 0, lastY = 0;
-    function onPointerDown(event) {
-      if (event.button !== 0) return;
-      pointerId = event.pointerId;
-      lastX = event.clientX;
-      lastY = event.clientY;
-      if (state.mapViewport.setPointerCapture) state.mapViewport.setPointerCapture(event.pointerId);
-    }
-    function onPointerMove(event) {
-      if (pointerId !== null) {
-        panBy(event.clientX - lastX, event.clientY - lastY);
-        lastX = event.clientX;
-        lastY = event.clientY;
-        return;
-      }
-      var entry = featureAt(event.clientX, event.clientY);
-      if (entry !== state.hoveredFeature) {
-        state.hoveredFeature = entry;
-        if (entry) showTooltip(event, entry.feature);
-        else hideTooltip();
-        queueRender();
-      }
-    }
-    function endDrag(event) {
-      if (pointerId === null || event.pointerId !== pointerId) return;
-      pointerId = null;
-      if (state.mapViewport.releasePointerCapture) state.mapViewport.releasePointerCapture(event.pointerId);
-    }
-    function onClick(event) {
-      var entry = featureAt(event.clientX, event.clientY);
-      state.selectedFeature = entry;
-      if (entry) selectFeature(entry.feature);
-      else selectFeature(null);
-      queueRender();
-    }
-    function onWheel(event) {
-      event.preventDefault();
-      zoomBy(event.deltaY < 0 ? 1.12 : 1 / 1.12);
-    }
-    function onDoubleClick() {
-      fitMap();
-    }
-    var entries = [
-      { type: 'pointerdown', fn: onPointerDown, opts: false },
-      { type: 'pointermove', fn: onPointerMove, opts: false },
-      { type: 'pointerup', fn: endDrag, opts: false },
-      { type: 'pointercancel', fn: endDrag, opts: false },
-      { type: 'click', fn: onClick, opts: false },
-      { type: 'wheel', fn: onWheel, opts: { passive: false } },
-      { type: 'dblclick', fn: onDoubleClick, opts: false },
-    ];
-    entries.forEach(function (entry) {
-      state.mapViewport.addEventListener(entry.type, entry.fn, entry.opts);
-    });
-    boundInteractions = { element: state.mapViewport, entries: entries };
-    state.interactionsBound = true;
+  function zoomBy(factor) {
+    if (!state.map) return;
+    if (factor > 0) state.map.zoomIn();
+    else state.map.zoomOut();
   }
 
-  function unbindMapInteractions() {
-    if (!boundInteractions) return;
-    boundInteractions.entries.forEach(function (entry) {
-      boundInteractions.element.removeEventListener(entry.type, entry.fn, entry.opts || false);
-    });
-    boundInteractions = null;
-    state.interactionsBound = false;
+  function panBy(deltaX, deltaY) {
+    if (!state.map || !window.L) return;
+    state.map.panBy(L.point(deltaX, deltaY));
+  }
+
+  function invalidateSize() {
+    if (state.map) state.map.invalidateSize();
+  }
+
+  function refresh() {
+    currentTheme();
+    applyBasemap();
+    if (state.map) state.map.invalidateSize();
+    if (state.planarLayer) state.planarLayer.redraw();
+  }
+
+  function queueRender() {
+    if (state.planarLayer) state.planarLayer.redraw();
   }
 
   // ─────────────────────────── Feature detail ───────────────────────────
@@ -858,6 +993,20 @@
     });
   }
 
+  // Highlight + center a planar by its exact official name (summary row focus).
+  function focusPlanarByName(name) {
+    var entry = state.featureByName.get(String(name));
+    if (!entry) return false;
+    state.selectedFeature = entry;
+    selectFeature(entry.feature);
+    if (state.map && window.L) {
+      var center = worldToLatLng((entry.bounds.minX + entry.bounds.maxX) / 2, (entry.bounds.minY + entry.bounds.maxY) / 2);
+      state.map.flyTo(center, Math.max(state.map.getZoom(), 17), { duration: 0.6 });
+    }
+    queueRender();
+    return true;
+  }
+
   // ─────────────────────────── Filters (official semantics) ───────────────────────────
 
   function rebuildFilterState() {
@@ -892,14 +1041,11 @@
       }
       if (match && type) match = String(props.facilityType || '') === type;
       entry.dimmed = !match;
-      entry.dimmedColorDrawn = false;
     }
   }
 
   // ─────────────────────────── Public API ───────────────────────────
 
-  // Orchestrates the full official load for a facility and renders when real
-  // geometry exists. Resolves to a status descriptor for the dashboard glue.
   function loadForFacility(facilityId, facilityName) {
     state.requestToken++;
     var token = state.requestToken;
@@ -946,14 +1092,22 @@
           state.active = false;
           return { status: 'unavailable', reason: 'no-geometry', message: 'No surveyed planar geometry is available for warehouse ' + resolved.warehouseId + '.' };
         }
-        finalizeAndRender();
-        return {
-          status: 'official',
-          warehouseId: resolved.warehouseId,
-          source: resolved.source,
-          counts: counts,
-          authoritative: state.authoritative,
-        };
+        return gisLoadLeaflet().then(function (leaflet) {
+          if (token !== state.requestToken) return { stale: true };
+          if (!leaflet && document && typeof document.createElement === 'function') {
+            state.active = false;
+            return { status: 'unavailable', reason: 'map-engine', message: 'The map engine could not be loaded for the official GIS layout.' };
+          }
+          state.mapReady = !!leaflet;
+          finalizeAndRender();
+          return {
+            status: 'official',
+            warehouseId: resolved.warehouseId,
+            source: resolved.source,
+            counts: counts,
+            authoritative: state.authoritative,
+          };
+        });
       });
     }).catch(function (error) {
       if (token !== state.requestToken) return { stale: true };
@@ -969,7 +1123,6 @@
       var features = state.layers[layerKeys[i]];
       for (var f = 0; f < features.length; f++) allFeatures.push(features[f]);
     }
-    // Center the projection on the loaded geometry (falls back to pointCenter).
     var lngBounds = null;
     function extend(coordinates) {
       for (var i = 0; i < coordinates.length; i++) {
@@ -995,23 +1148,13 @@
       var center = state.warehouse.pointCenter.coordinates;
       lngBounds = { minLng: center[0], minLat: center[1], maxLng: center[0], maxLat: center[1] };
     }
-    var centerLng = lngBounds ? (lngBounds.minLng + lngBounds.maxLng) / 2 : -118.24;
-    var centerLat = lngBounds ? (lngBounds.minLat + lngBounds.maxLat) / 2 : 33.94;
-    var project = makeProjection(centerLng, centerLat);
+    state.centerLng = lngBounds ? (lngBounds.minLng + lngBounds.maxLng) / 2 : -118.24;
+    state.centerLat = lngBounds ? (lngBounds.minLat + lngBounds.maxLat) / 2 : 33.94;
+    var project = makeProjection(state.centerLng, state.centerLat);
 
     state.projected = projectFeatures(allFeatures, project);
     state.aisleProjected = projectFeatures(state.aisles, project);
     state.outlineProjected = projectWarehouseOutline(state.warehouse, project);
-    if (state.outlineProjected) {
-      var ring = state.outlineProjected.rings[0];
-      var outlineBounds = state.outlineProjected.bounds;
-      for (var q = 0; q < ring.length; q++) {
-        if (ring[q][0] < outlineBounds.minX) outlineBounds.minX = ring[q][0];
-        if (ring[q][1] < outlineBounds.minY) outlineBounds.minY = ring[q][1];
-        if (ring[q][0] > outlineBounds.maxX) outlineBounds.maxX = ring[q][0];
-        if (ring[q][1] > outlineBounds.maxY) outlineBounds.maxY = ring[q][1];
-      }
-    }
     state.layerProjected = {};
     for (var l = 0; l < layerKeys.length; l++) {
       var key = layerKeys[l];
@@ -1021,30 +1164,49 @@
     }
     state.spatial = buildSpatialIndex(state.projected, 40);
     state.gridLines = buildCellGrid(state.outlineProjected ? state.outlineProjected.rings : null, GRID_CELL_FEET);
+    state.featureByName = new Map();
+    state.projected.forEach(function (entry) {
+      var name = entry.feature.properties && entry.feature.properties.name;
+      if (name) state.featureByName.set(String(name), entry);
+    });
     state.selectedFeature = null;
     state.hoveredFeature = null;
-    state.transform = { scale: 1, x: 0, y: 0 };
+
     var bounds = computeBounds(state.projected, state.aisleProjected, state.outlineProjected);
-    state.fit = bounds ? { bounds: bounds, fitScale: 1, x: 0, y: 0 } : null;
-    if (!state.fit) {
+    if (!bounds) {
       state.active = false;
       return;
     }
-    ensureCanvas();
-    bindMapInteractions();
-    // The dashboard hides the map viewport behind its loading state while the
-    // official geometry is fetched. The canvas must be shown and measured
-    // before the first draw (the schematic renderer does the same ordering).
+    state.fitBounds = (window.L && window.L.latLngBounds) ? window.L.latLngBounds([
+      worldToLatLng(bounds.minX, bounds.minY),
+      worldToLatLng(bounds.maxX, bounds.maxY),
+    ]) : null;
+
+    // Show the workspace map container before sizing/drawing (the loading
+    // state hides it; the schematic renderer shows its viewport the same way).
     var loadingState = el('gis-map-state');
-    var mapViewport = el('gis-map-viewport');
+    var mapContainer = el('gis-ws-leaflet');
+    var schematicCanvas = el('gis-map-canvas');
     if (loadingState) loadingState.hidden = true;
-    if (mapViewport) mapViewport.hidden = false;
-    resizeCanvas();
-    fitMap();
-    rebuildFilterState();
+    if (mapContainer) mapContainer.hidden = false;
+    if (schematicCanvas) schematicCanvas.hidden = true;
+    ensureMap();
+    if (state.map) {
+      fitMap();
+    }
     syncLayerSwatches();
+    rebuildFilterState();
     state.active = true;
-    draw();
+    if (state.map && state.planarLayer) {
+      state.planarLayer.redraw();
+    }
+    if (mapContainer) {
+      mapContainer.dataset.geometrySource = 'official-gis';
+      mapContainer.dataset.officialFeatureCount = String(state.projected.length);
+      mapContainer.dataset.officialAisleCount = String(state.aisleProjected.length);
+      mapContainer.dataset.warehouseId = String(state.warehouseId);
+      mapContainer.dataset.renderedTheme = currentTheme();
+    }
   }
 
   // Official layer palette is applied at runtime (the dashboard's brand policy
@@ -1059,52 +1221,20 @@
     });
   }
 
-  function ensureCanvas() {
-    var viewport = el('gis-map-viewport');
-    if (!viewport) return;
-    var schematicCanvas = el('gis-map-canvas');
-    if (schematicCanvas) schematicCanvas.hidden = true;
-    if (!state.canvas || !state.canvas.parentNode) {
-      if (state.canvas && state.canvas.parentNode) state.canvas.parentNode.removeChild(state.canvas);
-      state.canvas = document.createElement('canvas');
-      state.canvas.id = 'gis-official-canvas';
-      state.canvas.className = 'gis-map-canvas gis-official-canvas';
-      state.canvas.setAttribute('aria-hidden', 'true');
-      viewport.appendChild(state.canvas);
-    } else {
-      state.canvas.hidden = false;
-    }
-    state.mapViewport = viewport;
-    unbindMapInteractions();
-    state.interactionsBound = false;
-    if (!state.resizeBound) {
-      state.resizeBound = true;
-      window.addEventListener('resize', function () {
-        if (!state.active) return;
-        resizeCanvas();
-        queueRender();
-      });
-    }
-  }
-
   function removeCanvas() {
     state.active = false;
-    unbindMapInteractions();
-    if (state.canvas) {
-      state.canvas.hidden = true;
-      if (state.canvas.parentNode) state.canvas.parentNode.removeChild(state.canvas);
-      state.canvas = null;
+    if (state.map) {
+      state.map.remove();
+      state.map = null;
+      state.tileLayer = null;
+      state.planarLayer = null;
     }
+    var mapContainer = el('gis-ws-leaflet');
+    if (mapContainer) mapContainer.hidden = true;
     var schematicCanvas = el('gis-map-canvas');
     if (schematicCanvas) schematicCanvas.hidden = false;
-    state.mapViewport = null;
-    state.interactionsBound = false;
-  }
-
-  function setLayerVisible(layerKey, visible) {
-    if (!(layerKey in state.visible)) return;
-    state.visible[layerKey] = !!visible;
-    queueRender();
+    var loadingState = el('gis-map-state');
+    if (loadingState) loadingState.hidden = false;
   }
 
   function loadCustomerMapping(planarNames) {
@@ -1143,6 +1273,7 @@
   function reset() {
     state.requestToken++;
     state.active = false;
+    state.mapReady = false;
     state.layers = { zone: [], rack: [], bulk: [], dock: [] };
     state.aisles = [];
     state.counts = { zone: 0, rack: 0, bulk: 0, dock: 0, aisles: 0 };
@@ -1156,10 +1287,35 @@
     state.outlineProjected = null;
     state.spatial = null;
     state.gridLines = [];
+    state.featureByName = new Map();
     state.selectedFeature = null;
     state.hoveredFeature = null;
-    state.fit = null;
+    state.fitBounds = null;
+    state.inventory = {
+      filters: { customerId: '', titleId: '', itemId: '' },
+      summary: [],
+      detailPlanar: '',
+      detail: null,
+      detailPage: 1,
+      detailPageSize: 50,
+    };
     removeCanvas();
+  }
+
+  function setLayerVisible(layerKey, visible) {
+    if (!(layerKey in state.visible)) return;
+    state.visible[layerKey] = !!visible;
+    queueRender();
+  }
+
+  function onThemeChange() {
+    currentTheme();
+    applyBasemap();
+    if (state.planarLayer) state.planarLayer.redraw();
+  }
+
+  if (window.addEventListener) {
+    window.addEventListener('item-theme-change', onThemeChange);
   }
 
   window.GISOfficial = {
@@ -1172,6 +1328,10 @@
       gisAuthoritativeStats: gisAuthoritativeStats,
       gisPlanarNames: gisPlanarNames,
       gisParseCustomerPlanars: gisParseCustomerPlanars,
+      gisCategorizeSummaryName: gisCategorizeSummaryName,
+      gisClassifySummaryRow: gisClassifySummaryRow,
+      gisBasemapUrl: gisBasemapUrl,
+      gisBasemapAttribution: gisBasemapAttribution,
       LAYER_DEFS: LAYER_DEFS,
       AISLE_STYLE: AISLE_STYLE,
       GRID_CELL_FEET: GRID_CELL_FEET,
@@ -1179,14 +1339,19 @@
     loadForFacility: loadForFacility,
     reset: reset,
     queueRender: queueRender,
-    refresh: refresh,
     fitMap: fitMap,
     zoomBy: zoomBy,
     panBy: panBy,
+    invalidateSize: invalidateSize,
+    refresh: refresh,
+    setBasemapMode: setBasemapMode,
     setLayerVisible: setLayerVisible,
     rebuildFilterState: rebuildFilterState,
     selectFeature: selectFeature,
+    focusPlanarByName: focusPlanarByName,
     loadCustomerMapping: loadCustomerMapping,
+    loadInventoryStat: loadInventoryStat,
+    loadInventoryDetail: loadInventoryDetail,
     removeCanvas: removeCanvas,
     state: state,
   };
