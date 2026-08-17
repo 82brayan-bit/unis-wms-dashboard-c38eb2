@@ -1,0 +1,325 @@
+'use strict';
+
+// Official GIS warehouse map tests. Pure helpers (facility→warehouse mapping,
+// GeoJSON conversion, pagination, authoritative counts) are exercised in a
+// Node sandbox, and the full loadForFacility flow runs end-to-end against a
+// stubbed read-only fetch with sanitized real-shape LT_F1 fixtures. Source
+// assertions verify lazy loading, official-first branching, stale guards and
+// that real coordinates are never replaced by synthetic placement.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const ROOT = path.resolve(__dirname, '..');
+const modules = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-modules.js'), 'utf8');
+const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const gisSource = modules.slice(modules.indexOf('// ═══ ROBOT COUNT GIS'), modules.indexOf('async function loadRobotWarehouseInventory'));
+const officialSource = fs.readFileSync(path.join(ROOT, 'public/assets/js/gis-official-map.js'), 'utf8');
+
+// ── Sanitized real-shape fixtures (LT_F1 → official GIS warehouse 12) ──
+
+function polygon(coordinates) {
+  return { type: 'Polygon', coordinates: [coordinates] };
+}
+
+// Valley View area bounding box (lng/lat order, as the official GIS stores).
+const FIXTURE_CENTER = [-118.24, 33.94];
+
+function rackRecord(index) {
+  const lng = FIXTURE_CENTER[0] + (index % 10) * 0.0004;
+  const lat = FIXTURE_CENTER[1] + Math.floor(index / 10) * 0.0003;
+  return {
+    id: index + 1,
+    name: 'RACK-' + String(index + 1).padStart(4, '0'),
+    facilityType: 'RACK',
+    inventoryCount: index % 3 === 0 ? 1 : 0,
+    latlng: polygon([
+      [lng, lat], [lng, lat + 0.0002], [lng + 0.0003, lat + 0.0002],
+      [lng + 0.0003, lat], [lng, lat],
+    ]),
+  };
+}
+
+function bulkRecord(index) {
+  const lng = FIXTURE_CENTER[0] + 0.01 + (index % 6) * 0.0005;
+  const lat = FIXTURE_CENTER[1] + Math.floor(index / 6) * 0.0004;
+  return {
+    id: 10000 + index + 1,
+    name: 'BULK-' + String(index + 1).padStart(4, '0'),
+    facilityType: 'BULK',
+    latlng: polygon([
+      [lng, lat], [lng, lat + 0.0003], [lng + 0.0005, lat + 0.0003],
+      [lng + 0.0005, lat], [lng, lat],
+    ]),
+  };
+}
+
+function aisleRecord(index) {
+  const lng = FIXTURE_CENTER[0] + index * 0.001;
+  return {
+    id: 500 + index + 1,
+    warehouseId: 12,
+    width: 10,
+    length: 300,
+    linearUnit: 'feet',
+    startPoint: 'A' + (index + 1),
+    endPoint: 'B' + (index + 1),
+    latlng: { type: 'LineString', coordinates: [[lng, FIXTURE_CENTER[1]], [lng + 0.004, FIXTURE_CENTER[1] + 0.002]] },
+  };
+}
+
+function page(list, currentPage, pageSize, totalCount) {
+  return { success: true, data: { list, currentPage, pageSize, totalCount } };
+}
+
+function buildFetchStub(options = {}) {
+  const calls = [];
+  const rackList = Array.from({ length: 100 }, (_, index) => rackRecord(index));
+  const bulkList = Array.from({ length: 30 }, (_, index) => bulkRecord(index));
+  const aisleList = Array.from({ length: 5 }, (_, index) => aisleRecord(index));
+  const warehouses = options.warehouses === undefined
+    ? [{ id: 12, name: 'Valley View', facilityId: 'LT_F1', stats: { rack: 7027, bulk: 2114, zone: 0, dock: 0 }, pointCenter: { type: 'Point', coordinates: FIXTURE_CENTER.slice() }, latlng: polygon([FIXTURE_CENTER.slice(), [FIXTURE_CENTER[0] + 0.02, FIXTURE_CENTER[1]], [FIXTURE_CENTER[0] + 0.02, FIXTURE_CENTER[1] + 0.015], [FIXTURE_CENTER[0], FIXTURE_CENTER[1] + 0.015], FIXTURE_CENTER.slice()]) }]
+    : options.warehouses;
+  const facilitySearch = options.facilitySearch === undefined
+    ? [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }]
+    : options.facilitySearch;
+  return function fetchStub(url, fetchOptions) {
+    calls.push({ url, fetchOptions });
+    const method = (fetchOptions && fetchOptions.method) || 'GET';
+    const respond = payload => Promise.resolve({ json: () => Promise.resolve(payload) });
+    if (url.includes('/gis-bam/facility-search')) return respond({ success: true, data: facilitySearch });
+    if (url.includes('/gis-app/warehouse-aisles/warehouse/')) return respond({ success: true, data: aisleList });
+    if (url === '/api/proxy/gis/gis-app/warehouse') return respond({ success: true, data: warehouses });
+    if (url.includes('/gis-bam/planar-model/facility-type-data')) {
+      const params = new URL('http://localhost' + url.slice('/api/proxy/gis'.length)).searchParams;
+      const type = params.get('type');
+      const body = fetchOptions && fetchOptions.body ? JSON.parse(fetchOptions.body) : {};
+      const currentPage = Number(body.currentPage || 1);
+      const rackPool = options.emptyPlanars ? [] : rackList;
+      const bulkPool = options.emptyPlanars ? [] : bulkList;
+      const list = type === 'RACK' ? rackPool : (type === 'BULK' ? bulkPool : []);
+      const totalCount = type === 'RACK' ? list.length : (type === 'BULK' ? list.length : 0);
+      const start = (currentPage - 1) * 25;
+      return respond(page(list.slice(start, start + 25), currentPage, 25, totalCount));
+    }
+    if (url.includes('/gis-bam/location-inventory/customers-by-planars')) {
+      const body = JSON.parse(fetchOptions.body);
+      const data = body.planarNames
+        .filter(name => name.startsWith('RACK-'))
+        .map(name => ({ planarName: name, customerId: 'CUST-1', customerName: 'Fixture Customer' }));
+      return respond({ success: true, data });
+    }
+    return Promise.reject(new Error('unexpected fetch: ' + url));
+  };
+}
+
+function loadOfficial(fetchStub) {
+  const sandbox = {
+    window: {},
+    document: { getElementById: () => null, documentElement: { classList: { contains: () => false } } },
+    fetch: fetchStub,
+    requestAnimationFrame: () => 0,
+    cancelAnimationFrame: () => {},
+    Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console,
+  };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  return sandbox.window.GISOfficial;
+}
+
+// ── Pure helper tests ──
+
+test('official GIS resolves the dashboard facility to the warehouse dynamically', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+
+  // LT_F1 → warehouse 12 via facility-search (the official mapping endpoint).
+  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }], []);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'facility-search');
+
+  // LT_F1 → warehouse 12 via warehouse.facilityId and via name.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'Valley View', facilityId: 'LT_F1' }]);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.facilityId');
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'Valley View' }]);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.name');
+
+  // A facility with no official warehouse must never map onto warehouse 12.
+  resolved = p.gisResolveWarehouse('LT_F42', 'Airport', [], [{ id: 12, name: 'Valley View', facilityId: 'LT_F1' }]);
+  assert.equal(resolved, null);
+});
+
+test('GIS records without real coordinates never become synthetic features', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+
+  const records = [
+    { id: 1, name: 'R-001', latlng: polygon([[ -117.1, 33.9 ], [ -117.1, 33.91 ], [ -117.09, 33.91 ], [ -117.09, 33.9 ], [ -117.1, 33.9 ]]) },
+    { id: 2, name: 'R-002', latlng: null },
+    { id: 3, name: 'R-003' },
+  ];
+  const features = p.gisToGeoJSON(records, 'rack');
+  assert.equal(features.length, 1, 'records without latlng geometry are skipped');
+  assert.deepEqual(features[0].geometry.coordinates[0][0], [-117.1, 33.9], 'coordinates preserved verbatim, never replaced');
+  assert.equal(features[0].properties.name, 'R-001');
+  assert.equal(features[0].properties.layerType, 'rack');
+  assert.equal(features[0].properties.latlng, undefined, 'latlng stays out of properties');
+});
+
+test('authoritative LT_F1 layer counts and pagination math', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+
+  // Official evidence: RACK 7,027, BULK 2,114 (9,141 planar objects), 1500/page.
+  assert.equal(p.gisPlanPagination(7027, 1500), 5);
+  assert.equal(p.gisPlanPagination(2114, 1500), 2);
+  let rackTotal = 0;
+  for (let pageNumber = 1; pageNumber <= 5; pageNumber++) rackTotal += pageNumber < 5 ? 1500 : 7027 - 4 * 1500;
+  assert.equal(rackTotal, 7027, 'paginated rack merge totals 7027');
+  assert.equal(p.gisCountFeatures(Array.from({ length: 7027 }, () => ({}))), 7027);
+
+  const stats = p.gisAuthoritativeStats({ stats: { rack: 7027, bulk: 2114, zone: 0, dock: 0 } });
+  // Compare fields individually (the vm sandbox creates cross-realm objects).
+  assert.equal(stats.rack, 7027);
+  assert.equal(stats.bulk, 2114);
+  assert.equal(stats.zone, 0);
+  assert.equal(stats.dock, 0);
+  assert.equal(p.gisPlanarNames({ rack: [{ properties: { name: 'A' } }, { properties: { name: 'A' } }], bulk: [], zone: [], dock: [] }).length, 1);
+});
+
+// ── End-to-end loadForFacility (stubbed read-only fetch) ──
+
+test('loadForFacility renders the official LT_F1 map with authoritative counts', async () => {
+  const G = loadOfficial(buildFetchStub());
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.warehouseId, 12);
+  assert.equal(result.source, 'facility-search');
+  assert.equal(result.counts.rack, 100, 'paginated rack pages merged');
+  assert.equal(result.counts.bulk, 30);
+  assert.equal(result.counts.aisles, 5);
+  assert.equal(result.counts.zone, 0);
+  assert.equal(result.counts.dock, 0);
+  assert.equal(result.authoritative.rack, 7027, 'authoritative rack count from the warehouse record');
+  assert.equal(result.authoritative.bulk, 2114);
+  assert.equal(G.state.projected.length, 130, 'only real-coordinate features are projected');
+  assert.equal(G.state.active, true);
+  G.reset();
+});
+
+test('official mode is skipped when the warehouse cannot be resolved (fallback path)', async () => {
+  const G = loadOfficial(buildFetchStub({ warehouses: [], facilitySearch: [] }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'no-warehouse');
+  assert.equal(G.state.active, false);
+});
+
+test('official mode is skipped when no surveyed planar geometry exists', async () => {
+  const G = loadOfficial(buildFetchStub({
+    warehouses: [{ id: 12, name: 'Valley View', facilityId: 'LT_F1', stats: { rack: 0, bulk: 0, zone: 0, dock: 0 } }],
+    emptyPlanars: true,
+  }));
+  // With no planar records, all pages come back empty → no geometry present.
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'no-geometry');
+});
+
+test('stale facility switches never let an older official load win', async () => {
+  const G = loadOfficial(buildFetchStub());
+  const first = G.loadForFacility('LT_F1', 'Valley View');
+  const second = G.loadForFacility('LT_F42', 'Airport'); // resets the request token
+  const results = await Promise.all([first, second]);
+  const firstResult = results[0];
+  const secondResult = results[1];
+  assert.equal(firstResult.stale, true, 'older official load must be discarded');
+  assert.ok(!secondResult.stale, 'latest official load wins');
+  assert.equal(secondResult.status, 'unavailable'); // LT_F42 has no fixture mapping
+});
+
+test('customer mapping is only enabled when the official endpoint returns planars', async () => {
+  const G = loadOfficial(buildFetchStub());
+  await G.loadForFacility('LT_F1', 'Valley View');
+  const available = await G.loadCustomerMapping(['RACK-0001', 'BULK-0001']);
+  assert.equal(available, true);
+  assert.equal(G.state.customers.get('RACK-0001').name, 'Fixture Customer');
+  assert.equal(G.state.customerUnavailable, false);
+});
+
+test('customer mapping fails truthfully when the endpoint is unusable', async () => {
+  const G = loadOfficial((url, options) => {
+    if (url.includes('/customers-by-planars')) {
+      return Promise.resolve({ json: () => Promise.resolve({ success: true, data: [] }) });
+    }
+    return buildFetchStub()(url, options);
+  });
+  await G.loadForFacility('LT_F1', 'Valley View');
+  const available = await G.loadCustomerMapping(['RACK-0001']);
+  assert.equal(available, false);
+  assert.equal(G.state.customerUnavailable, true);
+});
+
+// ── Source-level wiring: lazy loading, official-first, fallback, guards ──
+
+test('the official GIS module is lazy-loaded only when the GIS view initializes', () => {
+  assert.match(modules, /function gisLoadOfficialModule\(\)/);
+  assert.match(modules, /document\.createElement\('script'\)/);
+  assert.match(modules, /script\.src = '\/assets\/js\/gis-official-map\.js'/);
+  assert.doesNotMatch(html, /<script[^>]+gis-official-map\.js/, 'no static GIS renderer script in index.html');
+  assert.doesNotMatch(html, /gis-official-map/);
+});
+
+test('initGisView tries official geometry first and keeps the schematic as the fallback', () => {
+  assert.match(gisSource, /const official = await officialModule\.loadForFacility\(facilityId, facilityName\)/);
+  assert.match(gisSource, /if \(official\.status === 'official'\)[\s\S]*gisRenderOfficialMode\(official, context\)[\s\S]*return \{facilityId, official:true/);
+  assert.match(gisSource, /gisExitOfficialMode\(official\.message\)/);
+  const officialIndex = gisSource.indexOf('loadForFacility');
+  const facilityDataIndex = gisSource.indexOf('FacilityData.load(facilityId)');
+  assert.ok(officialIndex >= 0 && facilityDataIndex > officialIndex, 'official load precedes the schematic fallback load');
+  assert.match(gisSource, /gisSetModeBanner\('fallback', 'WMS topology fallback'/);
+  assert.match(gisSource, /Official GIS geometry is unavailable for this warehouse\. Showing recorded aisle and bay order\./);
+});
+
+test('official mode honors stale request guards and facility resets', () => {
+  assert.match(gisSource, /if \(official\.stale \|\| token !== GIS\.requestToken \|\| facilityId !== gisDashboardFacilityContext\(\)\.facilityId\) return \{stale:true\}/);
+  assert.match(gisSource, /gisClearOfficialMode\(\)/);
+  assert.match(gisSource, /function gisClearOfficialMode\(\)[\s\S]*window\.GISOfficial\) window\.GISOfficial\.reset\(\)/);
+  assert.match(gisSource, /function queueGisRender\(\)[\s\S]*GIS\.official\.active && window\.GISOfficial[\s\S]*rebuildFilterState/);
+  assert.match(gisSource, /function gisZoomMap\(direction\)[\s\S]*GIS\.official\.active[\s\S]*GISOfficial\.zoomBy/);
+  assert.match(gisSource, /function gisFitMap\(\)[\s\S]*GIS\.official\.active[\s\S]*GISOfficial\.fitMap/);
+  const runtime = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-runtime.js'), 'utf8');
+  assert.match(runtime, /activeName === 'gis'[\s\S]*initGisView\(\{facilityChanged:true\}\)/);
+});
+
+test('official GIS source never fabricates coordinates or markers', () => {
+  // The renderer only draws what the official endpoints returned.
+  assert.doesNotMatch(officialSource, /fakeMarker|sampleMarker|mockData|seedData|demoData|hardcodedCoordinates|fabricated/i);
+  assert.match(officialSource, /if \(!record \|\| !record\.latlng\) continue/);
+  assert.doesNotMatch(gisSource, /latitude|longitude|robotMarker|fakeMarker|sampleMarker|syntheticZone|fakeZone|sampleZone|perimeterDevice|doorGeometry|robotCoordinate|surveyedOutline|greenIndicator|GIS_MAP_CELL_LIMIT|fallback.*facility|default.*facility/i);
+});
+
+test('official mode chrome and layer controls exist in the GIS view', () => {
+  assert.match(html, /id="gis-mode-banner"/);
+  assert.match(html, /id="gis-layer-controls"/);
+  assert.match(html, /data-gis-layer="rack"[\s\S]*data-gis-layer="bulk"[\s\S]*data-gis-layer="zone"[\s\S]*data-gis-layer="dock"[\s\S]*data-gis-layer="aisles"[\s\S]*data-gis-layer="grid"/);
+  assert.match(html, /onchange="gisToggleLayer\('rack', this\.checked\)"/);
+  assert.match(modules, /function gisToggleLayer\(layerKey, checked\)/);
+  assert.match(modules, /function gisRenderOfficialMetrics\(\)/);
+  assert.match(modules, /function gisPopulateOfficialFilters\(\)/);
+  assert.match(modules, /function gisRenderOfficialLegend\(\)/);
+});

@@ -2805,6 +2805,14 @@ const GIS = {
   facilityId: '',
   records: [],
   customers: new Map(),
+  official: {
+    active: false,
+    moduleLoaded: false,
+    moduleError: '',
+    moduleLoading: null,
+    result: null,
+    fallbackNote: false,
+  },
   map: {
     scale: 1,
     x: 0,
@@ -3513,6 +3521,10 @@ function gisApplyMapTransform() {
 }
 
 function gisZoomMap(direction) {
+  if (GIS.official.active && window.GISOfficial) {
+    window.GISOfficial.zoomBy(direction > 0 ? 1.3 : 1 / 1.3);
+    return;
+  }
   const previous = GIS.map.scale;
   const next = Math.max(0.75, Math.min(3, previous * (direction > 0 ? 1.25 : 0.8)));
   if (next === previous) return;
@@ -3524,6 +3536,10 @@ function gisZoomMap(direction) {
 }
 
 function gisFitMap() {
+  if (GIS.official.active && window.GISOfficial) {
+    window.GISOfficial.fitMap();
+    return;
+  }
   GIS.map.scale = 1;
   GIS.map.x = 0;
   GIS.map.y = 0;
@@ -3687,10 +3703,11 @@ function renderGisTopology() {
   }
   const mappedLocations = built.groups.reduce((sum, group) => sum + group.records.length, 0);
   if (note) {
+    const fallbackDisclosure = GIS.official.fallbackNote ? 'Official GIS geometry is unavailable for this warehouse. Showing recorded aisle and bay order. ' : '';
     const layoutDisclosure = ' The outer frame and wide gaps organize the schematic only; they are not surveyed geometry or measured travel aisles.';
-    note.textContent = customerId
-      ? 'Customer coverage: ' + built.groups.length.toLocaleString() + ' mapped aisle/bay cells and ' + mappedLocations.toLocaleString() + ' mapped locations. All ' + facilityBuilt.groups.length.toLocaleString() + ' facility cells retain their position; unrelated customer cells are suppressed.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' customer locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.' + layoutDisclosure
-      : 'Complete map: all ' + facilityBuilt.groups.length.toLocaleString() + ' real facility aisle/bay cells are represented. ' + built.groups.length.toLocaleString() + ' cells and ' + mappedLocations.toLocaleString() + ' mapped locations match the current filters.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.' + layoutDisclosure;
+    note.textContent = (fallbackDisclosure + (customerId
+      ? 'Customer coverage: ' + built.groups.length.toLocaleString() + ' mapped aisle/bay cells and ' + mappedLocations.toLocaleString() + ' mapped locations. All ' + facilityBuilt.groups.length.toLocaleString() + ' facility cells retain their position; unrelated customer cells are suppressed.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' customer locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.'
+      : 'Complete map: all ' + facilityBuilt.groups.length.toLocaleString() + ' real facility aisle/bay cells are represented. ' + built.groups.length.toLocaleString() + ' cells and ' + mappedLocations.toLocaleString() + ' mapped locations match the current filters.' + (built.unmappedCount ? ' ' + built.unmappedCount.toLocaleString() + ' matching locations have no aisle/bay topology.' : '') + ' Schematic, not to scale.') + layoutDisclosure);
   }
   const colorMode = (document.getElementById('gis-color-mode') || {}).value || 'occupancy';
   gisRenderMapCanvas(facilityBuilt.groups, built.groups, colorMode, customerId);
@@ -3703,11 +3720,278 @@ function renderGisTopology() {
 }
 
 function queueGisRender() {
+  if (GIS.official.active && window.GISOfficial) {
+    // Official GIS layout: filters re-apply to the surveyed geometry.
+    window.GISOfficial.rebuildFilterState();
+    window.GISOfficial.queueRender();
+    gisRenderOfficialMetrics();
+    return;
+  }
   if (GIS.renderFrame) cancelAnimationFrame(GIS.renderFrame);
   GIS.renderFrame = requestAnimationFrame(() => {
     GIS.renderFrame = 0;
     renderGisTopology();
   });
+}
+
+// ── Official GIS warehouse map glue ──
+// The surveyed-geometry renderer lives in a lazy chunk (gis-official-map.js)
+// that is only fetched when the GIS view first initializes. When real official
+// geometry exists it becomes the primary map; otherwise the WMS aisle/bay
+// schematic below remains the explicit fallback.
+
+function gisLoadOfficialModule() {
+  if (GIS.official.moduleLoaded) return Promise.resolve(window.GISOfficial || null);
+  if (GIS.official.moduleError) return Promise.resolve(null);
+  if (GIS.official.moduleLoading) return GIS.official.moduleLoading;
+  GIS.official.moduleLoading = new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = '/assets/js/gis-official-map.js';
+    script.async = true;
+    let settled = false;
+    const finish = ok => {
+      if (settled) return;
+      settled = true;
+      if (ok && window.GISOfficial) {
+        GIS.official.moduleLoaded = true;
+        resolve(window.GISOfficial);
+      } else {
+        GIS.official.moduleError = 'Official GIS module could not be loaded.';
+        resolve(null);
+      }
+    };
+    script.onload = () => finish(true);
+    script.onerror = () => finish(false);
+    setTimeout(() => finish(false), 10000);
+    document.head.appendChild(script);
+  });
+  GIS.official.moduleLoading.finally(() => { GIS.official.moduleLoading = null; });
+  return GIS.official.moduleLoading;
+}
+
+function gisSetModeBanner(kind, title, message) {
+  const banner = document.getElementById('gis-mode-banner');
+  if (!banner) return;
+  banner.hidden = false;
+  banner.className = 'gis-mode-banner ' + (kind === 'official' ? 'official' : 'fallback');
+  const heading = banner.querySelector('strong');
+  const detail = banner.querySelector('span');
+  if (heading) heading.textContent = title;
+  if (detail) detail.textContent = message;
+}
+
+function gisSetKpiLabels(labels) {
+  const pairs = [
+    ['gis-kpi-locations-lbl', labels.locations],
+    ['gis-kpi-aisles-lbl', labels.aisles],
+    ['gis-kpi-empty-lbl', labels.empty],
+    ['gis-kpi-used-lbl', labels.used],
+  ];
+  pairs.forEach(pair => {
+    const element = document.getElementById(pair[0]);
+    if (element && pair[1]) element.textContent = pair[1];
+  });
+}
+
+function gisClearOfficialMode() {
+  GIS.official.active = false;
+  GIS.official.result = null;
+  GIS.official.fallbackNote = false;
+  if (window.GISOfficial) window.GISOfficial.reset();
+  const banner = document.getElementById('gis-mode-banner');
+  if (banner) banner.hidden = true;
+  const controls = document.getElementById('gis-layer-controls');
+  if (controls) controls.hidden = true;
+  const browser = document.getElementById('gis-map-browser');
+  if (browser) browser.hidden = false;
+  const colorMode = document.getElementById('gis-color-mode');
+  if (colorMode) { colorMode.disabled = false; colorMode.title = ''; }
+  const occupancy = document.getElementById('gis-occupancy');
+  if (occupancy) { occupancy.disabled = false; occupancy.title = ''; }
+  const customer = document.getElementById('gis-customer');
+  if (customer) customer.disabled = false;
+  const type = document.getElementById('gis-type');
+  if (type) type.disabled = false;
+  gisSetKpiLabels({locations:'Locations', aisles:'Aisles', empty:'Empty', used:'Occupied / Full'});
+  ['gis-kpi-locations-chg','gis-kpi-aisles-chg','gis-kpi-empty-chg','gis-kpi-used-chg'].forEach(selId => {
+    const element = document.getElementById(selId);
+    if (element) element.textContent = 'matching filters';
+  });
+}
+
+function gisExitOfficialMode(reason) {
+  gisClearOfficialMode();
+  GIS.official.fallbackNote = true;
+  gisSetModeBanner('fallback', 'WMS topology fallback', reason || 'Official GIS geometry is not available for this warehouse. Showing recorded aisle and bay order.');
+}
+
+function gisRenderOfficialLegend() {
+  const legend = document.getElementById('gis-map-legend');
+  if (!legend || !window.GISOfficial) return;
+  const G = window.GISOfficial;
+  legend.innerHTML = '';
+  [
+    [G.pure.LAYER_DEFS.rack.fill, 'Racks'],
+    [G.pure.LAYER_DEFS.bulk.fill, 'Bulk'],
+    [G.pure.LAYER_DEFS.zone.fill, 'Zones'],
+    [G.pure.LAYER_DEFS.dock.fill, 'Docks'],
+    [G.pure.AISLE_STYLE.stroke, 'Aisles & roads'],
+  ].forEach(pair => {
+    const item = document.createElement('span');
+    const dot = document.createElement('i');
+    dot.className = 'gis-legend-dot official';
+    dot.style.backgroundColor = pair[0];
+    item.append(dot, document.createTextNode(pair[1]));
+    legend.appendChild(item);
+  });
+}
+
+function gisPopulateOfficialFilters() {
+  const G = window.GISOfficial;
+  if (!G) return;
+  const typeSelect = document.getElementById('gis-type');
+  if (typeSelect) {
+    const types = new Set();
+    G.state.projected.forEach(entry => {
+      const value = entry.feature.properties && entry.feature.properties.facilityType;
+      if (value) types.add(String(value));
+    });
+    typeSelect.innerHTML = '<option value="">All types</option>';
+    Array.from(types).sort().forEach(value => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value.replaceAll('_', ' ');
+      typeSelect.appendChild(option);
+    });
+    typeSelect.disabled = types.size === 0;
+    typeSelect.title = types.size === 0 ? 'Planar types are not recorded for this warehouse' : '';
+    typeSelect.value = '';
+  }
+  const hasCounts = G.state.projected.some(entry => (entry.feature.properties || {}).inventoryCount != null);
+  const occupancySelect = document.getElementById('gis-occupancy');
+  if (occupancySelect) {
+    occupancySelect.value = '';
+    occupancySelect.disabled = !hasCounts;
+    occupancySelect.title = hasCounts ? '' : 'Inventory counts are not available for the official GIS layout of this warehouse';
+  }
+  const colorMode = document.getElementById('gis-color-mode');
+  if (colorMode) {
+    colorMode.value = 'occupancy';
+    colorMode.disabled = true;
+    colorMode.title = 'The official GIS layout colors by layer';
+  }
+  const customerSelect = document.getElementById('gis-customer');
+  if (customerSelect) {
+    customerSelect.disabled = false;
+    customerSelect.innerHTML = '<option value="">All customers</option>';
+    customerSelect.title = 'Loading official customer-planar mapping…';
+    const names = G.pure.gisPlanarNames(G.state.layers);
+    G.loadCustomerMapping(names).then(available => {
+      if (!GIS.official.active) return;
+      const select = document.getElementById('gis-customer');
+      if (!select) return;
+      if (available) {
+        const sorted = Array.from(G.state.customerNames.entries()).sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+        select.innerHTML = '<option value="">All customers</option>';
+        sorted.forEach(pair => {
+          const option = document.createElement('option');
+          option.value = pair[0];
+          option.textContent = pair[1];
+          select.appendChild(option);
+        });
+        select.disabled = false;
+        select.title = '';
+      } else {
+        select.innerHTML = '<option value="">All customers</option>';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'Customer mapping unavailable for the official GIS layout';
+        select.appendChild(option);
+        select.disabled = true;
+        select.title = 'Customer-planar relationships could not be loaded from the official GIS inventory service';
+      }
+      gisRenderOfficialMetrics();
+    });
+  }
+}
+
+function gisRenderOfficialMetrics() {
+  if (!GIS.official.active || !window.GISOfficial) return;
+  const G = window.GISOfficial;
+  const result = GIS.official.result || {};
+  const stats = result.authoritative;
+  const all = G.state.projected;
+  const filtered = all.filter(entry => !entry.dimmed);
+  const anyFilter = G.state.customerFilterActive || G.state.searchFilterActive || G.state.occupancyFilterActive || G.state.typeFilterActive;
+  const rackOf = list => list.filter(entry => entry.feature.properties.layerType === 'rack').length;
+  const bulkOf = list => list.filter(entry => entry.feature.properties.layerType === 'bulk').length;
+  const planarTotal = stats ? stats.rack + stats.bulk + stats.zone + stats.dock : all.length;
+  const rackCount = stats ? stats.rack : rackOf(all);
+  const bulkCount = stats ? stats.bulk : bulkOf(all);
+  const aisleCount = G.state.aisleProjected.length;
+  if (anyFilter) {
+    gisUpdateMetric('gis-kpi-locations', filtered.length);
+    gisUpdateMetric('gis-kpi-aisles', rackOf(filtered));
+    gisUpdateMetric('gis-kpi-empty', bulkOf(filtered));
+    gisUpdateMetric('gis-kpi-used', G.state.visible.aisles ? aisleCount : 0);
+  } else {
+    gisUpdateMetric('gis-kpi-locations', planarTotal);
+    gisUpdateMetric('gis-kpi-aisles', rackCount);
+    gisUpdateMetric('gis-kpi-empty', bulkCount);
+    gisUpdateMetric('gis-kpi-used', aisleCount);
+  }
+  const chgText = anyFilter ? 'matching filters' : 'official GIS geometry';
+  ['gis-kpi-locations-chg','gis-kpi-aisles-chg','gis-kpi-empty-chg','gis-kpi-used-chg'].forEach(selId => {
+    const element = document.getElementById(selId);
+    if (element) element.textContent = chgText;
+  });
+  const summary = document.getElementById('gis-customer-summary');
+  if (summary) {
+    let text = 'Official GIS layout for ' + G.state.facilityName + ' — ' + filtered.length.toLocaleString() + ' planar objects visible';
+    if (anyFilter && G.state.activeCustomerId && G.state.customerNames.get(G.state.activeCustomerId)) {
+      text += ' for ' + G.state.customerNames.get(G.state.activeCustomerId);
+    }
+    if (G.state.customerUnavailable) text += '. Customer mapping is unavailable for the official GIS layout';
+    summary.textContent = text + '.';
+  }
+  const status = document.getElementById('gis-status');
+  if (status) {
+    status.textContent = 'Official GIS layout: ' + all.length.toLocaleString() + ' planar objects and ' + aisleCount.toLocaleString() + ' aisles and roads for ' + G.state.facilityName + '.';
+  }
+}
+
+function gisRenderOfficialMode(result, context) {
+  const G = window.GISOfficial;
+  if (!G) return;
+  GIS.official.active = true;
+  GIS.official.result = result;
+  gisSetKpiLabels({locations:'Planar objects', aisles:'Racks', empty:'Bulk', used:'Aisles & roads'});
+  const browser = document.getElementById('gis-map-browser');
+  if (browser) browser.hidden = true;
+  const controls = document.getElementById('gis-layer-controls');
+  if (controls) {
+    controls.hidden = false;
+    controls.querySelectorAll('input[type="checkbox"]').forEach(input => {
+      input.checked = G.state.visible[input.dataset.gisLayer] !== false;
+    });
+  }
+  const note = document.getElementById('gis-render-note');
+  if (note) note.textContent = 'Official GIS layout: surveyed warehouse geometry from the official GIS service, shown as stored. Polygon colors and the aisle/road overlay follow the official warehouse map.';
+  gisSetModeBanner('official', 'Official GIS layout', 'Surveyed warehouse geometry from the official GIS service. Rack, bulk, zone and dock planars are shown at their real stored coordinates with the official aisle and road overlay.');
+  gisShowMap();
+  // The geometry loads while the viewport is still hidden for the loading
+  // state; size and redraw it now that the map is visible.
+  G.refresh();
+  gisRenderOfficialLegend();
+  gisPopulateOfficialFilters();
+  gisResetDetail('Select a planar object on the map to inspect its official GIS details.');
+  gisRenderOfficialMetrics();
+  gisSetStatus('Official GIS layout loaded for ' + context.facilityName + '.');
+}
+
+function gisToggleLayer(layerKey, checked) {
+  if (window.GISOfficial) window.GISOfficial.setLayerVisible(layerKey, checked);
+  gisRenderOfficialMetrics();
 }
 
 function gisDashboardFacilityContext() {
@@ -3727,6 +4011,7 @@ function gisResetFacilityContext() {
   GIS.requestToken++;
   if (GIS.renderFrame) cancelAnimationFrame(GIS.renderFrame);
   GIS.renderFrame = 0;
+  gisClearOfficialMode();
   GIS.facilityId = context.facilityId;
   GIS.records = [];
   GIS.customers = new Map();
@@ -3776,6 +4061,22 @@ async function initGisView(options) {
   gisResetDetail('Loading location detail…');
   gisResetMetrics();
   try {
+    // Official GIS geometry is the primary map source when the read-only GIS
+    // service resolves this facility to a warehouse with surveyed planars.
+    const officialModule = await gisLoadOfficialModule();
+    if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
+    if (officialModule) {
+      const official = await officialModule.loadForFacility(facilityId, facilityName);
+      if (official.stale || token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
+      if (official.status === 'official') {
+        GIS.facilityId = facilityId;
+        gisRenderOfficialMode(official, context);
+        return {facilityId, official:true, warehouseId:official.warehouseId, counts:official.counts};
+      }
+      gisExitOfficialMode(official.message);
+    } else {
+      gisExitOfficialMode('The official GIS service could not be reached.');
+    }
     const result = await FacilityData.load(facilityId);
     if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     const customers = Array.isArray(result.customers) ? result.customers : [];

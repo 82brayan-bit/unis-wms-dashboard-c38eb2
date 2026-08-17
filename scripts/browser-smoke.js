@@ -8,6 +8,101 @@ const path = require('node:path');
 const appUrl = process.argv[2] || 'http://127.0.0.1:4173/';
 const initialAppUrl = new URL(appUrl);
 if (!initialAppUrl.hash) initialAppUrl.hash = 'robots';
+
+// ── Sanitized real-shape official GIS fixtures (LT_F1 → warehouse 12) ──
+// Shape mirrors the official gis.item.com/gis/warehouse read contracts:
+// facility-search → warehouse mapping, warehouse list with authoritative
+// stats, paginated RACK/BULK planar-model pages, aisle/road overlays and the
+// customers-by-planars mapping. Counts are small for the browser; the
+// authoritative 7,027 / 2,114 / 973 evidence is asserted via warehouse stats
+// and unit tests.
+const GIS_FIXTURE_CENTER = [-118.24, 33.94];
+function gisFixturePolygon(coordinates) {
+  return { type: 'Polygon', coordinates: [coordinates] };
+}
+function gisFixtureRack(index) {
+  const lng = GIS_FIXTURE_CENTER[0] + (index % 10) * 0.0004;
+  const lat = GIS_FIXTURE_CENTER[1] + Math.floor(index / 10) * 0.0003;
+  return {
+    id: index + 1,
+    name: 'RACK-' + String(index + 1).padStart(4, '0'),
+    facilityType: 'RACK',
+    inventoryCount: index % 3 === 0 ? 1 : 0,
+    latlng: gisFixturePolygon([[lng, lat], [lng, lat + 0.0002], [lng + 0.0003, lat + 0.0002], [lng + 0.0003, lat], [lng, lat]]),
+  };
+}
+function gisFixtureBulk(index) {
+  const lng = GIS_FIXTURE_CENTER[0] + 0.01 + (index % 6) * 0.0005;
+  const lat = GIS_FIXTURE_CENTER[1] + Math.floor(index / 6) * 0.0004;
+  return {
+    id: 10000 + index + 1,
+    name: 'BULK-' + String(index + 1).padStart(4, '0'),
+    facilityType: 'BULK',
+    latlng: gisFixturePolygon([[lng, lat], [lng, lat + 0.0003], [lng + 0.0005, lat + 0.0003], [lng + 0.0005, lat], [lng, lat]]),
+  };
+}
+function gisFixtureAisle(index) {
+  const lng = GIS_FIXTURE_CENTER[0] + index * 0.001;
+  return {
+    id: 500 + index + 1,
+    warehouseId: 12,
+    width: 10,
+    length: 300,
+    linearUnit: 'feet',
+    startPoint: 'A' + (index + 1),
+    endPoint: 'B' + (index + 1),
+    latlng: { type: 'LineString', coordinates: [[lng, GIS_FIXTURE_CENTER[1]], [lng + 0.004, GIS_FIXTURE_CENTER[1] + 0.002]] },
+  };
+}
+const GIS_RACK_FIXTURES = Array.from({ length: 100 }, (_, index) => gisFixtureRack(index));
+const GIS_BULK_FIXTURES = Array.from({ length: 30 }, (_, index) => gisFixtureBulk(index));
+const GIS_AISLE_FIXTURES = Array.from({ length: 5 }, (_, index) => gisFixtureAisle(index));
+const GIS_WAREHOUSE_FIXTURE = {
+  id: 12,
+  name: 'Valley View',
+  facilityId: 'LT_F1',
+  stats: { rack: 7027, bulk: 2114, zone: 0, dock: 0 },
+  pointCenter: { type: 'Point', coordinates: GIS_FIXTURE_CENTER.slice() },
+  latlng: gisFixturePolygon([
+    GIS_FIXTURE_CENTER.slice(),
+    [GIS_FIXTURE_CENTER[0] + 0.02, GIS_FIXTURE_CENTER[1]],
+    [GIS_FIXTURE_CENTER[0] + 0.02, GIS_FIXTURE_CENTER[1] + 0.015],
+    [GIS_FIXTURE_CENTER[0], GIS_FIXTURE_CENTER[1] + 0.015],
+    GIS_FIXTURE_CENTER.slice(),
+  ]),
+};
+
+// Exact official read responses for the mocked GIS proxy (no live mutations).
+function gisMockResponse(requestUrl, postData) {
+  const marker = '/api/proxy/gis';
+  const gisPath = requestUrl.slice(requestUrl.indexOf(marker) + marker.length);
+  if (gisPath.startsWith('/gis-bam/facility-search')) {
+    return { success: true, data: [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }] };
+  }
+  if (gisPath === '/gis-app/warehouse') {
+    return { success: true, data: [GIS_WAREHOUSE_FIXTURE] };
+  }
+  if (gisPath.startsWith('/gis-bam/planar-model/facility-type-data')) {
+    const type = new URL(requestUrl).searchParams.get('type');
+    const body = postData ? JSON.parse(postData) : {};
+    const currentPage = Number(body.currentPage || 1);
+    const pool = type === 'RACK' ? GIS_RACK_FIXTURES : (type === 'BULK' ? GIS_BULK_FIXTURES : []);
+    const totalCount = type === 'RACK' ? GIS_RACK_FIXTURES.length : (type === 'BULK' ? GIS_BULK_FIXTURES.length : 0);
+    const start = (currentPage - 1) * 25;
+    return { success: true, data: { list: pool.slice(start, start + 25), currentPage, pageSize: 25, totalCount } };
+  }
+  if (gisPath.startsWith('/gis-app/warehouse-aisles/warehouse/')) {
+    return { success: true, data: GIS_AISLE_FIXTURES };
+  }
+  if (gisPath.startsWith('/gis-bam/location-inventory/customers-by-planars')) {
+    const body = postData ? JSON.parse(postData) : {};
+    const data = (body.planarNames || [])
+      .filter(name => String(name).startsWith('RACK-'))
+      .map(name => ({ planarName: name, customerId: 'CUST-1', customerName: 'Fixture Customer' }));
+    return { success: true, data };
+  }
+  return { success: true, data: [] };
+}
 const screenshotPath = process.env.GIS_SMOKE_SCREENSHOT || '';
 const debuggingPort = Number(process.env.CHROME_DEBUG_PORT || 9223);
 const chromeCandidates = [
@@ -95,6 +190,10 @@ async function main() {
   const requests = [];
   const mutatingRequests = [];
   const requestUrls = new Map();
+  // Phase control: the first GIS phase runs with official data unavailable so
+  // the aisle/bay fallback is exercised; the second phase enables the mocked
+  // official GIS read responses to verify the primary official map.
+  const officialMock = { enabled: false };
 
   cdp.on('Runtime.exceptionThrown', event => consoleErrors.push(event.exceptionDetails.text || 'Uncaught exception'));
   cdp.on('Runtime.consoleAPICalled', event => {
@@ -103,7 +202,7 @@ async function main() {
   cdp.on('Network.requestWillBeSent', event => {
     requests.push(event.request.url);
     requestUrls.set(event.requestId, event.request.url);
-    if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
+    if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|facility-search|facility-type-data|customers-by-planars|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
       mutatingRequests.push(event.request.method + ' ' + event.request.url);
     }
   });
@@ -117,10 +216,15 @@ async function main() {
   });
   cdp.on('Fetch.requestPaused', event => {
     if (event.request.url.includes('/api/')) {
+      // The official GIS proxy reads are mocked with exact read-only responses
+      // when the phase flag is on; everything else gets the generic empty data.
+      const payload = officialMock.enabled && event.request.url.includes('/api/proxy/gis/')
+        ? gisMockResponse(event.request.url, event.request.postData || '')
+        : { code: 0, success: true, data: { list: [], records: [], total: 0 } };
       cdp.send('Fetch.fulfillRequest', {
         requestId:event.requestId, responseCode:200,
         responseHeaders:[{name:'Content-Type',value:'application/json'}],
-        body:Buffer.from(JSON.stringify({code:0,success:true,data:{list:[],records:[],total:0}})).toString('base64')
+        body:Buffer.from(JSON.stringify(payload)).toString('base64')
       }).catch(error => consoleErrors.push(error.message));
     } else {
       cdp.send('Fetch.continueRequest', {requestId:event.requestId}).catch(error => consoleErrors.push(error.message));
@@ -159,12 +263,12 @@ async function main() {
       const rect = element.getBoundingClientRect();
       return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
     }
-    async function waitFor(predicate) {
+    async function waitFor(predicate, label) {
       for (let attempt = 0; attempt < 200; attempt++) {
         if (predicate()) return;
         await new Promise(resolve => setTimeout(resolve, 25));
       }
-      throw new Error('Timed out waiting for the GIS view');
+      throw new Error('Timed out waiting for ' + (label || 'the GIS view') + ' | state: ' + JSON.stringify({facility:GIS.facilityId, records:GIS.records.length, cells:document.getElementById('gis-map-canvas').dataset.cellCount, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), official:GIS.official.active, viewportHidden:document.getElementById('gis-map-viewport').hidden, state:document.getElementById('gis-map-state').textContent}));
     }
     function themeState(theme, context) {
       ItemTheme.applyTheme(theme, {persist:true});
@@ -219,6 +323,7 @@ async function main() {
     initialTrigger.click();
     initialRobotNavigation.reopened = initialTrigger.getAttribute('aria-expanded') === 'true' && initialSubmenu.classList.contains('open') && visible(initialSubmenu);
 
+    const officialModuleNotLoaded = typeof window.GISOfficial === 'undefined';
     await populateFacilitySwitcher();
     await initGisView({facilityChanged:true});
     await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
@@ -473,6 +578,7 @@ async function main() {
     document.getElementById('view-dashboard').classList.add('active');
     return {
       lightLogin,darkLogin,lightApp,darkApp,views,initialRobotNavigation,
+      officialModuleNotLoaded,
       initialGisFacility,immediateF42Reset,immediateBackReset,backToF1State,staleLoadState,
       f1:{customers:f1.customers.length,presentCustomers:f1.customers.filter(customer => (f1.locations[customer.id] || []).length > 0).length,groups:Object.keys(f1.locations).length,cached:f1.cached},
       f40:{customers:f40.customers.length,groups:Object.keys(f40.locations).length,cached:f40.cached},
@@ -515,6 +621,197 @@ async function main() {
       browserStacked:browserFields.length < 2 || browserFields[1].top >= browserFields[0].bottom
     };
   })()`);
+
+  // ── Phase B: official GIS primary map with mocked read-only fixtures ──
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  officialMock.enabled = true;
+  summary.officialGis = await evaluate(`(async () => {
+    function waitFor(predicate, label) {
+      return new Promise((resolve, reject) => {
+        let attempts = 0;
+        const tick = () => {
+          attempts++;
+          if (predicate()) return resolve();
+          if (attempts > 240) return reject(new Error('Timed out waiting for ' + (label || 'official GIS state') + ' | ' + JSON.stringify({officialActive:GIS.official.active, module:typeof GISOfficial, stateActive:typeof GISOfficial === 'object' && GISOfficial.state.active, canvas:!!document.getElementById('gis-official-canvas'), source:document.getElementById('gis-official-canvas') ? document.getElementById('gis-official-canvas').dataset.geometrySource : null, counts:typeof GISOfficial === 'object' ? GISOfficial.state.counts : null, fit:typeof GISOfficial === 'object' && GISOfficial.state.fit ? !!GISOfficial.state.fit.bounds : null, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), facility:GIS.facilityId, status:document.getElementById('gis-status').textContent, banner:document.getElementById('gis-mode-banner').hidden ? '(hidden)' : document.getElementById('gis-mode-banner').textContent})));
+          setTimeout(tick, 25);
+        };
+        tick();
+      });
+    }
+    async function waitForOfficial() {
+      await waitFor(() => GIS.official.active && typeof GISOfficial === 'object' && GISOfficial.state.active && document.getElementById('gis-official-canvas') && document.getElementById('gis-official-canvas').dataset.geometrySource === 'official-gis' && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false', 'official GIS state | ' + JSON.stringify({officialActive:GIS.official.active, module:typeof GISOfficial, stateActive:typeof GISOfficial === 'object' && GISOfficial.state.active, canvas:!!document.getElementById('gis-official-canvas'), source:document.getElementById('gis-official-canvas') ? document.getElementById('gis-official-canvas').dataset.geometrySource : null, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), facility:GIS.facilityId, status:document.getElementById('gis-status').textContent, banner:document.getElementById('gis-mode-banner').hidden ? '(hidden)' : document.getElementById('gis-mode-banner').textContent, err:GIS.official.moduleError}));
+    }
+    function hashCanvas(canvas) {
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let hash = 2166136261;
+      const colors = new Set();
+      for (let index = 0; index < pixels.length; index += 388) {
+        hash ^= pixels[index] + (pixels[index + 1] << 8) + (pixels[index + 2] << 16) + (pixels[index + 3] << 24);
+        hash = Math.imul(hash, 16777619);
+        colors.add(pixels[index] + ',' + pixels[index + 1] + ',' + pixels[index + 2] + ',' + pixels[index + 3]);
+      }
+      return { hash:String(hash >>> 0), colors:colors.size, width:canvas.width, height:canvas.height };
+    }
+    function themeState() {
+      return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+    document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+    document.getElementById('view-gis').classList.add('active');
+    await switchFacility('LT_F1');
+    await waitForOfficial();
+    const canvas = document.getElementById('gis-official-canvas');
+    const banner = document.getElementById('gis-mode-banner');
+    const G = window.GISOfficial;
+    const officialState = {
+      banner:banner.textContent,
+      bannerKind:banner.className,
+      kpi:{
+        planar:document.getElementById('gis-kpi-locations').textContent,
+        racks:document.getElementById('gis-kpi-aisles').textContent,
+        bulk:document.getElementById('gis-kpi-empty').textContent,
+        aisles:document.getElementById('gis-kpi-used').textContent
+      },
+      kpiLabels:{
+        planar:document.getElementById('gis-kpi-locations-lbl').textContent,
+        racks:document.getElementById('gis-kpi-aisles-lbl').textContent,
+        bulk:document.getElementById('gis-kpi-empty-lbl').textContent,
+        aisles:document.getElementById('gis-kpi-used-lbl').textContent
+      },
+      kpiFooter:document.getElementById('gis-kpi-locations-chg').textContent,
+      features:Number(canvas.dataset.officialFeatureCount),
+      aisles:Number(canvas.dataset.officialAisleCount),
+      source:canvas.dataset.geometrySource,
+      warehouseId:canvas.dataset.warehouseId,
+      visibleLayers:canvas.dataset.visibleLayers,
+      layerControlsVisible:!document.getElementById('gis-layer-controls').hidden,
+      browserHidden:document.getElementById('gis-map-browser').hidden,
+      schematicCanvasHidden:document.getElementById('gis-map-canvas').hidden,
+      legend:document.getElementById('gis-map-legend').textContent,
+      note:document.getElementById('gis-render-note').textContent,
+      customerOptions:Array.from(document.getElementById('gis-customer').options).map(option => option.textContent),
+      customerTitle:document.getElementById('gis-customer').title,
+      occupancyDisabled:document.getElementById('gis-occupancy').disabled,
+      colorModeDisabled:document.getElementById('gis-color-mode').disabled,
+      status:document.getElementById('gis-status').textContent
+    };
+    await waitFor(() => !document.getElementById('gis-customer').disabled && document.getElementById('gis-customer').options.length >= 2);
+    officialState.customerOptions = Array.from(document.getElementById('gis-customer').options).map(option => option.textContent);
+    officialState.customerSummary = document.getElementById('gis-customer-summary').textContent;
+
+    // Hover + click on a real planar polygon (RACK-0001).
+    const viewport = document.getElementById('gis-map-viewport');
+    const entry = G.state.projected.find(candidate => candidate.feature.properties.name === 'RACK-0001');
+    const rect = viewport.getBoundingClientRect();
+    const scale = G.state.fit.fitScale * G.state.transform.scale;
+    const originX = G.state.fit.x + G.state.transform.x;
+    const originY = G.state.fit.y + G.state.transform.y;
+    // Use the polygon's center (a vertex would sit exactly on the boundary).
+    const worldX = (entry.bounds.minX + entry.bounds.maxX) / 2;
+    const worldY = (entry.bounds.minY + entry.bounds.maxY) / 2;
+    const pointerX = rect.left + originX + worldX * scale;
+    const pointerY = rect.top + originY + worldY * scale;
+    viewport.dispatchEvent(new PointerEvent('pointermove', {clientX:pointerX, clientY:pointerY, bubbles:true}));
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const tooltip = document.getElementById('gis-map-tooltip');
+    officialState.tooltipText = tooltip.hidden ? '' : tooltip.textContent;
+    viewport.dispatchEvent(new MouseEvent('click', {clientX:pointerX, clientY:pointerY, bubbles:true}));
+    await new Promise(resolve => setTimeout(resolve, 80));
+    officialState.detailText = document.getElementById('gis-detail-content').textContent;
+
+    // Layer toggle: hide bulk, verify render state + visible layers update.
+    const bulkCheckbox = document.querySelector('#gis-layer-controls input[data-gis-layer="bulk"]');
+    bulkCheckbox.checked = false;
+    gisToggleLayer('bulk', false);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    officialState.bulkOff = {
+      visibleLayers:document.getElementById('gis-official-canvas').dataset.visibleLayers,
+      stateVisible:G.state.visible.bulk === false,
+      kpiBulk:document.getElementById('gis-kpi-empty').textContent
+    };
+    bulkCheckbox.checked = true;
+    gisToggleLayer('bulk', true);
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    // Search filter dims non-matching planars and updates KPIs.
+    document.getElementById('gis-search').value = 'BULK';
+    queueGisRender();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    officialState.filtered = {
+      kpiPlanar:document.getElementById('gis-kpi-locations').textContent,
+      footer:document.getElementById('gis-kpi-locations-chg').textContent,
+      summary:document.getElementById('gis-customer-summary').textContent
+    };
+    document.getElementById('gis-search').value = '';
+    queueGisRender();
+    await new Promise(resolve => setTimeout(resolve, 80));
+
+    // Zoom / pan / fit controls drive the official renderer.
+    const beforeZoom = G.state.transform.scale;
+    G.zoomBy(1.3);
+    const zoomed = G.state.transform.scale;
+    G.panBy(40, 20);
+    const panned = JSON.stringify(G.state.transform);
+    G.fitMap();
+    const fitted = JSON.stringify(G.state.transform);
+
+    // Light and dark surfaces render the same geometry distinctly.
+    ItemTheme.applyTheme('light', {persist:true});
+    G.queueRender();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const lightTopology = hashCanvas(document.getElementById('gis-official-canvas'));
+    ItemTheme.applyTheme('dark', {persist:true});
+    G.queueRender();
+    await new Promise(resolve => setTimeout(resolve, 80));
+    const darkTopology = hashCanvas(document.getElementById('gis-official-canvas'));
+
+    // Facility switch with no official mapping → explicit WMS topology fallback.
+    await switchFacility('LT_F42');
+    await waitFor(() => GIS.facilityId === 'LT_F42' && !GIS.official.active && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    const fallback = {
+      banner:document.getElementById('gis-mode-banner').textContent,
+      bannerKind:document.getElementById('gis-mode-banner').className,
+      source:document.getElementById('gis-map-canvas').dataset.geometrySource,
+      note:document.getElementById('gis-render-note').textContent,
+      canvasNodes:document.querySelectorAll('#gis-map-viewport canvas').length,
+      officialCanvasGone:!document.getElementById('gis-official-canvas')
+    };
+
+    // Back to LT_F1 → official geometry again (module cached, no re-download).
+    await switchFacility('LT_F1');
+    await waitForOfficial();
+    const restored = {
+      source:document.getElementById('gis-official-canvas').dataset.geometrySource,
+      schematicHidden:document.getElementById('gis-map-canvas').hidden,
+      officialVisible:!document.getElementById('gis-official-canvas').hidden,
+      banner:document.getElementById('gis-mode-banner').textContent,
+      theme:themeState()
+    };
+    ItemTheme.applyTheme('light', {persist:true});
+    return { officialState, hover:{tooltipText:officialState.tooltipText}, zoomed, beforeZoom, panned, fitted, lightTopology, darkTopology, fallback, restored };
+  })()`);
+
+  const gisModuleRequests = requests.filter(url => /gis-official-map\./.test(url));
+  assert(summary.officialModuleNotLoaded, 'The official GIS module was loaded during login startup');
+  assert(gisModuleRequests.length === 1, 'The official GIS module chunk must be fetched exactly once: ' + JSON.stringify(gisModuleRequests));
+  assert(summary.officialGis.officialState.source === 'official-gis' && summary.officialGis.officialState.warehouseId === '12', 'Official GIS geometry did not render for LT_F1');
+  assert(summary.officialGis.officialState.banner.includes('Official GIS layout') && summary.officialGis.officialState.bannerKind.includes('official'), 'Official mode banner is missing');
+  assert(summary.officialGis.officialState.features === 130 && summary.officialGis.officialState.aisles === 5, 'Official geometry counts are incorrect: ' + JSON.stringify({features:summary.officialGis.officialState.features, aisles:summary.officialGis.officialState.aisles}));
+  assert(summary.officialGis.officialState.kpi.planar === '9,141' && summary.officialGis.officialState.kpi.racks === '7,027' && summary.officialGis.officialState.kpi.bulk === '2,114' && summary.officialGis.officialState.kpi.aisles === '5', 'Authoritative LT_F1 KPIs are incorrect: ' + JSON.stringify(summary.officialGis.officialState.kpi));
+  assert(summary.officialGis.officialState.kpiLabels.planar === 'Planar objects' && summary.officialGis.officialState.kpiLabels.racks === 'Racks' && summary.officialGis.officialState.kpiLabels.bulk === 'Bulk' && summary.officialGis.officialState.kpiLabels.aisles === 'Aisles & roads', 'Official KPI labels were not swapped');
+  assert(summary.officialGis.officialState.kpiFooter === 'official GIS geometry', 'Official KPI footer is missing');
+  assert(summary.officialGis.officialState.layerControlsVisible && summary.officialGis.officialState.browserHidden && summary.officialGis.officialState.schematicCanvasHidden, 'Official layer controls, browser or canvas states are wrong');
+  assert(summary.officialGis.officialState.legend.includes('Racks') && summary.officialGis.officialState.legend.includes('Aisles & roads'), 'Official legend is missing');
+  assert(summary.officialGis.officialState.customerOptions.length === 2 && summary.officialGis.officialState.customerOptions[1] === 'Fixture Customer', 'Customer mapping was not populated from the official endpoint');
+  assert(summary.officialGis.officialState.occupancyDisabled === false && summary.officialGis.officialState.colorModeDisabled === true, 'Official filter availability is wrong');
+  assert(summary.officialGis.hover.tooltipText.includes('RACK-0001') && summary.officialGis.officialState.detailText.includes('RACK-0001'), 'Official hover/click detail did not render: ' + JSON.stringify({tooltip:summary.officialGis.hover.tooltipText, detail:summary.officialGis.officialState.detailText}));
+  assert(summary.officialGis.officialState.bulkOff.stateVisible === true && !summary.officialGis.officialState.bulkOff.visibleLayers.includes('bulk'), 'Bulk layer toggle did not apply');
+  assert(summary.officialGis.officialState.filtered.kpiPlanar === '30' && summary.officialGis.officialState.filtered.footer === 'matching filters', 'Official search filter did not narrow the map');
+  assert(summary.officialGis.zoomed > summary.officialGis.beforeZoom && summary.officialGis.panned !== summary.officialGis.fitted && summary.officialGis.fitted === '{"scale":1,"x":0,"y":0}', 'Official zoom/pan/fit controls failed');
+  assert(summary.officialGis.lightTopology.colors > 3 && summary.officialGis.darkTopology.colors > 3 && summary.officialGis.lightTopology.hash !== summary.officialGis.darkTopology.hash, 'Official map did not render distinctly in both themes');
+  assert(summary.officialGis.fallback.banner.includes('WMS topology fallback') && summary.officialGis.fallback.bannerKind.includes('fallback') && summary.officialGis.fallback.source === 'aisle-bay-order' && summary.officialGis.fallback.note.includes('Official GIS geometry is unavailable'), 'Facility switch did not fall back to the WMS topology schematic');
+  assert(summary.officialGis.fallback.canvasNodes === 1 && summary.officialGis.fallback.officialCanvasGone, 'Official canvas lingered during fallback');
+  assert(summary.officialGis.restored.source === 'official-gis' && summary.officialGis.restored.schematicHidden && summary.officialGis.restored.officialVisible && summary.officialGis.restored.banner.includes('Official GIS layout'), 'Switching back did not restore the official map: ' + JSON.stringify(summary.officialGis.restored));
+  officialMock.enabled = false;
 
   for (const state of [summary.lightLogin, summary.darkLogin, summary.lightApp, summary.darkApp]) {
     assert(state.logoCount === 1, state.theme + ' ' + state.logoCount + ' visible logos');

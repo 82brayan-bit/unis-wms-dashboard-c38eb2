@@ -423,6 +423,12 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 /* Robot Count GIS location topology */
 .gis-toolbar{margin-bottom:16px}
 .gis-heading-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.gis-mode-banner{display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:9px 11px;border-radius:6px;border:1px solid var(--border);font-size:12px;line-height:1.45}
+.gis-mode-banner strong{flex:0 0 auto}
+.gis-mode-banner.official{background:color-mix(in srgb,var(--chart-3) 10%,var(--card));border-color:color-mix(in srgb,var(--chart-3) 45%,var(--border));color:var(--foreground)}
+.gis-mode-banner.official strong{color:var(--chart-3)}
+.gis-mode-banner.fallback{background:color-mix(in srgb,var(--chart-2) 9%,var(--card));border-color:color-mix(in srgb,var(--chart-2) 45%,var(--border));color:var(--foreground)}
+.gis-mode-banner.fallback strong{color:var(--chart-2)}
 .gis-refresh{flex:0 0 auto}
 .gis-refresh svg{width:15px;height:15px}
 .gis-context{display:flex;align-items:center;gap:7px;margin-top:14px;padding:9px 11px;border:1px solid var(--border);border-radius:6px;background:var(--accent);font-size:12px;color:var(--muted-foreground)}
@@ -457,6 +463,15 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 .gis-legend-dot.customer-2{background:var(--chart-3)}
 .gis-legend-dot.customer-3{background:var(--chart-4)}
 .gis-legend-dot.customer-4{background:var(--chart-5)}
+.gis-legend-dot.official{border-color:var(--border)}
+.gis-layer-controls{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.gis-layer-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border);border-radius:999px;background:var(--card);font-size:10.5px;color:var(--muted-foreground);cursor:pointer;user-select:none}
+.gis-layer-chip:hover{border-color:var(--ring);color:var(--foreground)}
+.gis-layer-chip input{accent-color:var(--primary);margin:0;cursor:pointer}
+.gis-layer-chip:has(input:checked){color:var(--foreground);border-color:color-mix(in srgb,var(--primary) 55%,var(--border))}
+.gis-layer-swatch{width:9px;height:9px;border-radius:2px;border:1px solid var(--border);display:inline-block}
+.gis-layer-swatch-grid{background:repeating-linear-gradient(0deg,transparent 0 2px,var(--border) 2px 3px),repeating-linear-gradient(90deg,transparent 0 2px,var(--border) 2px 3px)}
+.gis-official-canvas{cursor:grab;touch-action:none}
 .gis-legend-dot.status-usable{background:var(--chart-3)}
 .gis-legend-dot.status-disabled{background:var(--destructive)}
 .gis-legend-dot.coverage{background:var(--primary);border-color:var(--ring)}

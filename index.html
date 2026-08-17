@@ -944,6 +944,9 @@
               <span id="gis-refresh-label">Refresh</span>
             </button>
           </div>
+          <div id="gis-mode-banner" class="gis-mode-banner" hidden>
+            <strong></strong><span></span>
+          </div>
           <div class="gis-context" aria-label="Selected facility">
             <span class="gis-context-label">Facility</span>
             <strong id="gis-facility-name">Selected facility</strong>
@@ -976,10 +979,10 @@
         </div>
 
         <div class="gis-metrics" aria-label="Location summary">
-          <div class="kpi"><div class="kpi-ico blue">L</div><div><div class="kpi-lbl">Locations</div><div class="kpi-val" id="gis-kpi-locations">—</div><div class="kpi-chg neutral">matching filters</div></div></div>
-          <div class="kpi"><div class="kpi-ico purple">A</div><div><div class="kpi-lbl">Aisles</div><div class="kpi-val" id="gis-kpi-aisles">—</div><div class="kpi-chg neutral">represented</div></div></div>
-          <div class="kpi"><div class="kpi-ico green">E</div><div><div class="kpi-lbl">Empty</div><div class="kpi-val" id="gis-kpi-empty">—</div><div class="kpi-chg neutral">available locations</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber">O</div><div><div class="kpi-lbl">Occupied / Full</div><div class="kpi-val" id="gis-kpi-used">—</div><div class="kpi-chg neutral">locations in use</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue">L</div><div><div class="kpi-lbl" id="gis-kpi-locations-lbl">Locations</div><div class="kpi-val" id="gis-kpi-locations">—</div><div class="kpi-chg neutral" id="gis-kpi-locations-chg">matching filters</div></div></div>
+          <div class="kpi"><div class="kpi-ico purple">A</div><div><div class="kpi-lbl" id="gis-kpi-aisles-lbl">Aisles</div><div class="kpi-val" id="gis-kpi-aisles">—</div><div class="kpi-chg neutral" id="gis-kpi-aisles-chg">represented</div></div></div>
+          <div class="kpi"><div class="kpi-ico green">E</div><div><div class="kpi-lbl" id="gis-kpi-empty-lbl">Empty</div><div class="kpi-val" id="gis-kpi-empty">—</div><div class="kpi-chg neutral" id="gis-kpi-empty-chg">available locations</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber">O</div><div><div class="kpi-lbl" id="gis-kpi-used-lbl">Occupied / Full</div><div class="kpi-val" id="gis-kpi-used">—</div><div class="kpi-chg neutral" id="gis-kpi-used-chg">locations in use</div></div></div>
         </div>
 
         <div class="gis-content-grid">
@@ -1004,9 +1007,17 @@
                   <span><i class="gis-legend-dot full"></i>Full</span>
                   <span><i class="gis-legend-dot mixed"></i>Mixed</span>
                 </div>
+                <div class="gis-layer-controls" id="gis-layer-controls" role="group" aria-label="Official GIS layers" hidden>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="rack" checked onchange="gisToggleLayer('rack', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="rack"></i>Rack</label>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="bulk" checked onchange="gisToggleLayer('bulk', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="bulk"></i>Bulk</label>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="zone" checked onchange="gisToggleLayer('zone', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="zone"></i>Zone</label>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="dock" checked onchange="gisToggleLayer('dock', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="dock"></i>Dock</label>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="aisles" checked onchange="gisToggleLayer('aisles', this.checked)"/><i class="gis-layer-swatch" data-gis-swatch="aisles"></i>Aisles &amp; roads</label>
+                  <label class="gis-layer-chip"><input type="checkbox" data-gis-layer="grid" onchange="gisToggleLayer('grid', this.checked)"/><i class="gis-layer-swatch gis-layer-swatch-grid" aria-hidden="true"></i>Cell grid</label>
+                </div>
               </div>
             </div>
-            <div class="gis-map-browser">
+            <div class="gis-map-browser" id="gis-map-browser">
               <div class="cc-field">
                 <label class="cc-label" for="gis-bay-picker">Browse mapped aisle / bay</label>
                 <select class="cc-input" id="gis-bay-picker" onchange="gisSelectBayFromPicker()"><option value="">Select a mapped bay</option></select>

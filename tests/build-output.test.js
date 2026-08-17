@@ -17,6 +17,12 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   assert.match(html, /facility-data-loader\.[0-9a-f]{10}\.js/);
   assert.match(manifest['/assets/js/dashboard-runtime.js'], /dashboard-runtime\.[0-9a-f]{10}\.js$/);
   assert.match(manifest['/assets/data/facilities/lt-f1.js'], /lt-f1\.[0-9a-f]{10}\.js$/);
+  // The official GIS renderer ships as its own lazy chunk: hashed in the
+  // manifest, compressed, and never referenced statically by the page.
+  assert.match(manifest['/assets/js/gis-official-map.js'], /gis-official-map\.[0-9a-f]{10}\.js$/);
+  assert.doesNotMatch(html, /gis-official-map\.js/, 'official GIS renderer must not be a static page script');
+  assert.match(html, /id="gis-layer-controls"/);
+  assert.match(html, /id="gis-mode-banner"/);
   for (const output of Object.values(manifest)) {
     const full = path.join(dist, output.replace(/^\//, ''));
     assert.equal(fs.existsSync(full), true, output);
@@ -27,6 +33,10 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   }
   const runtime = fs.readFileSync(path.join(dist, manifest['/assets/js/dashboard-runtime.js'].replace(/^\//, '')), 'utf8');
   const modules = fs.readFileSync(path.join(dist, manifest['/assets/js/dashboard-modules.js'].replace(/^\//, '')), 'utf8');
+  const officialGis = fs.readFileSync(path.join(dist, manifest['/assets/js/gis-official-map.js'].replace(/^\//, '')), 'utf8');
+  assert.match(modules, /gis-official-map\.[0-9a-f]{10}\.js/, 'dist glue references the hashed lazy GIS chunk');
+  assert.match(officialGis, /window\.GISOfficial/);
+  assert.match(officialGis, /loadForFacility/);
   assert.match(runtime, /function showView/);
   assert.match(runtime, /async function switchFacility/);
   assert.match(runtime, /function toggleRobotGroup/);

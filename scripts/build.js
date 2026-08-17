@@ -77,16 +77,28 @@ async function main() {
   }
 
   const jsDir = path.join(PUBLIC, 'assets/js');
-  for (const filename of fs.readdirSync(jsDir).filter(name => name.endsWith('.js') && name !== 'facility-customer-locations.js').sort()) {
+  const jsFiles = fs.readdirSync(jsDir).filter(name => name.endsWith('.js') && name !== 'facility-customer-locations.js').sort();
+  // Pass 1: minify every JS file and register its hashed name so cross-file
+  // references (e.g. dashboard-modules.js → the lazy gis-official-map chunk)
+  // resolve during pass 2 regardless of alphabetical processing order.
+  const minifyIdentifiersFor = filename => filename === 'theme.js' || filename === 'facility-data-loader.js';
+  const nameMap = {};
+  for (const filename of jsFiles) {
     const sourcePath = '/assets/js/' + filename;
-    let source = replacePaths(fs.readFileSync(path.join(jsDir, filename), 'utf8'), manifest);
+    const output = Buffer.from(await minifyJavaScript(fs.readFileSync(path.join(jsDir, filename), 'utf8'), sourcePath, minifyIdentifiersFor(filename)));
+    nameMap[sourcePath] = hashedName('assets/js/' + filename, output);
+  }
+  // Pass 2: rewrite manifest paths, minify again, and write the final files.
+  for (const filename of jsFiles) {
+    const sourcePath = '/assets/js/' + filename;
+    const resolutionManifest = Object.assign({}, manifest, nameMap);
+    let source = replacePaths(fs.readFileSync(path.join(jsDir, filename), 'utf8'), resolutionManifest);
     if (filename === 'facility-data-loader.js') {
-      for (const [input, output] of Object.entries(manifest)) {
+      for (const [input, output] of Object.entries(resolutionManifest)) {
         if (input.startsWith('/assets/data/facilities/')) source = source.replaceAll(input.split('/').pop(), output.split('/').pop());
       }
     }
-    const preserveGlobals = filename !== 'theme.js' && filename !== 'facility-data-loader.js';
-    const output = Buffer.from(await minifyJavaScript(source, sourcePath, !preserveGlobals));
+    const output = Buffer.from(await minifyJavaScript(source, sourcePath, minifyIdentifiersFor(filename)));
     write(hashedName('assets/js/' + filename, output), output, manifest, sourcePath);
   }
 

@@ -13,6 +13,21 @@ const HAS_DIST = fs.existsSync(path.join(DIST_ROOT, 'index.html'));
 const ROBOT_COUNT_API_URL = process.env.ROBOT_COUNT_API_URL || 'https://pget47t1vc.execute-api.us-west-2.amazonaws.com/prd/download_object';
 const ROBOT_COUNT_API_KEY = process.env.ROBOT_COUNT_API_KEY || '';
 
+// Official GIS (warehouse map) service — read-only proxy configuration.
+// The dashboard never calls gis.item.com directly; all GIS reads go through
+// the allow-listed /api/proxy/gis/ routes below so the user's authenticated
+// context (Authorization / cookies) is forwarded without being exposed to
+// the browser, and no GIS write endpoint is ever proxied.
+const GIS_API_HOST = process.env.GIS_API_HOST || 'gis.item.com';
+// 'http' is supported only for local tests against a mock upstream.
+const GIS_API_PROTOCOL = process.env.GIS_API_PROTOCOL || 'https';
+// Explicit upstream port (tests point this at a local mock listener).
+const GIS_API_PORT = Number(process.env.GIS_API_PORT || (GIS_API_PROTOCOL === 'http' ? 80 : 443));
+const GIS_ALLOWED_PLANAR_TYPES = new Set(['RACK', 'BULK', 'ZONE', 'DOCK']);
+const GIS_MAX_PAGE = 500;
+const GIS_MAX_PLANAR_NAMES = 2000;
+console.log('[gis-proxy] Config: host=' + GIS_API_HOST + ' protocol=' + GIS_API_PROTOCOL + ' readOnly=allowlist');
+
 const DATABASE_URL = process.env.DATABASE_URL || '';
 let dbPool = null;
 let dbReady = false;
@@ -119,6 +134,141 @@ function wmsUpstream(method, pathname, body, incomingHeaders, query='') {
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+function gisUpstream(method, pathname, body, incomingHeaders, query='') {
+  return new Promise((resolve) => {
+    const payload = body == null || body === '' ? null : (typeof body === 'string' ? body : JSON.stringify(body));
+    const hdrs = {
+      'Accept': 'application/json',
+      'User-Agent': 'UNIS-WMS-Dashboard/1.0'
+    };
+    // Forward the authenticated user context without exposing it: the token
+    // and cookies travel server-to-server only, never back to the browser.
+    if (incomingHeaders['authorization']) hdrs['Authorization'] = incomingHeaders['authorization'];
+    if (incomingHeaders['cookie']) hdrs['Cookie'] = incomingHeaders['cookie'];
+    if (payload) {
+      hdrs['Content-Type'] = incomingHeaders['content-type'] || 'application/json';
+      hdrs['Content-Length'] = Buffer.byteLength(payload);
+    }
+    const transport = GIS_API_PROTOCOL === 'http' ? http : https;
+    // The port is read lazily so tests can point the proxy at a mock listener
+    // that only binds after server.js has been required.
+    const port = Number(process.env.GIS_API_PORT) || GIS_API_PORT;
+    const req = transport.request({ method, host: GIS_API_HOST, port, path: pathname + (query || ''), headers: hdrs }, r => {
+      let raw = '';
+      r.on('data', c => { raw += c; if (raw.length > 30_000_000) { req.destroy(); } });
+      r.on('end', () => {
+        let parsed = null;
+        try { parsed = raw ? JSON.parse(raw) : null; } catch(_) {}
+        resolve({ status: r.statusCode || 502, headers: r.headers, raw, json: parsed });
+      });
+    });
+    req.on('error', e => resolve({ status: 502, json: { success: false, msg: 'GIS service unreachable: ' + e.message }, raw: '' }));
+    req.setTimeout(30000, () => { req.destroy(); resolve({ status: 504, json: { success: false, msg: 'GIS service timeout' }, raw: '' }); });
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+// Validate an integer path/query id. Returns null when invalid.
+function gisIntParam(value, max = 1e9) {
+  if (!/^\d+$/.test(String(value).trim())) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 1 && parsed <= max ? parsed : null;
+}
+
+// Resolve an allow-listed read-only GIS request. Returns
+// {upstreamPath, query, body, method} or {reject:{code,msg}}.
+function gisResolveProxyRoute(method, url) {
+  const suffix = url.pathname.replace(/^\/api\/proxy\/gis/, '');
+  if (!suffix.startsWith('/')) return { reject: { code: 404, msg: 'Unknown GIS proxy route' } };
+
+  // POST /gis-bam/facility-search — read-only facility/warehouse mapping list.
+  if (suffix === '/gis-bam/facility-search') {
+    if (method !== 'GET' && method !== 'POST') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: suffix, method, query: '', body: method === 'POST' ? '{}' : null, forwardBody: method === 'POST' };
+  }
+
+  // GET /gis-app/warehouse — warehouse list with authoritative layer stats.
+  if (suffix === '/gis-app/warehouse') {
+    if (method !== 'GET') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: suffix, method, query: '', body: null };
+  }
+
+  // GET /gis-app/warehouse/{id} — single warehouse record (read-only).
+  const singleWarehouse = suffix.match(/^\/gis-app\/warehouse\/(\d+)$/);
+  if (singleWarehouse) {
+    if (method !== 'GET') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: '/gis-app/warehouse/' + singleWarehouse[1], method, query: '', body: null };
+  }
+
+  // GET|POST /gis-bam/planar-model/facility-type-data?warehouseId={id}&type={TYPE}
+  // POST carries {currentPage} for read-only pagination of the same query.
+  if (suffix === '/gis-bam/planar-model/facility-type-data') {
+    const warehouseId = gisIntParam(url.searchParams.get('warehouseId'));
+    const type = String(url.searchParams.get('type') || '').toUpperCase();
+    if (!warehouseId) return { reject: { code: 400, msg: 'Invalid warehouseId' } };
+    if (!GIS_ALLOWED_PLANAR_TYPES.has(type)) return { reject: { code: 400, msg: 'Unsupported planar type' } };
+    const query = '?warehouseId=' + warehouseId + '&type=' + type;
+    if (method === 'GET') return { upstreamPath: suffix, method, query, body: null };
+    if (method === 'POST') {
+      return { upstreamPath: suffix, method, query, body: { currentPage: 1 } };
+    }
+    return { reject: { code: 405, msg: 'Method not allowed' } };
+  }
+
+  // GET /gis-app/warehouse-aisles/warehouse/{id} — aisle/road overlay geometry.
+  const aisles = suffix.match(/^\/gis-app\/warehouse-aisles\/warehouse\/(\d+)$/);
+  if (aisles) {
+    if (method !== 'GET') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: '/gis-app/warehouse-aisles/warehouse/' + aisles[1], method, query: '', body: null };
+  }
+
+  // POST /gis-bam/location-inventory/customers-by-planars — customer↔planar read mapping.
+  if (suffix === '/gis-bam/location-inventory/customers-by-planars') {
+    if (method !== 'POST') return { reject: { code: 405, msg: 'Method not allowed' } };
+    return { upstreamPath: suffix, method, query: '', body: null, planarNamesBody: true };
+  }
+
+  return { reject: { code: 404, msg: 'Unknown GIS proxy route' } };
+}
+
+async function handleGisProxy(req, res, url) {
+  const resolved = gisResolveProxyRoute(req.method, url);
+  if (resolved.reject) return send(res, resolved.reject.code, { success: false, msg: resolved.reject.msg });
+
+  let body = null;
+  if (resolved.forwardBody || resolved.body !== null || resolved.planarNamesBody) {
+    const raw = await readBody(req);
+    if (raw.length > 1_000_000) return send(res, 413, { success: false, msg: 'GIS proxy body too large' });
+    let parsed;
+    try { parsed = raw ? JSON.parse(raw) : {}; } catch(_) {
+      return send(res, 400, { success: false, msg: 'Invalid GIS proxy request body' });
+    }
+    if (resolved.planarNamesBody) {
+      const names = Array.isArray(parsed.planarNames) ? parsed.planarNames : [];
+      if (names.length === 0) return send(res, 400, { success: false, msg: 'planarNames is required' });
+      if (names.length > GIS_MAX_PLANAR_NAMES) return send(res, 400, { success: false, msg: 'Too many planarNames' });
+      if (names.some(name => typeof name !== 'string' || !name.trim() || name.length > 128)) {
+        return send(res, 400, { success: false, msg: 'Invalid planarNames entry' });
+      }
+      body = JSON.stringify({ planarNames: names });
+    } else if (resolved.forwardBody) {
+      // Facility-search: forward the caller's read-only body verbatim.
+      body = raw || '{}';
+    } else {
+      // Planar pagination: currentPage must be a bounded positive integer.
+      const page = parsed.currentPage == null ? 1 : Number(parsed.currentPage);
+      if (!Number.isSafeInteger(page) || page < 1 || page > GIS_MAX_PAGE) {
+        return send(res, 400, { success: false, msg: 'Invalid currentPage' });
+      }
+      body = JSON.stringify({ currentPage: page });
+    }
+  }
+
+  const out = await gisUpstream(resolved.method, resolved.upstreamPath, body, req.headers, resolved.query);
+  return send(res, out.status, out.json || { success: false, msg: out.raw ? out.raw.slice(0, 300) : 'No response from GIS' });
 }
 
 function hrmUpstream(method, pathname, body, incomingHeaders, query='') {
@@ -285,6 +435,10 @@ async function handleApi(req, res, url) {
         req, res, url, send, readBody, dbQuery, wmsUpstream,
         isDbReady: () => !!dbPool && !!dbReady
       });
+    }
+
+    if (url.pathname.startsWith('/api/proxy/gis/')) {
+      return handleGisProxy(req, res, url);
     }
 
     if (url.pathname.startsWith('/api/proxy/wms/')) {
@@ -546,9 +700,15 @@ const server = http.createServer((req,res) => {
     res.end(data);
   });
 });
-initDatabase().finally(() => {
-  server.listen(PORT, '0.0.0.0', () => console.log(`UNIS WMS dashboard server listening on 0.0.0.0:${PORT}`));
-});
+if (require.main === module) {
+  initDatabase().finally(() => {
+    server.listen(PORT, '0.0.0.0', () => console.log(`UNIS WMS dashboard server listening on 0.0.0.0:${PORT}`));
+  });
+}
+
+// Exported for tests: the full app server can be listened on an ephemeral
+// port in-process, and the GIS route allow-list can be unit-tested directly.
+module.exports = { server, handleApi, gisResolveProxyRoute };
 
 async function handleSendNotification(req, res) {
   try {
