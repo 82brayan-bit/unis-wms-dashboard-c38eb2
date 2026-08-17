@@ -99,6 +99,47 @@
     return !!(facilityNameKey && normalizeKey(candidate && candidate.name == null ? '' : String(candidate && candidate.name)) === facilityNameKey);
   }
 
+  // Audited exact facilityId → warehouseId registry (frozen). Completed
+  // read-only mapping audit: all 41 LT facilities map uniquely via
+  // warehouse.facilityId === facility.id. Used ONLY as an exact-ID fallback
+  // when live mapping reads fail, return empty, or lack an exact match; never
+  // for facilities not listed, and never by name/accounting/position.
+  var GIS_FACILITY_WAREHOUSE_REGISTRY = Object.freeze({
+    'LT_F1': 12, 'LT_ORG-7759': 13, 'LT_F11': 14, 'LT_ORG-7941': 15, 'LT_F131': 16,
+    'LT_ORG-67669': 17, 'LT_F16': 18, 'LT_F25': 19, 'LT_F98': 20, 'LT_F42': 21,
+    'LT_F29': 22, 'LT_F34': 23, 'LT_ORG-8127': 24, 'LT_ORG-61213': 25, 'LT_ORG-35184': 26,
+    'LT_F7': 27, 'LT_F46': 28, 'LT_F45': 29, 'LT_F35': 30, 'LT_F33': 31,
+    'LT_F37': 32, 'LT_F27': 33, 'LT_F32': 34, 'LT_F44': 35, 'LT_F10002': 36,
+    'LT_F19': 37, 'LT_F133': 38, 'LT_F22': 39, 'LT_F40': 40, 'LT_F132': 42,
+    'LT_F38': 43, 'LT_ORG-7955': 44, 'LT_F21': 45, 'LT_ORG-34646': 46, 'LT_F31': 47,
+    'LT_F23': 48, 'LT_F14': 49, 'LT_F4': 50, 'LT_F36': 51, 'LT_F59': 52, 'LT_ORG-2': 53,
+  });
+
+  // Exact registry lookup by normalized facility id; null when not listed.
+  function gisRegistryWarehouseId(facilityId) {
+    var facilityKey = normalizeKey(facilityId);
+    if (!facilityKey) return null;
+    for (var name in GIS_FACILITY_WAREHOUSE_REGISTRY) {
+      if (normalizeKey(name) === facilityKey) return GIS_FACILITY_WAREHOUSE_REGISTRY[name];
+    }
+    return null;
+  }
+
+  // Exact live matches: warehouses whose facilityId normalizes to the selected
+  // facility AND that carry a valid positive numeric id.
+  function gisLiveWarehouseMatches(facilityId, warehouses) {
+    var facilityKey = normalizeKey(facilityId);
+    var matches = [];
+    (Array.isArray(warehouses) ? warehouses : []).forEach(function (warehouse) {
+      if (!warehouse || typeof warehouse !== 'object') return;
+      if (normalizeKey(warehouse.facilityId == null ? '' : String(warehouse.facilityId)) !== facilityKey) return;
+      var warehouseId = Number(warehouse.id);
+      if (!Number.isSafeInteger(warehouseId) || warehouseId < 1) return;
+      matches.push(warehouse);
+    });
+    return matches;
+  }
+
   // Warehouse selection is EXACT facilityId matching only (audited: all 41
   // LT facilities map uniquely via warehouse.facilityId === facility.id, e.g.
   // LT_F1 → 12). Accounting codes, names, array positions and facility-search
@@ -249,45 +290,96 @@
 
   // Loads the facility/warehouse mapping lists and resolves the warehouse id.
   function loadWarehouseInfo(facilityId, facilityName) {
+    // Mapping reads preserve errors instead of swallowing them: a failed or
+    // non-array response becomes a safe diagnostic reason used for the
+    // registry fallback and for visible mapping-conflict/unavailable messages.
     var facilitySearchPromise = apiFetch('/gis-bam/facility-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: '{}',
     }).then(function (json) {
       var data = gisUnwrapData(json);
-      return Array.isArray(data) ? data : [];
-    }).catch(function () { return []; });
+      return Array.isArray(data) ? { ok: true, data: data, error: null } : { ok: false, data: [], error: 'facility-search did not return an array' };
+    }).catch(function (error) {
+      return { ok: false, data: [], error: error && error.message ? error.message : 'facility-search failed' };
+    });
 
     var warehouseListPromise = apiFetch('/gis-app/warehouse').then(function (json) {
       var data = gisUnwrapData(json);
-      return Array.isArray(data) ? data : [];
-    }).catch(function () { return []; });
+      return Array.isArray(data) ? { ok: true, data: data, error: null } : { ok: false, data: [], error: 'warehouse list did not return an array' };
+    }).catch(function (error) {
+      return { ok: false, data: [], error: error && error.message ? error.message : 'warehouse list failed' };
+    });
 
     return Promise.all([facilitySearchPromise, warehouseListPromise]).then(function (results) {
-      // Adopt the exact matched facility record's timezone for every later
-      // planar / inventory request.
-      var candidates = Array.isArray(results[0]) ? results[0] : [];
+      var facilityResult = results[0];
+      var warehouseResult = results[1];
+      var candidates = facilityResult.data;
+      var warehouseList = warehouseResult.data;
+
+      // Facility-search is metadata only: adopt the exact matched facility
+      // record's timezone for every later planar / inventory request.
       for (var c = 0; c < candidates.length; c++) {
         if (gisFacilityMatches(candidates[c], facilityId, facilityName)) {
           var facilityTimezone = candidates[c].timeZone;
-          if (typeof facilityTimezone === 'string' && /^[A-Za-z0-9_+/\-]{1,64}$/.test(facilityTimezone) && !facilityTimezone.includes('..') && !facilityTimezone.startsWith('/') && !facilityTimezone.endsWith('/')) {
+          if (typeof facilityTimezone === 'string' && /^[A-Za-z0-9_+/-]{1,64}$/.test(facilityTimezone) && !facilityTimezone.includes('..') && !facilityTimezone.startsWith('/') && !facilityTimezone.endsWith('/')) {
             state.timezone = facilityTimezone;
           }
           break;
         }
       }
-      var resolved = gisResolveWarehouse(facilityId, facilityName, results[0], results[1]);
-      if (resolved && !resolved.warehouse) {
-        var warehouseList = Array.isArray(results[1]) ? results[1] : [];
-        for (var i = 0; i < warehouseList.length; i++) {
-          if (String(warehouseList[i].id) === String(resolved.warehouseId)) {
-            resolved.warehouse = warehouseList[i];
-            break;
-          }
+
+      var facilityKey = normalizeKey(facilityId);
+      var registryId = gisRegistryWarehouseId(facilityId);
+      var liveMatches = gisLiveWarehouseMatches(facilityId, warehouseList);
+
+      // 1) Prefer a unique exact live match.
+      if (liveMatches.length === 1) {
+        var live = liveMatches[0];
+        if (registryId !== null && Number(live.id) !== registryId) {
+          return { resolved: null, reason: 'conflict', diagnostic: 'Live GIS mapping for ' + facilityId + ' points to warehouse ' + live.id + ' but the audited registry says warehouse ' + registryId + '. Mapping conflict — no warehouse selected.' };
         }
+        return { resolved: { warehouseId: Number(live.id), warehouse: live, source: 'warehouse.facilityId', matchedOn: 'facilityId' }, reason: 'live', diagnostic: null, warehouses: warehouseList };
       }
-      return { resolved: resolved, warehouses: results[1] };
+      // Ambiguous live matches are a mapping conflict, never a silent pick.
+      if (liveMatches.length > 1) {
+        return { resolved: null, reason: 'conflict', diagnostic: 'Ambiguous live GIS mapping: multiple warehouses claim facility ' + facilityId + '. Mapping conflict — no warehouse selected.' };
+      }
+      // 2) No live match → exact audited registry entry (never for unlisted
+      //    facilities).
+      if (registryId === null) {
+        return {
+          resolved: null, reason: 'no-warehouse',
+          diagnostic: 'No exact warehouse.facilityId mapping found for ' + facilityId + (warehouseResult.ok ? '.' : ' and the warehouse list could not be read (' + warehouseResult.error + ').') + ' It is not listed in the audited GIS registry.',
+        };
+      }
+      // If live data claims this facility with a DIFFERENT warehouse id than
+      // the registry, fail visibly — never pick either silently.
+      var conflicting = warehouseList.some(function (warehouse) {
+        return warehouse && typeof warehouse === 'object'
+          && normalizeKey(warehouse.facilityId == null ? '' : String(warehouse.facilityId)) === facilityKey
+          && Number(warehouse.id) !== registryId;
+      });
+      if (conflicting) {
+        return { resolved: null, reason: 'conflict', diagnostic: 'Live GIS mapping for ' + facilityId + ' conflicts with the audited registry (warehouse ' + registryId + '). Mapping conflict — no warehouse selected.' };
+      }
+      return {
+        resolved: { warehouseId: registryId, warehouse: null, source: 'registry', matchedOn: 'audited-registry' },
+        reason: 'registry',
+        diagnostic: 'Live mapping unavailable for ' + facilityId + (warehouseResult.ok ? '' : ' (' + warehouseResult.error + ')') + '; using verified GIS mapping from the audited registry (warehouse ' + registryId + ').',
+        warehouses: warehouseList,
+      };
     });
+  }
+
+  // Read-only single-warehouse metadata fetch used when the audited registry
+  // selected the warehouse id. Optional: geometry loading never blocks on it.
+  function loadWarehouseMetadata(warehouseId) {
+    return apiFetch('/gis-app/warehouse/' + warehouseId).then(function (json) {
+      var data = gisUnwrapData(json);
+      if (Array.isArray(data)) return data[0] || null;
+      return data && typeof data === 'object' ? data : null;
+    }).catch(function () { return null; });
   }
 
   // Loads one planar layer type with the official pagination contract:
@@ -1080,9 +1172,20 @@
       if (token !== state.requestToken) return { stale: true };
       if (!info.resolved) {
         state.active = false;
-        return { status: 'unavailable', reason: 'no-warehouse', message: 'No official GIS warehouse matches facility ' + facilityId + '.' };
+        return { status: 'unavailable', reason: info.reason || 'no-warehouse', message: info.diagnostic || ('No official GIS warehouse matches facility ' + facilityId + '.'), diagnostic: info.diagnostic || null };
       }
       var resolved = info.resolved;
+      state.warehouseId = resolved.warehouseId;
+      state.warehouse = resolved.warehouse || null;
+      state.authoritative = gisAuthoritativeStats(state.warehouse);
+      if (resolved.source === 'registry') {
+        setStatus('Live mapping unavailable; using verified GIS mapping from the audited registry (warehouse ' + resolved.warehouseId + ') for ' + facilityName + '. Loading geometry…');
+      } else {
+        setStatus('Official GIS warehouse found for ' + facilityName + ' (warehouse ' + resolved.warehouseId + '). Loading geometry…');
+      }
+      // Registry fallback fetches warehouse metadata for name/stats/outline;
+      // geometry proceeds with the verified id even if it fails.
+      var metadataPromise = resolved.source === 'registry' ? loadWarehouseMetadata(resolved.warehouseId) : Promise.resolve(null);
       state.warehouseId = resolved.warehouseId;
       state.warehouse = resolved.warehouse || null;
       state.authoritative = gisAuthoritativeStats(state.warehouse);
@@ -1120,15 +1223,23 @@
             state.active = false;
             return { status: 'unavailable', reason: 'map-engine', message: 'The map engine could not be loaded for the official GIS layout.' };
           }
-          state.mapReady = !!leaflet;
-          finalizeAndRender();
-          return {
-            status: 'official',
-            warehouseId: resolved.warehouseId,
-            source: resolved.source,
-            counts: counts,
-            authoritative: state.authoritative,
-          };
+          return metadataPromise.then(function (metadata) {
+            if (token !== state.requestToken) return { stale: true };
+            if (metadata) {
+              state.warehouse = metadata;
+              state.authoritative = gisAuthoritativeStats(metadata);
+            }
+            state.mapReady = !!leaflet;
+            finalizeAndRender();
+            return {
+              status: 'official',
+              warehouseId: resolved.warehouseId,
+              source: resolved.source,
+              verified: resolved.source === 'registry',
+              counts: counts,
+              authoritative: state.authoritative,
+            };
+          });
         });
       });
     }).catch(function (error) {
@@ -1346,6 +1457,9 @@
       normalizeKey: normalizeKey,
       gisUnwrapData: gisUnwrapData,
       gisFacilityMatches: gisFacilityMatches,
+      GIS_FACILITY_WAREHOUSE_REGISTRY: GIS_FACILITY_WAREHOUSE_REGISTRY,
+      gisRegistryWarehouseId: gisRegistryWarehouseId,
+      gisLiveWarehouseMatches: gisLiveWarehouseMatches,
       gisToGeoJSON: gisToGeoJSON,
       gisResolveWarehouse: gisResolveWarehouse,
       gisPlanPagination: gisPlanPagination,

@@ -94,6 +94,9 @@ function buildFetchStub(options = {}) {
     const respond = payload => Promise.resolve({ json: () => Promise.resolve(payload) });
     if (url.includes('/gis-bam/facility-search')) return respond(wrap(facilitySearch));
     if (url.includes('/gis-app/warehouse-aisles/warehouse/')) return respond(wrap(aisleList));
+    if (/\/api\/proxy\/gis\/gis-app\/warehouse\/\d+$/.test(url)) {
+      return respond(wrap(options.metadata ? [options.metadata] : []));
+    }
     if (url === '/api/proxy/gis/gis-app/warehouse') return respond(wrap(warehouses));
     if (url.includes('/gis-bam/planar-model/facility-type-data')) {
       const params = new URL('http://localhost' + url.slice('/api/proxy/gis'.length)).searchParams;
@@ -255,11 +258,13 @@ test('loadForFacility renders the official LT_F1 map with authoritative counts',
   G.reset();
 });
 
-test('official mode is skipped when the warehouse cannot be resolved (fallback path)', async () => {
+test('official mode is skipped only for facilities outside the audited registry', async () => {
+  // LT_F999 is not in the audited registry and has no live mapping → fallback.
   const G = loadOfficial(buildFetchStub({ warehouses: [], facilitySearch: [] }));
-  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  const result = await G.loadForFacility('LT_F999', 'Unlisted Facility');
   assert.equal(result.status, 'unavailable');
   assert.equal(result.reason, 'no-warehouse');
+  assert.match(result.message, /not listed in the audited GIS registry/, 'truthful registry diagnostic');
   assert.equal(G.state.active, false);
 });
 
@@ -277,13 +282,13 @@ test('official mode is skipped when no surveyed planar geometry exists', async (
 test('stale facility switches never let an older official load win', async () => {
   const G = loadOfficial(buildFetchStub());
   const first = G.loadForFacility('LT_F1', 'Valley View');
-  const second = G.loadForFacility('LT_F42', 'Airport'); // resets the request token
+  const second = G.loadForFacility('LT_F999', 'Unlisted'); // resets the request token
   const results = await Promise.all([first, second]);
   const firstResult = results[0];
   const secondResult = results[1];
   assert.equal(firstResult.stale, true, 'older official load must be discarded');
   assert.ok(!secondResult.stale, 'latest official load wins');
-  assert.equal(secondResult.status, 'unavailable'); // LT_F42 has no fixture mapping
+  assert.equal(secondResult.status, 'unavailable'); // unlisted facility stays unavailable
 });
 
 test('customer mapping is only enabled when the official endpoint returns planars', async () => {
@@ -584,7 +589,7 @@ test('facility changes replace the scope headers immediately and stale loads can
     ],
     warehouses: [
       { id: 12, facilityId: 'LT_F1', name: 'VALLEY VIEW', accountingCode: '889' },
-      { id: 99, facilityId: 'LT_F42', name: 'AIRPORT', accountingCode: '999' },
+      { id: 21, facilityId: 'LT_F42', name: 'AIRPORT', accountingCode: '999' },
     ],
   });
   const G = loadOfficial(stub);
@@ -596,9 +601,131 @@ test('facility changes replace the scope headers immediately and stale loads can
   assert.equal(facilitySearchCall.headers['x-facility-id'], 'LT_F42', 'facility-search for the new facility is scoped to LT_F42');
   const result = await switching;
   assert.equal(result.status, 'official');
-  assert.equal(G.state.warehouseId, 99);
+  assert.equal(G.state.warehouseId, 21, 'LT_F42 live mapping matches the audited registry');
   const later = stub.calls[stub.calls.length - 1];
   assert.equal(later.headers['x-facility-id'], 'LT_F42', 'later requests never reuse LT_F1 scope');
   assert.equal(later.headers['Item-Time-Zone'], 'America/Chicago', 'new facility timezone applies');
+  G.reset();
+});
+
+
+// ── Audited facilityId → warehouseId registry fallback ──
+
+test('the audited registry holds all 41 exact mappings with unique ids', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+  const registry = p.GIS_FACILITY_WAREHOUSE_REGISTRY;
+  const entries = Object.entries(registry);
+  assert.equal(entries.length, 41, 'registry has exactly 41 audited entries');
+  const facilityIds = entries.map(([id]) => id);
+  const warehouseIds = entries.map(([, wid]) => wid);
+  assert.equal(new Set(facilityIds).size, 41, 'facility ids are unique');
+  assert.equal(new Set(warehouseIds).size, 41, 'warehouse ids are unique');
+  assert.equal(Object.isFrozen(registry), true, 'registry is frozen');
+  // Exact normalized lookups resolve; unlisted facilities never resolve.
+  assert.equal(p.gisRegistryWarehouseId('LT_F1'), 12);
+  assert.equal(p.gisRegistryWarehouseId('LT_F42'), 21);
+  assert.equal(p.gisRegistryWarehouseId('LT_ORG-2'), 53);
+  assert.equal(p.gisRegistryWarehouseId('LT_F999'), null, 'unlisted facility never resolves');
+  assert.equal(p.gisRegistryWarehouseId(''), null);
+});
+
+test('LT_F1 falls back to verified registry warehouse 12 when live mapping reads fail', async () => {
+  const stub = buildFetchStub({
+    facilitySearchFail: true,
+    warehouses: [],
+  });
+  // Force both mapping endpoints to reject.
+  stub.calls = [];
+  const origStub = stub;
+  const failing = function (url, fetchOptions) {
+    if (url.includes('/gis-bam/facility-search') || url === '/api/proxy/gis/gis-app/warehouse') {
+      return Promise.reject(new Error('mapping service unavailable'));
+    }
+    return origStub(url, fetchOptions);
+  };
+  failing.calls = origStub.calls;
+  const G = loadOfficial(failing);
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official', 'registry fallback keeps the official map');
+  assert.equal(result.warehouseId, 12);
+  assert.equal(result.source, 'registry');
+  assert.equal(result.verified, true, 'verified GIS mapping flag set');
+  assert.equal(result.counts.rack, 100, 'geometry still loads from the verified warehouse id');
+  assert.equal(result.counts.bulk, 30);
+  assert.equal(G.state.projected.length, 130);
+  G.reset();
+});
+
+test('empty or double-wrapped mapping lists also fall back to the registry', async () => {
+  const G = loadOfficial(buildFetchStub({ warehouses: [], facilitySearch: [], wrapEnvelopes: true }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.warehouseId, 12);
+  assert.equal(result.source, 'registry');
+  G.reset();
+});
+
+test('registry fallback fetches metadata but geometry proceeds if it fails', async () => {
+  const G = loadOfficial(buildFetchStub({ warehouses: [], facilitySearch: [] }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.warehouseId, 12);
+  // Metadata endpoint was called (stub rejects it) yet geometry loaded.
+  assert.equal(G.state.projected.length, 130);
+  G.reset();
+});
+
+test('registry fallback adopts warehouse metadata when the single-warehouse read succeeds', async () => {
+  const stub = buildFetchStub({
+    warehouses: [],
+    facilitySearch: [],
+    metadata: { id: 12, facilityId: 'LT_F1', name: 'VALLEY VIEW', stats: { rack: 7027, bulk: 2114, zone: 0, dock: 0 } },
+  });
+  const G = loadOfficial(stub);
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.authoritative.rack, 7027, 'authoritative stats adopted from metadata');
+  assert.equal(G.state.warehouse.name, 'VALLEY VIEW');
+  G.reset();
+});
+
+test('a live mapping conflicting with the registry fails visibly, picking neither', async () => {
+  const G = loadOfficial(buildFetchStub({
+    warehouses: [{ id: 99, facilityId: 'LT_F1', name: 'Wrong Warehouse' }],
+  }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'conflict');
+  assert.match(result.message, /conflict/i, 'visible mapping-conflict diagnostic');
+  assert.match(result.message, /audited registry/, 'registry referenced in the conflict message');
+  assert.equal(G.state.active, false, 'neither warehouse is selected silently');
+});
+
+test('ambiguous live matches are a conflict, never a silent pick', async () => {
+  const G = loadOfficial(buildFetchStub({
+    warehouses: [
+      { id: 12, facilityId: 'LT_F1', name: 'A' },
+      { id: 42, facilityId: 'LT_F1', name: 'B' },
+    ],
+  }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'conflict');
+  assert.match(result.message, /Ambiguous/);
+});
+
+test('live exact matches consistent with the registry win over registry fallback', async () => {
+  const G = loadOfficial(buildFetchStub({
+    warehouses: [{ id: 12, facilityId: 'LT_F1', name: 'VALLEY VIEW', stats: { rack: 7027, bulk: 2114, zone: 0, dock: 0 } }],
+  }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.warehouseId, 12);
+  assert.equal(result.source, 'warehouse.facilityId');
+  assert.equal(result.verified, false, 'live mapping is not flagged as registry-verified');
   G.reset();
 });

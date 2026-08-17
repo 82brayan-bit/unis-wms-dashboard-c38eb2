@@ -79,12 +79,20 @@ function gisMockResponse(requestUrl, postData) {
   // The live service returns {code:0,success:true,msg:'OK',data:[...]} and the
   // proxy can wrap that again, so the resolver-facing responses are mocked
   // double-wrapped to exercise the repeated-envelope normalizer.
-  const envelope = payload => ({ data: { code: 0, success: true, msg: 'OK', data: payload } });
+  // Mapping endpoints are FORCED to fail here so the browser smoke exercises
+  // the audited-registry fallback (LT_F1 → warehouse 12) while planars,
+  // aisles and inventory reads keep succeeding.
+  const mappingFailure = () => ({ code: 500, success: false, msg: 'mapping service unavailable (forced for smoke)' });
   if (gisPath.startsWith('/gis-bam/facility-search')) {
-    return envelope([{ id: 'LT_F1', facilityCode: 'FAC242', name: 'Valley View', accountingCode: '889', timeZone: 'America/Los_Angeles', legacyId: 'F1' }]);
+    return mappingFailure();
   }
   if (gisPath === '/gis-app/warehouse') {
-    return envelope([GIS_WAREHOUSE_FIXTURE]);
+    return mappingFailure();
+  }
+  // Single-warehouse metadata read succeeds, so the registry fallback adopts
+  // name/stats/outline for authoritative KPIs (geometry never depends on it).
+  if (/^\/gis-app\/warehouse\/\d+$/.test(gisPath)) {
+    return { success: true, data: [GIS_WAREHOUSE_FIXTURE] };
   }
   if (gisPath.startsWith('/gis-bam/planar-model/facility-type-data')) {
     const type = new URL(requestUrl).searchParams.get('type');
@@ -96,7 +104,7 @@ function gisMockResponse(requestUrl, postData) {
     return { success: true, data: { list: pool.slice(start, start + 25), currentPage, pageSize: 25, totalCount } };
   }
   if (gisPath.startsWith('/gis-app/warehouse-aisles/warehouse/')) {
-    return envelope(GIS_AISLE_FIXTURES);
+    return { success: true, data: GIS_AISLE_FIXTURES };
   }
   if (gisPath.startsWith('/gis-bam/location-inventory/customers-by-planars')) {
     const body = postData ? JSON.parse(postData) : {};
@@ -848,9 +856,10 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 160));
     const darkTopology = hashCanvas(document.querySelector('#gis-ws-leaflet canvas.gis-planar-canvas'));
 
-    // Facility switch with no official mapping → explicit WMS topology fallback.
-    await switchFacility('LT_F42');
-    await waitFor(() => GIS.facilityId === 'LT_F42' && !GIS.official.active && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    // Facility switch with no live mapping AND no audited-registry entry →
+    // explicit WMS topology fallback (LT_ORG-45230 is not in the registry).
+    await switchFacility('LT_ORG-45230');
+    await waitFor(() => GIS.facilityId === 'LT_ORG-45230' && !GIS.official.active && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
     const fallback = {
       banner:document.getElementById('gis-mode-banner').textContent,
       bannerKind:document.getElementById('gis-mode-banner').className,
@@ -889,6 +898,7 @@ async function main() {
   assert(os.satellite.mode === 'satellite' && os.satellite.label === 'Map' && os.satellite.pressed === 'true', 'Satellite toggle did not switch the basemap');
   assert(os.backToMap === 'map', 'Map/Satellite toggle did not return to map mode');
   assert(os.banner.includes('Official GIS layout') && os.bannerKind.includes('official'), 'Official mode banner is missing');
+  assert(os.banner.includes('verified against the audited facility registry'), 'Registry fallback must disclose the verified GIS mapping: ' + os.banner);
   assert(os.features === 130 && os.aisles === 5, 'Official geometry counts are incorrect: ' + JSON.stringify({features:os.features, aisles:os.aisles}));
   assert(os.kpi.planar === '9,141' && os.kpi.racks === '7,027' && os.kpi.bulk === '2,114' && os.kpi.aisles === '5', 'Authoritative LT_F1 KPIs are incorrect: ' + JSON.stringify(os.kpi));
   assert(os.kpiLabels.planar === 'Planar objects' && os.kpiLabels.racks === 'Racks' && os.kpiLabels.bulk === 'Bulk' && os.kpiLabels.aisles === 'Aisles & roads', 'Official KPI labels were not swapped');

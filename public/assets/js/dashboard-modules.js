@@ -3991,7 +3991,8 @@ function gisRenderOfficialMode(result, context) {
   }
   const note = document.getElementById('gis-render-note');
   if (note) note.textContent = 'Official GIS layout: surveyed warehouse geometry from the official GIS service, shown as stored. Polygon colors and the aisle/road overlay follow the official warehouse map.';
-  gisSetModeBanner('official', 'Official GIS layout', 'Surveyed warehouse geometry from the official GIS service. Rack, bulk, zone and dock planars are shown at their real stored coordinates with the official aisle and road overlay.');
+  const verifiedMapping = result.verified ? ' The warehouse mapping is verified against the audited facility registry.' : '';
+  gisSetModeBanner('official', 'Official GIS layout', 'Surveyed warehouse geometry from the official GIS service. Rack, bulk, zone and dock planars are shown at their real stored coordinates with the official aisle and road overlay.' + verifiedMapping);
   gisShowMap();
   // The geometry loads while the viewport is still hidden for the loading
   // state; size and redraw it now that the map is visible.
