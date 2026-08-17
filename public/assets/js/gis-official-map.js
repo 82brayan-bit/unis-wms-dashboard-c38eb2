@@ -99,75 +99,28 @@
     return !!(facilityNameKey && normalizeKey(candidate && candidate.name == null ? '' : String(candidate && candidate.name)) === facilityNameKey);
   }
 
-  // Dynamic facility → official warehouse resolution. Priority:
-  // 1. exact normalized warehouse.facilityId === selected facility (primary),
-  // 2. facility-search candidates carrying an explicit warehouse id,
-  // 3. accounting code shared by the matched facility and the warehouse,
-  // 4. normalized warehouse name === facility name (explicit fallback).
-  // Returns {warehouseId, warehouse, source, matchedOn} or null.
+  // Warehouse selection is EXACT facilityId matching only (audited: all 41
+  // LT facilities map uniquely via warehouse.facilityId === facility.id, e.g.
+  // LT_F1 → 12). Accounting codes, names, array positions and facility-search
+  // ids are NEVER used for selection; facility-search is metadata/timezone
+  // only. A missing or ambiguous (duplicate) match returns null so the
+  // dashboard falls back truthfully instead of picking another warehouse.
   function gisResolveWarehouse(facilityId, facilityName, facilityCandidates, warehouses) {
     var facilityKey = normalizeKey(facilityId);
-    var facilityNameKey = normalizeKey(facilityName);
-    var idFields = ['warehouseId', 'warehouse_ids', 'warehouseIds'];
-    function candidateValue(item, field) {
-      var value = item[field];
-      return value == null ? '' : String(value);
-    }
-    function numericId(value) {
-      return /^\d+$/.test(String(value)) ? Number(value) : null;
-    }
-    function sameFacility(candidate) {
-      return gisFacilityMatches(candidate, facilityId, facilityName);
-    }
-    var candidates = Array.isArray(facilityCandidates) ? facilityCandidates : [];
+    if (!facilityKey) return null;
+    var matches = [];
     var list = Array.isArray(warehouses) ? warehouses : [];
-
-    // 1) Primary: warehouse record whose facilityId matches the selected facility.
     for (var j = 0; j < list.length; j++) {
       var warehouse = list[j];
-      var facility = normalizeKey(candidateValue(warehouse, 'facilityId') || candidateValue(warehouse, 'facility_code'));
-      if (facility && facility === facilityKey) {
-        return { warehouseId: Number(warehouse.id), warehouse: warehouse, source: 'warehouse.facilityId', matchedOn: 'facilityId' };
-      }
+      if (!warehouse || typeof warehouse !== 'object') continue;
+      var facility = normalizeKey(warehouse.facilityId == null ? '' : String(warehouse.facilityId));
+      if (!facility || facility !== facilityKey) continue;
+      var warehouseId = Number(warehouse.id);
+      if (!Number.isSafeInteger(warehouseId) || warehouseId < 1) continue;
+      matches.push(warehouse);
     }
-    // 2) Facility-search candidates that reference the selected facility and
-    //    carry an explicit warehouse id (or a nested warehouse record).
-    for (var i = 0; i < candidates.length; i++) {
-      var candidate = candidates[i];
-      if (!sameFacility(candidate)) continue;
-      for (var w = 0; w < idFields.length; w++) {
-        var warehouseId = numericId(candidateValue(candidate, idFields[w]));
-        if (warehouseId !== null) return { warehouseId: warehouseId, warehouse: null, source: 'facility-search', matchedOn: idFields[w] };
-      }
-      var nested = candidate.warehouse || candidate.warehouseInfo;
-      if (nested && numericId(candidateValue(nested, 'id')) !== null) {
-        return { warehouseId: Number(nested.id), warehouse: nested, source: 'facility-search', matchedOn: 'warehouse.id' };
-      }
-    }
-    // 3) Accounting fallback: the matched facility and the warehouse share an
-    //    explicit accounting code (exact normalized equality only).
-    var matchedCandidate = null;
-    for (var c = 0; c < candidates.length; c++) {
-      if (sameFacility(candidates[c])) { matchedCandidate = candidates[c]; break; }
-    }
-    var accountingKey = matchedCandidate ? normalizeKey(candidateValue(matchedCandidate, 'accountingCode')) : '';
-    if (accountingKey) {
-      for (var a = 0; a < list.length; a++) {
-        if (normalizeKey(candidateValue(list[a], 'accountingCode')) === accountingKey) {
-          return { warehouseId: Number(list[a].id), warehouse: list[a], source: 'warehouse.accountingCode', matchedOn: 'accountingCode' };
-        }
-      }
-    }
-    // 4) Name fallback: normalized warehouse name equals the facility name.
-    if (facilityNameKey) {
-      for (var m = 0; m < list.length; m++) {
-        var named = list[m];
-        if (normalizeKey(named.name) === facilityNameKey || normalizeKey(named.warehouseName) === facilityNameKey) {
-          return { warehouseId: Number(named.id), warehouse: named, source: 'warehouse.name', matchedOn: 'name' };
-        }
-      }
-    }
-    return null;
+    if (matches.length !== 1) return null; // none, or ambiguous duplicates
+    return { warehouseId: Number(matches[0].id), warehouse: matches[0], source: 'warehouse.facilityId', matchedOn: 'facilityId' };
   }
 
   // Official pagination: page 1 via GET, remaining pages via POST {currentPage}.

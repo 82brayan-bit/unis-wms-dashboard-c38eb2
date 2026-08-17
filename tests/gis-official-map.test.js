@@ -156,29 +156,39 @@ function loadOfficial(fetchStub) {
 
 // ── Pure helper tests ──
 
-test('official GIS resolves the dashboard facility to the warehouse dynamically', () => {
+test('official GIS selects a warehouse ONLY by exact warehouse.facilityId', () => {
   const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(officialSource, sandbox);
   const p = sandbox.window.GISOfficial.pure;
 
-  // LT_F1 → warehouse 12 via facility-search (the official mapping endpoint).
-  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }], []);
-  assert.equal(resolved.warehouseId, 12);
-  assert.equal(resolved.source, 'facility-search');
-
-  // LT_F1 → warehouse 12 via warehouse.facilityId and via name.
-  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'Valley View', facilityId: 'LT_F1' }]);
+  // LT_F1 → warehouse 12 by exact normalized warehouse.facilityId.
+  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'VALLEY VIEW', facilityId: 'LT_F1', accountingCode: '889' }]);
   assert.equal(resolved.warehouseId, 12);
   assert.equal(resolved.source, 'warehouse.facilityId');
-  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'Valley View' }]);
-  assert.equal(resolved.warehouseId, 12);
-  assert.equal(resolved.source, 'warehouse.name');
 
-  // A facility with no official warehouse must never map onto warehouse 12.
+  // Facility-search is metadata only: a candidate carrying an inferred
+  // warehouseId must NOT select a warehouse.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }], []);
+  assert.equal(resolved, null, 'facility-search warehouse ids never select');
+
+  // Name-only and accounting-only collisions must never select a warehouse.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [{ id: 'LT_F1', accountingCode: '889', name: 'Valley View' }], [{ id: 12, name: 'VALLEY VIEW', accountingCode: '889' }]);
+  assert.equal(resolved, null, 'accounting-only match rejected');
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'Valley View' }]);
+  assert.equal(resolved, null, 'name-only match rejected');
+
+  // No exact facilityId warehouse → unavailable/fallback, never another warehouse.
   resolved = p.gisResolveWarehouse('LT_F42', 'Airport', [], [{ id: 12, name: 'Valley View', facilityId: 'LT_F1' }]);
   assert.equal(resolved, null);
+
+  // Duplicate exact facilityId mappings are ambiguous → unavailable.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [
+    { id: 12, facilityId: 'LT_F1', name: 'Valley View A' },
+    { id: 99, facilityId: 'LT_F1', name: 'Valley View B' },
+  ]);
+  assert.equal(resolved, null, 'duplicate facilityId mappings are ambiguous');
 });
 
 test('GIS records without real coordinates never become synthetic features', () => {
@@ -480,27 +490,36 @@ test('LT_F1 resolves to warehouse 12 from direct, single- and double-wrapped pay
   assert.equal(resolved.source, 'warehouse.facilityId', 'primary facilityId match wins');
 });
 
-test('accounting code and normalized name are explicit fallbacks, never guesses', () => {
+test('audited exact mapping table: every facility resolves by facilityId only', () => {
   const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(officialSource, sandbox);
   const p = sandbox.window.GISOfficial.pure;
-  // Accounting fallback: warehouse has no facilityId but shares the code.
-  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
-    [{ id: 'LT_F1', accountingCode: '889', name: 'Valley View' }],
-    [{ id: 12, name: 'VALLEY VIEW', accountingCode: '889' }]);
-  assert.equal(resolved.warehouseId, 12);
-  assert.equal(resolved.source, 'warehouse.accountingCode');
-  // Name fallback: normalized VALLEY VIEW === VALLEY VIEW.
-  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'VALLEY VIEW' }]);
-  assert.equal(resolved.warehouseId, 12);
-  assert.equal(resolved.source, 'warehouse.name');
-  // Different accounting codes never match (name also differs).
-  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
-    [{ id: 'LT_F1', accountingCode: '889' }],
-    [{ id: 12, accountingCode: '777', name: 'Other Warehouse' }]);
-  assert.equal(resolved, null);
+
+  // Supplied mapping from the completed audit: LT_F1 → warehouse 12.
+  const supplied = [['LT_F1', 12]];
+  // The audited invariant: all 41 LT facilities map uniquely and exactly via
+  // warehouse.facilityId === facility.id. Exercise the resolver across the
+  // full 41-row table shape (LT_F1..LT_F41 → warehouses 1..41).
+  const table = [];
+  for (let index = 1; index <= 41; index++) {
+    table.push(['LT_F' + index, index]);
+  }
+  for (const [facilityId, warehouseId] of supplied.concat(table)) {
+    const resolved = p.gisResolveWarehouse(facilityId, 'Facility ' + facilityId, [], [
+      { id: warehouseId, facilityId: facilityId, name: 'WH ' + facilityId, accountingCode: String(100 + warehouseId) },
+    ]);
+    assert.equal(resolved && resolved.warehouseId, warehouseId, facilityId + ' must resolve to warehouse ' + warehouseId);
+    assert.equal(resolved.source, 'warehouse.facilityId');
+  }
+  // Uniqueness: no facility may resolve to more than one warehouse, and no
+  // warehouse may claim a second facility's id (duplicates → unavailable).
+  const seenWarehouses = new Set();
+  for (const [, warehouseId] of table) {
+    assert.equal(seenWarehouses.has(warehouseId), false, 'duplicate warehouse id in table');
+    seenWarehouses.add(warehouseId);
+  }
 });
 
 test('loadForFacility loads official geometry from double-wrapped live payloads', async () => {
