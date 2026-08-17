@@ -23,10 +23,36 @@ const GIS_API_HOST = process.env.GIS_API_HOST || 'gis.item.com';
 const GIS_API_PROTOCOL = process.env.GIS_API_PROTOCOL || 'https';
 // Explicit upstream port (tests point this at a local mock listener).
 const GIS_API_PORT = Number(process.env.GIS_API_PORT || (GIS_API_PROTOCOL === 'http' ? 80 : 443));
+// The external upstream requires an '/api' prefix on every route
+// (POST /api/gis-bam/facility-search works; /gis-bam/... is rejected with
+// 405 by Nginx). The base path is applied ONLY at the transport boundary —
+// browser proxy URLs and the allow-list keep their /gis-bam|/gis-app suffixes.
+// Unset → production default '/api'; explicitly set '' → no prefix (local mocks).
+const GIS_API_BASE_PATH_VALUE = process.env.GIS_API_BASE_PATH === undefined ? '/api' : process.env.GIS_API_BASE_PATH;
 const GIS_ALLOWED_PLANAR_TYPES = new Set(['RACK', 'BULK', 'ZONE', 'DOCK']);
 const GIS_MAX_PAGE = 500;
 const GIS_MAX_PLANAR_NAMES = 2000;
-console.log('[gis-proxy] Config: host=' + GIS_API_HOST + ' protocol=' + GIS_API_PROTOCOL + ' readOnly=allowlist');
+
+// Normalize the upstream base path to '' or a single leading slash with no
+// trailing slash. Returns null for unsafe values (query/fragment/wildcards,
+// backslashes, dot segments / path traversal, double slashes).
+function gisNormalizeBasePath(value) {
+  const raw = String(value == null ? '' : value).trim();
+  if (!raw || raw === '/') return '';
+  if (/[?#*\\]/.test(raw)) return null;
+  let out = raw.startsWith('/') ? raw : '/' + raw;
+  out = out.replace(/\/+$/, '');
+  if (!/^\/[A-Za-z0-9._~-]+(\/[A-Za-z0-9._~-]+)*$/.test(out)) return null;
+  if (out.split('/').some(segment => segment === '..' || segment === '.')) return null;
+  return out;
+}
+
+const GIS_API_BASE_PATH = gisNormalizeBasePath(GIS_API_BASE_PATH_VALUE);
+if (GIS_API_BASE_PATH === null) {
+  console.error('[gis-proxy] Refusing to start: unsafe GIS_API_BASE_PATH=' + JSON.stringify(GIS_API_BASE_PATH_VALUE) + ' (rejected: path traversal or invalid characters).');
+  process.exit(1);
+}
+console.log('[gis-proxy] Config: host=' + GIS_API_HOST + ' protocol=' + GIS_API_PROTOCOL + ' basePath=' + (GIS_API_BASE_PATH || '(none)') + ' readOnly=allowlist');
 
 const DATABASE_URL = process.env.DATABASE_URL || '';
 let dbPool = null;
@@ -155,7 +181,7 @@ function gisUpstream(method, pathname, body, incomingHeaders, query='') {
     // The port is read lazily so tests can point the proxy at a mock listener
     // that only binds after server.js has been required.
     const port = Number(process.env.GIS_API_PORT) || GIS_API_PORT;
-    const req = transport.request({ method, host: GIS_API_HOST, port, path: pathname + (query || ''), headers: hdrs }, r => {
+    const req = transport.request({ method, host: GIS_API_HOST, port, path: gisUpstreamUrlPath(pathname) + (query || ''), headers: hdrs }, r => {
       let raw = '';
       r.on('data', c => { raw += c; if (raw.length > 30_000_000) { req.destroy(); } });
       r.on('end', () => {
@@ -169,6 +195,12 @@ function gisUpstream(method, pathname, body, incomingHeaders, query='') {
     if (payload) req.write(payload);
     req.end();
   });
+}
+
+// Apply the upstream base path to an allow-listed route suffix at the
+// transport boundary only. The allow-list itself never sees the prefix.
+function gisUpstreamUrlPath(pathname) {
+  return GIS_API_BASE_PATH + pathname;
 }
 
 // Validate an integer path/query id. Returns null when invalid.
@@ -756,7 +788,7 @@ if (require.main === module) {
 
 // Exported for tests: the full app server can be listened on an ephemeral
 // port in-process, and the GIS route allow-list can be unit-tested directly.
-module.exports = { server, handleApi, gisResolveProxyRoute };
+module.exports = { server, handleApi, gisResolveProxyRoute, gisNormalizeBasePath, gisUpstreamUrlPath };
 
 async function handleSendNotification(req, res) {
   try {

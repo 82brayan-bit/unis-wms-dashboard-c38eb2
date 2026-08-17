@@ -12,6 +12,8 @@ const http = require('node:http');
 
 process.env.GIS_API_HOST = '127.0.0.1';
 process.env.GIS_API_PROTOCOL = 'http';
+// Local mock upstream expects the bare allow-listed suffixes (no /api prefix).
+process.env.GIS_API_BASE_PATH = '';
 process.env.ROBOT_COUNT_API_KEY = '';
 process.env.DATABASE_URL = '';
 process.env.SMTP_HOST = '';
