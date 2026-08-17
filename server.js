@@ -162,19 +162,43 @@ function wmsUpstream(method, pathname, body, incomingHeaders, query='') {
   });
 }
 
-function gisUpstream(method, pathname, body, incomingHeaders, query='') {
+// Build the ONLY headers the GIS upstream ever sees: safe scope headers plus
+// the authenticated user context. No arbitrary browser headers are forwarded.
+function gisScopeHeaders(incomingHeaders) {
+  const out = {};
+  const tenant = incomingHeaders['x-tenant-id'];
+  if (tenant == null || tenant === '') {
+    out['x-tenant-id'] = 'LT'; // tenant default only when absent
+  } else {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(tenant))) return { error: 'Invalid x-tenant-id' };
+    out['x-tenant-id'] = String(tenant);
+  }
+  // Facility scope is REQUIRED for every GIS read; never silently substitute.
+  const facility = String(incomingHeaders['x-facility-id'] || '');
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(facility)) return { error: 'x-facility-id is required for GIS reads' };
+  out['x-facility-id'] = facility;
+  const timezone = incomingHeaders['item-time-zone'];
+  if (timezone == null || timezone === '') {
+    out['Item-Time-Zone'] = 'America/Los_Angeles'; // timezone default only when absent
+  } else {
+    const tz = String(timezone);
+    if (!/^[A-Za-z0-9_+/\-]{1,64}$/.test(tz) || tz.includes('..') || tz.startsWith('/') || tz.endsWith('/')) {
+      return { error: 'Invalid Item-Time-Zone' };
+    }
+    out['Item-Time-Zone'] = tz;
+  }
+  out['x-channel'] = 'WEB'; // established app channel convention
+  if (incomingHeaders['authorization']) out['Authorization'] = incomingHeaders['authorization'];
+  if (incomingHeaders['cookie']) out['Cookie'] = incomingHeaders['cookie'];
+  return { headers: out };
+}
+
+function gisUpstream(method, pathname, body, scopeHeaders, query='') {
   return new Promise((resolve) => {
     const payload = body == null || body === '' ? null : (typeof body === 'string' ? body : JSON.stringify(body));
-    const hdrs = {
-      'Accept': 'application/json',
-      'User-Agent': 'UNIS-WMS-Dashboard/1.0'
-    };
-    // Forward the authenticated user context without exposing it: the token
-    // and cookies travel server-to-server only, never back to the browser.
-    if (incomingHeaders['authorization']) hdrs['Authorization'] = incomingHeaders['authorization'];
-    if (incomingHeaders['cookie']) hdrs['Cookie'] = incomingHeaders['cookie'];
+    const hdrs = Object.assign({ 'Accept': 'application/json', 'User-Agent': 'UNIS-WMS-Dashboard/1.0' }, scopeHeaders);
     if (payload) {
-      hdrs['Content-Type'] = incomingHeaders['content-type'] || 'application/json';
+      hdrs['Content-Type'] = 'application/json';
       hdrs['Content-Length'] = Buffer.byteLength(payload);
     }
     const transport = GIS_API_PROTOCOL === 'http' ? http : https;
@@ -347,7 +371,10 @@ async function handleGisProxy(req, res, url) {
     }
   }
 
-  const out = await gisUpstream(resolved.method, resolved.upstreamPath, body, req.headers, resolved.query);
+  const scope = gisScopeHeaders(req.headers);
+  if (scope.error) return send(res, 400, { success: false, msg: scope.error });
+
+  const out = await gisUpstream(resolved.method, resolved.upstreamPath, body, scope.headers, resolved.query);
   return send(res, out.status, out.json || { success: false, msg: out.raw ? out.raw.slice(0, 300) : 'No response from GIS' });
 }
 
@@ -788,7 +815,7 @@ if (require.main === module) {
 
 // Exported for tests: the full app server can be listened on an ephemeral
 // port in-process, and the GIS route allow-list can be unit-tested directly.
-module.exports = { server, handleApi, gisResolveProxyRoute, gisNormalizeBasePath, gisUpstreamUrlPath };
+module.exports = { server, handleApi, gisResolveProxyRoute, gisNormalizeBasePath, gisUpstreamUrlPath, gisScopeHeaders };
 
 async function handleSendNotification(req, res) {
   try {

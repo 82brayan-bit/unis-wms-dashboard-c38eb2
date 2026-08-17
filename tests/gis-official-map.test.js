@@ -88,8 +88,8 @@ function buildFetchStub(options = {}) {
   const wrap = payload => options.wrapEnvelopes
     ? { data: { code: 0, success: true, msg: 'OK', data: payload } }
     : payload;
-  return function fetchStub(url, fetchOptions) {
-    calls.push({ url, fetchOptions });
+  const stub = function (url, fetchOptions) {
+    calls.push({ url, fetchOptions, headers: (fetchOptions && fetchOptions.headers) || {} });
     const method = (fetchOptions && fetchOptions.method) || 'GET';
     const respond = payload => Promise.resolve({ json: () => Promise.resolve(payload) });
     if (url.includes('/gis-bam/facility-search')) return respond(wrap(facilitySearch));
@@ -135,6 +135,8 @@ function buildFetchStub(options = {}) {
     }
     return Promise.reject(new Error('unexpected fetch: ' + url));
   };
+  stub.calls = calls;
+  return stub;
 }
 
 function loadOfficial(fetchStub) {
@@ -512,5 +514,72 @@ test('loadForFacility loads official geometry from double-wrapped live payloads'
   assert.equal(result.counts.aisles, 5);
   assert.equal(G.state.projected.length, 130);
   assert.equal(G.state.active, true);
+  G.reset();
+});
+
+
+// ── Facility/tenant/timezone scope headers on every GIS proxy request ──
+
+test('every GIS proxy request is scoped to tenant LT and the selected facility', async () => {
+  const stub = buildFetchStub();
+  const G = loadOfficial(stub);
+  await G.loadForFacility('LT_F1', 'Valley View');
+  const calls = stub.calls;
+  assert.ok(calls.length > 8, 'facility-search + warehouse + planars + aisles + customers');
+  // The very first request (facility-search) already carries the scope.
+  const first = calls[0];
+  assert.equal(first.headers['x-tenant-id'], 'LT', 'tenant on facility-search');
+  assert.equal(first.headers['x-facility-id'], 'LT_F1', 'facility scope set synchronously before facility-search');
+  assert.equal(first.headers['Item-Time-Zone'], 'America/Los_Angeles', 'default timezone on facility-search');
+  assert.equal(first.headers['x-channel'], 'WEB', 'channel convention on every request');
+  // Every request in the load is scoped.
+  for (const call of calls) {
+    assert.equal(call.headers['x-tenant-id'], 'LT', 'tenant on ' + call.url);
+    assert.equal(call.headers['x-facility-id'], 'LT_F1', 'facility on ' + call.url);
+  }
+  G.reset();
+});
+
+test('the matched facility record replaces the timezone for later requests', async () => {
+  const stub = buildFetchStub({
+    facilitySearch: [{ id: 'LT_F1', facilityCode: 'FAC242', name: 'Valley View', accountingCode: '889', timeZone: 'America/New_York', legacyId: 'F1' }],
+  });
+  const G = loadOfficial(stub);
+  await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(G.state.timezone, 'America/New_York', 'timezone adopted from the exact matched facility record');
+  const planarCall = stub.calls.find(call => call.url.includes('/gis-bam/planar-model/facility-type-data'));
+  assert.equal(planarCall.headers['Item-Time-Zone'], 'America/New_York', 'later planars use the facility timezone');
+  const inventoryCall = await (async () => {
+    await G.loadInventoryStat({});
+    return stub.calls[stub.calls.length - 1];
+  })();
+  assert.equal(inventoryCall.headers['Item-Time-Zone'], 'America/New_York', 'inventory requests use the facility timezone');
+  G.reset();
+});
+
+test('facility changes replace the scope headers immediately and stale loads cannot reuse the prior facility', async () => {
+  const stub = buildFetchStub({
+    facilitySearch: [
+      { id: 'LT_F1', facilityCode: 'FAC242', name: 'Valley View', accountingCode: '889', timeZone: 'America/Los_Angeles', legacyId: 'F1' },
+      { id: 'LT_F42', facilityCode: 'FAC999', name: 'Airport', accountingCode: '999', timeZone: 'America/Chicago', legacyId: 'F42' },
+    ],
+    warehouses: [
+      { id: 12, facilityId: 'LT_F1', name: 'VALLEY VIEW', accountingCode: '889' },
+      { id: 99, facilityId: 'LT_F42', name: 'AIRPORT', accountingCode: '999' },
+    ],
+  });
+  const G = loadOfficial(stub);
+  await G.loadForFacility('LT_F1', 'Valley View');
+  // A facility switch replaces the facility scope synchronously at the start
+  // of the next load; in-flight stale responses are discarded by the token.
+  const switching = G.loadForFacility('LT_F42', 'Airport');
+  const facilitySearchCall = stub.calls.find(call => call.url.includes('/gis-bam/facility-search') && call !== stub.calls[0]);
+  assert.equal(facilitySearchCall.headers['x-facility-id'], 'LT_F42', 'facility-search for the new facility is scoped to LT_F42');
+  const result = await switching;
+  assert.equal(result.status, 'official');
+  assert.equal(G.state.warehouseId, 99);
+  const later = stub.calls[stub.calls.length - 1];
+  assert.equal(later.headers['x-facility-id'], 'LT_F42', 'later requests never reuse LT_F1 scope');
+  assert.equal(later.headers['Item-Time-Zone'], 'America/Chicago', 'new facility timezone applies');
   G.reset();
 });

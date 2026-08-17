@@ -55,6 +55,7 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
         url: request.url,
         authorization: request.headers['authorization'] || '',
         cookie: request.headers['cookie'] || '',
+        headers: request.headers,
         body: raw || null,
       });
       response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -68,12 +69,17 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
 
   try {
     // ── Allow-listed read routes forward with authenticated context ──
-    const authHeaders = { 'Authorization': 'Bearer secret-token', 'Cookie': 'session=abc123' };
+    const authHeaders = { 'Authorization': 'Bearer secret-token', 'Cookie': 'session=abc123', 'x-tenant-id': 'LT', 'x-facility-id': 'LT_F1', 'Item-Time-Zone': 'America/Los_Angeles', 'x-evil': 'must-not-forward' };
     let response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, authHeaders);
     assert.equal(response.status, 200);
     assert.equal(forwarded.at(-1).url, '/gis-app/warehouse');
     assert.equal(forwarded.at(-1).authorization, 'Bearer secret-token');
     assert.equal(forwarded.at(-1).cookie, 'session=abc123');
+    assert.equal(forwarded.at(-1).headers['x-tenant-id'], 'LT', 'tenant scope forwarded');
+    assert.equal(forwarded.at(-1).headers['x-facility-id'], 'LT_F1', 'facility scope forwarded');
+    assert.equal(forwarded.at(-1).headers['item-time-zone'], 'America/Los_Angeles', 'timezone scope forwarded');
+    assert.equal(forwarded.at(-1).headers['x-channel'], 'WEB', 'channel convention forwarded');
+    assert.equal(forwarded.at(-1).headers['x-evil'], undefined, 'arbitrary headers are never forwarded');
 
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/facility-search', 'POST', '{}', authHeaders);
     assert.equal(response.status, 200);
@@ -153,9 +159,27 @@ test('GIS proxy allow-list, auth forwarding, validation and no-mutation guarante
     assert.equal(response.status, 405, 'DELETE detail refused');
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/stat', 'PUT', '{}');
     assert.equal(response.status, 405, 'PUT stat refused');
-    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', currentPage: 1, pageSize: 50, write: true }));
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/location-inventory/detail', 'POST', JSON.stringify({ planarName: 'RACK-1', currentPage: 1, pageSize: 50, write: true }), { 'x-facility-id': 'LT_F1' });
     assert.equal(response.status, 200, 'extra unknown keys are stripped, never forwarded');
     assert.equal(JSON.parse(forwarded.at(-1).body).write, undefined, 'unknown keys stripped from the forwarded body');
+
+    // ── Scope header validation ──
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, {});
+    assert.equal(response.status, 400, 'missing x-facility-id rejected');
+    assert.match(response.json.msg, /x-facility-id/, 'truthful facility-scope error');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { 'x-facility-id': 'LT F1!' });
+    assert.equal(response.status, 400, 'invalid x-facility-id rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { 'x-facility-id': '../../etc' });
+    assert.equal(response.status, 400, 'traversal-shaped facility id rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { 'x-facility-id': 'LT_F1', 'Item-Time-Zone': '../evil' });
+    assert.equal(response.status, 400, 'unsafe timezone rejected');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { 'x-facility-id': 'LT_F1' });
+    assert.equal(response.status, 200, 'tenant and timezone default when absent');
+    assert.equal(forwarded.at(-1).headers['x-tenant-id'], 'LT', 'tenant defaulted to LT');
+    assert.equal(forwarded.at(-1).headers['item-time-zone'], 'America/Los_Angeles', 'timezone defaulted');
+    response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { 'x-facility-id': 'LT_F1', 'x-tenant-id': 'OTHER_TENANT' });
+    assert.equal(response.status, 200);
+    assert.equal(forwarded.at(-1).headers['x-tenant-id'], 'OTHER_TENANT', 'explicit tenant respected');
 
     // ── No GIS writes: mutating methods and unlisted routes are refused ──
     response = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'POST', '{}');

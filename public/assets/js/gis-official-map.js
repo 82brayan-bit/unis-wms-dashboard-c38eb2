@@ -86,6 +86,19 @@
     return value;
   }
 
+  // Exact identity match of a facility-search candidate against the selected
+  // facility (id / facilityId / facilityCode / code / legacyId, then name).
+  function gisFacilityMatches(candidate, facilityId, facilityName) {
+    var facilityKey = normalizeKey(facilityId);
+    var facilityNameKey = normalizeKey(facilityName);
+    var fields = ['id', 'facilityId', 'facility_id', 'facilityCode', 'code', 'legacyId'];
+    for (var f = 0; f < fields.length; f++) {
+      var value = candidate ? candidate[fields[f]] : null;
+      if (normalizeKey(value == null ? '' : String(value)) === facilityKey) return true;
+    }
+    return !!(facilityNameKey && normalizeKey(candidate && candidate.name == null ? '' : String(candidate && candidate.name)) === facilityNameKey);
+  }
+
   // Dynamic facility → official warehouse resolution. Priority:
   // 1. exact normalized warehouse.facilityId === selected facility (primary),
   // 2. facility-search candidates carrying an explicit warehouse id,
@@ -96,7 +109,6 @@
     var facilityKey = normalizeKey(facilityId);
     var facilityNameKey = normalizeKey(facilityName);
     var idFields = ['warehouseId', 'warehouse_ids', 'warehouseIds'];
-    var facilityMatchFields = ['id', 'facilityId', 'facility_id', 'facilityCode', 'code', 'legacyId'];
     function candidateValue(item, field) {
       var value = item[field];
       return value == null ? '' : String(value);
@@ -105,10 +117,7 @@
       return /^\d+$/.test(String(value)) ? Number(value) : null;
     }
     function sameFacility(candidate) {
-      for (var f = 0; f < facilityMatchFields.length; f++) {
-        if (normalizeKey(candidateValue(candidate, facilityMatchFields[f])) === facilityKey) return true;
-      }
-      return !!(facilityNameKey && normalizeKey(candidateValue(candidate, 'name')) === facilityNameKey);
+      return gisFacilityMatches(candidate, facilityId, facilityName);
     }
     var candidates = Array.isArray(facilityCandidates) ? facilityCandidates : [];
     var list = Array.isArray(warehouses) ? warehouses : [];
@@ -257,8 +266,21 @@
 
   // ─────────────────────────── IO (read-only via proxy) ───────────────────────────
 
+  // Every GIS proxy request is scoped to the selected facility: tenant LT,
+  // the dashboard-selected facility id and the facility timezone (default
+  // America/Los_Angeles, replaced from the matched facility record after
+  // facility-search). The facility id is read live so facility switches
+  // replace the scope on the very next request.
   function apiFetch(pathAndQuery, options) {
-    return fetch('/api/proxy/gis' + pathAndQuery, options).then(function (response) {
+    var headers = Object.assign({}, options && options.headers, {
+      'Accept': 'application/json',
+      'x-tenant-id': 'LT',
+      'x-facility-id': state.facilityId || '',
+      'Item-Time-Zone': state.timezone || 'America/Los_Angeles',
+      'x-channel': 'WEB',
+    });
+    var fetchOptions = Object.assign({}, options || {}, { headers: headers });
+    return fetch('/api/proxy/gis' + pathAndQuery, fetchOptions).then(function (response) {
       return response.json().catch(function () { return null; });
     });
   }
@@ -289,6 +311,18 @@
     }).catch(function () { return []; });
 
     return Promise.all([facilitySearchPromise, warehouseListPromise]).then(function (results) {
+      // Adopt the exact matched facility record's timezone for every later
+      // planar / inventory request.
+      var candidates = Array.isArray(results[0]) ? results[0] : [];
+      for (var c = 0; c < candidates.length; c++) {
+        if (gisFacilityMatches(candidates[c], facilityId, facilityName)) {
+          var facilityTimezone = candidates[c].timeZone;
+          if (typeof facilityTimezone === 'string' && /^[A-Za-z0-9_+/\-]{1,64}$/.test(facilityTimezone) && !facilityTimezone.includes('..') && !facilityTimezone.startsWith('/') && !facilityTimezone.endsWith('/')) {
+            state.timezone = facilityTimezone;
+          }
+          break;
+        }
+      }
       var resolved = gisResolveWarehouse(facilityId, facilityName, results[0], results[1]);
       if (resolved && !resolved.warehouse) {
         var warehouseList = Array.isArray(results[1]) ? results[1] : [];
@@ -549,6 +583,7 @@
     centerLng: -118.24,
     centerLat: 33.94,
     theme: 'light',
+    timezone: 'America/Los_Angeles',
     basemapMode: 'map',
     map: null,
     tileLayer: null,
@@ -1080,6 +1115,11 @@
   function loadForFacility(facilityId, facilityName) {
     state.requestToken++;
     var token = state.requestToken;
+    // Scope the entire load to the selected facility synchronously, before
+    // facility-search goes out, so no request can reuse a prior facility.
+    state.facilityId = facilityId;
+    state.facilityName = facilityName;
+    state.timezone = 'America/Los_Angeles';
     state.active = false;
     hideTooltip();
     setStatus('Loading official GIS layout for ' + facilityName + '…');
@@ -1090,8 +1130,6 @@
         return { status: 'unavailable', reason: 'no-warehouse', message: 'No official GIS warehouse matches facility ' + facilityId + '.' };
       }
       var resolved = info.resolved;
-      state.facilityId = facilityId;
-      state.facilityName = facilityName;
       state.warehouseId = resolved.warehouseId;
       state.warehouse = resolved.warehouse || null;
       state.authoritative = gisAuthoritativeStats(state.warehouse);
@@ -1312,6 +1350,7 @@
     state.customers = new Map();
     state.customerNames = new Map();
     state.customerUnavailable = false;
+    state.timezone = 'America/Los_Angeles';
     state.projected = [];
     state.aisleProjected = [];
     state.layerProjected = {};
@@ -1353,6 +1392,7 @@
     pure: {
       normalizeKey: normalizeKey,
       gisUnwrapData: gisUnwrapData,
+      gisFacilityMatches: gisFacilityMatches,
       gisToGeoJSON: gisToGeoJSON,
       gisResolveWarehouse: gisResolveWarehouse,
       gisPlanPagination: gisPlanPagination,

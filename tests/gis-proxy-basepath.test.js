@@ -56,7 +56,7 @@ test('every allow-listed GIS route is forwarded exactly once with the /api prefi
     let raw = '';
     request.on('data', chunk => { raw += chunk; });
     request.on('end', () => {
-      forwarded.push({ method: request.method, url: request.url, body: raw || null, authorization: request.headers['authorization'] || '', cookie: request.headers['cookie'] || '' });
+      forwarded.push({ method: request.method, url: request.url, body: raw || null, authorization: request.headers['authorization'] || '', cookie: request.headers['cookie'] || '', headers: request.headers });
       response.writeHead(200, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ success: true, data: { list: [], totalCount: 0 } }));
     });
@@ -79,15 +79,18 @@ test('every allow-listed GIS route is forwarded exactly once with the /api prefi
       ['POST', '/api/proxy/gis/gis-bam/location-inventory/detail', JSON.stringify({ planarName: 'R-1', currentPage: 1, pageSize: 50 }), '/api/gis-bam/location-inventory/detail'],
     ];
     for (const [method, path, body, expectedUpstream] of requests) {
-      const response = await upstreamRequest(baseUrl + path, method, body, { Authorization: 'Bearer t' });
+      const response = await upstreamRequest(baseUrl + path, method, body, { Authorization: 'Bearer t', 'x-tenant-id': 'LT', 'x-facility-id': 'LT_F1', 'Item-Time-Zone': 'America/Los_Angeles' });
       assert.equal(response.status, 200, method + ' ' + path + ' must reach the prefixed upstream');
       assert.equal(forwarded.at(-1).url, expectedUpstream, method + ' ' + path + ' forwarded to ' + forwarded.at(-1).url);
       assert.equal(forwarded.at(-1).url.includes('/api/api'), false, 'no double /api prefix');
+      assert.equal(forwarded.at(-1).headers['x-facility-id'], 'LT_F1', 'facility scope on ' + method + ' ' + path);
+      assert.equal(forwarded.at(-1).headers['x-tenant-id'], 'LT', 'tenant scope on ' + method + ' ' + path);
+      assert.equal(forwarded.at(-1).headers['item-time-zone'], 'America/Los_Angeles', 'timezone scope on ' + method + ' ' + path);
     }
     // Every forwarded request was prefixed exactly once.
     assert.equal(forwarded.every(entry => entry.url.startsWith('/api/') && !entry.url.startsWith('/api/api')), true);
     // Auth forwarding survives the prefix change.
-    const auth = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { Authorization: 'Bearer secret', Cookie: 's=1' });
+    const auth = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-app/warehouse', 'GET', null, { Authorization: 'Bearer secret', Cookie: 's=1', 'x-facility-id': 'LT_F1', 'x-tenant-id': 'LT', 'Item-Time-Zone': 'America/Los_Angeles' });
     assert.equal(auth.status, 200);
     assert.equal(forwarded.at(-1).authorization || '', 'Bearer secret');
 
@@ -119,4 +122,48 @@ test('GIS_API_BASE_PATH normalization rejects unsafe values', () => {
   assert.equal(gisNormalizeBasePath('/api*'), null, 'wildcard rejected');
   assert.equal(gisNormalizeBasePath('//api'), null, 'double leading slash rejected');
   assert.equal(gisNormalizeBasePath('C:\\api'), null, 'backslash rejected');
+});
+
+
+test('upstream returns TenantNotFound unless all three scope headers are correct', { timeout: 30000 }, async () => {
+  const seen = [];
+  const mockUpstream = http.createServer((request, response) => {
+    if (!request.url.startsWith('/api/')) {
+      response.writeHead(405, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ success: false, msg: '405 Not Allowed' }));
+      return;
+    }
+    const h = request.headers;
+    seen.push({ tenant: h['x-tenant-id'], facility: h['x-facility-id'], timezone: h['item-time-zone'] });
+    // Reproduce the deployed failure mode: without the exact scope, 500.
+    if (h['x-tenant-id'] !== 'LT' || h['x-facility-id'] !== 'LT_F1' || !/^[A-Za-z0-9_+/-]{1,64}$/.test(String(h['item-time-zone'] || ''))) {
+      response.writeHead(500, { 'Content-Type': 'application/json' });
+      response.end(JSON.stringify({ success: false, msg: 'TenantNotFoundException' }));
+      return;
+    }
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ success: true, data: [] }));
+  });
+
+  const mockPort = await listen(mockUpstream);
+  process.env.GIS_API_PORT = String(mockPort);
+  const baseUrl = 'http://127.0.0.1:' + (await listen(server));
+
+  try {
+    // Missing facility scope → the proxy rejects before any upstream call.
+    const noScope = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/facility-search', 'POST', '{}', { 'x-tenant-id': 'LT', 'Item-Time-Zone': 'America/Los_Angeles' });
+    assert.equal(noScope.status, 400);
+    assert.equal(seen.length, 0, 'no upstream call without facility scope');
+    // Correct scope → 200 through the TenantNotFound-guarding mock.
+    const ok = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/facility-search', 'POST', '{}', { 'x-tenant-id': 'LT', 'x-facility-id': 'LT_F1', 'Item-Time-Zone': 'America/Los_Angeles' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(seen[0], { tenant: 'LT', facility: 'LT_F1', timezone: 'America/Los_Angeles' }, 'exact scope reached the upstream');
+    // Wrong tenant → upstream 500 surfaces truthfully.
+    const wrongTenant = await upstreamRequest(baseUrl + '/api/proxy/gis/gis-bam/facility-search', 'POST', '{}', { 'x-tenant-id': 'XX', 'x-facility-id': 'LT_F1', 'Item-Time-Zone': 'America/Los_Angeles' });
+    assert.equal(wrongTenant.status, 500);
+    assert.match(wrongTenant.json.msg, /TenantNotFound/);
+  } finally {
+    server.close();
+    mockUpstream.close();
+  }
 });
