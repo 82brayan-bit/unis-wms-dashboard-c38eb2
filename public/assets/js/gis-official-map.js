@@ -71,39 +71,49 @@
     return features;
   }
 
-  // Dynamic facility → official warehouse resolution. Tries, in order:
-  // 1. explicit warehouse id fields on facility-search candidates,
-  // 2. warehouse records whose facilityId matches the dashboard facility id,
-  // 3. name matches (facility name vs warehouse name / candidate name).
+  // Repeated-envelope normalizer: the GIS service returns
+  // {code,success,msg,data:[...]} and the dashboard proxy may wrap that again
+  // in another {data: ...}, so unwrap object `.data` layers until an array or
+  // a non-envelope value is reached. Only `.data` is unwrapped — arbitrary
+  // guessed list/record keys are never accepted.
+  function gisUnwrapData(payload) {
+    var value = payload;
+    var depth = 0;
+    while (value && typeof value === 'object' && !Array.isArray(value) && value.data !== undefined && depth < 8) {
+      value = value.data;
+      depth++;
+    }
+    return value;
+  }
+
+  // Dynamic facility → official warehouse resolution. Priority:
+  // 1. exact normalized warehouse.facilityId === selected facility (primary),
+  // 2. facility-search candidates carrying an explicit warehouse id,
+  // 3. accounting code shared by the matched facility and the warehouse,
+  // 4. normalized warehouse name === facility name (explicit fallback).
   // Returns {warehouseId, warehouse, source, matchedOn} or null.
   function gisResolveWarehouse(facilityId, facilityName, facilityCandidates, warehouses) {
     var facilityKey = normalizeKey(facilityId);
     var facilityNameKey = normalizeKey(facilityName);
     var idFields = ['warehouseId', 'warehouse_ids', 'warehouseIds'];
-    var matchFields = ['facilityId', 'facility_id', 'facilityCode', 'code', 'id', 'facility', 'name', 'warehouseName', 'warehouse'];
+    var facilityMatchFields = ['id', 'facilityId', 'facility_id', 'facilityCode', 'code', 'legacyId'];
     function candidateValue(item, field) {
       var value = item[field];
       return value == null ? '' : String(value);
     }
-    var candidates = Array.isArray(facilityCandidates) ? facilityCandidates : [];
-    for (var i = 0; i < candidates.length; i++) {
-      var candidate = candidates[i];
-      var sameFacility = false;
-      for (var f = 0; f < matchFields.length; f++) {
-        if (normalizeKey(candidateValue(candidate, matchFields[f])) === facilityKey) { sameFacility = true; break; }
-      }
-      if (!sameFacility && facilityNameKey && normalizeKey(candidateValue(candidate, 'name')) === facilityNameKey) sameFacility = true;
-      if (!sameFacility) continue;
-      for (var w = 0; w < idFields.length; w++) {
-        var warehouseId = candidateValue(candidate, idFields[w]);
-        if (/^\d+$/.test(warehouseId)) return { warehouseId: Number(warehouseId), warehouse: null, source: 'facility-search', matchedOn: idFields[w] };
-      }
-      var nested = candidate.warehouse || candidate.warehouseInfo;
-      if (nested && /^\d+$/.test(candidateValue(nested, 'id'))) {
-        return { warehouseId: Number(nested.id), warehouse: nested, source: 'facility-search', matchedOn: 'warehouse.id' };
-      }
+    function numericId(value) {
+      return /^\d+$/.test(String(value)) ? Number(value) : null;
     }
+    function sameFacility(candidate) {
+      for (var f = 0; f < facilityMatchFields.length; f++) {
+        if (normalizeKey(candidateValue(candidate, facilityMatchFields[f])) === facilityKey) return true;
+      }
+      return !!(facilityNameKey && normalizeKey(candidateValue(candidate, 'name')) === facilityNameKey);
+    }
+    var candidates = Array.isArray(facilityCandidates) ? facilityCandidates : [];
     var list = Array.isArray(warehouses) ? warehouses : [];
+
+    // 1) Primary: warehouse record whose facilityId matches the selected facility.
     for (var j = 0; j < list.length; j++) {
       var warehouse = list[j];
       var facility = normalizeKey(candidateValue(warehouse, 'facilityId') || candidateValue(warehouse, 'facility_code'));
@@ -111,6 +121,35 @@
         return { warehouseId: Number(warehouse.id), warehouse: warehouse, source: 'warehouse.facilityId', matchedOn: 'facilityId' };
       }
     }
+    // 2) Facility-search candidates that reference the selected facility and
+    //    carry an explicit warehouse id (or a nested warehouse record).
+    for (var i = 0; i < candidates.length; i++) {
+      var candidate = candidates[i];
+      if (!sameFacility(candidate)) continue;
+      for (var w = 0; w < idFields.length; w++) {
+        var warehouseId = numericId(candidateValue(candidate, idFields[w]));
+        if (warehouseId !== null) return { warehouseId: warehouseId, warehouse: null, source: 'facility-search', matchedOn: idFields[w] };
+      }
+      var nested = candidate.warehouse || candidate.warehouseInfo;
+      if (nested && numericId(candidateValue(nested, 'id')) !== null) {
+        return { warehouseId: Number(nested.id), warehouse: nested, source: 'facility-search', matchedOn: 'warehouse.id' };
+      }
+    }
+    // 3) Accounting fallback: the matched facility and the warehouse share an
+    //    explicit accounting code (exact normalized equality only).
+    var matchedCandidate = null;
+    for (var c = 0; c < candidates.length; c++) {
+      if (sameFacility(candidates[c])) { matchedCandidate = candidates[c]; break; }
+    }
+    var accountingKey = matchedCandidate ? normalizeKey(candidateValue(matchedCandidate, 'accountingCode')) : '';
+    if (accountingKey) {
+      for (var a = 0; a < list.length; a++) {
+        if (normalizeKey(candidateValue(list[a], 'accountingCode')) === accountingKey) {
+          return { warehouseId: Number(list[a].id), warehouse: list[a], source: 'warehouse.accountingCode', matchedOn: 'accountingCode' };
+        }
+      }
+    }
+    // 4) Name fallback: normalized warehouse name equals the facility name.
     if (facilityNameKey) {
       for (var m = 0; m < list.length; m++) {
         var named = list[m];
@@ -240,18 +279,13 @@
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: '{}',
     }).then(function (json) {
-      var data = json && json.data !== undefined ? json.data : json;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.list)) return data.list;
-      if (data && Array.isArray(data.records)) return data.records;
-      return [];
+      var data = gisUnwrapData(json);
+      return Array.isArray(data) ? data : [];
     }).catch(function () { return []; });
 
     var warehouseListPromise = apiFetch('/gis-app/warehouse').then(function (json) {
-      var data = json && json.data !== undefined ? json.data : json;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.list)) return data.list;
-      return [];
+      var data = gisUnwrapData(json);
+      return Array.isArray(data) ? data : [];
     }).catch(function () { return []; });
 
     return Promise.all([facilitySearchPromise, warehouseListPromise]).then(function (results) {
@@ -274,7 +308,7 @@
   function loadPlanarLayer(warehouseId, type, onProgress) {
     var base = '/gis-bam/planar-model/facility-type-data?warehouseId=' + warehouseId + '&type=' + type.toUpperCase();
     return apiFetch(base).then(function (page1) {
-      var data = page1 && page1.data !== undefined ? page1.data : page1;
+      var data = gisUnwrapData(page1);
       if (!data || typeof data !== 'object') return { type: type, records: [], totalCount: 0, totalPage: 1 };
       if (Array.isArray(data)) return { type: type, records: data, totalCount: data.length, totalPage: 1 };
       if (!Array.isArray(data.list)) {
@@ -321,10 +355,8 @@
 
   function loadAisles(warehouseId) {
     return apiFetch('/gis-app/warehouse-aisles/warehouse/' + warehouseId).then(function (json) {
-      var data = json && json.data !== undefined ? json.data : json;
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.list)) return data.list;
-      return [];
+      var data = gisUnwrapData(json);
+      return Array.isArray(data) ? data : [];
     }).catch(function () { return []; });
   }
 
@@ -335,8 +367,7 @@
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(inventoryFilterPayload(filters)),
     }).then(function (json) {
-      var rows = Array.isArray(json) ? json : (json && json.data !== undefined ? json.data : null);
-      if (rows && Array.isArray(rows.list)) rows = rows.list;
+      var rows = gisUnwrapData(json);
       return Array.isArray(rows) ? rows : [];
     });
   }
@@ -352,8 +383,8 @@
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(payload),
     }).then(function (json) {
-      var data = json && json.data !== undefined ? json.data : json;
-      var list = data && Array.isArray(data.list) ? data.list : (Array.isArray(data) ? data : []);
+      var data = gisUnwrapData(json);
+      var list = Array.isArray(data) ? data : (data && Array.isArray(data.list) ? data.list : []);
       return {
         rows: list,
         total: Number(data && data.totalCount) || 0,
@@ -1321,6 +1352,7 @@
   window.GISOfficial = {
     pure: {
       normalizeKey: normalizeKey,
+      gisUnwrapData: gisUnwrapData,
       gisToGeoJSON: gisToGeoJSON,
       gisResolveWarehouse: gisResolveWarehouse,
       gisPlanPagination: gisPlanPagination,

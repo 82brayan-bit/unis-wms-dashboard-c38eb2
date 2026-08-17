@@ -85,13 +85,16 @@ function buildFetchStub(options = {}) {
   const facilitySearch = options.facilitySearch === undefined
     ? [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }]
     : options.facilitySearch;
+  const wrap = payload => options.wrapEnvelopes
+    ? { data: { code: 0, success: true, msg: 'OK', data: payload } }
+    : payload;
   return function fetchStub(url, fetchOptions) {
     calls.push({ url, fetchOptions });
     const method = (fetchOptions && fetchOptions.method) || 'GET';
     const respond = payload => Promise.resolve({ json: () => Promise.resolve(payload) });
-    if (url.includes('/gis-bam/facility-search')) return respond({ success: true, data: facilitySearch });
-    if (url.includes('/gis-app/warehouse-aisles/warehouse/')) return respond({ success: true, data: aisleList });
-    if (url === '/api/proxy/gis/gis-app/warehouse') return respond({ success: true, data: warehouses });
+    if (url.includes('/gis-bam/facility-search')) return respond(wrap(facilitySearch));
+    if (url.includes('/gis-app/warehouse-aisles/warehouse/')) return respond(wrap(aisleList));
+    if (url === '/api/proxy/gis/gis-app/warehouse') return respond(wrap(warehouses));
     if (url.includes('/gis-bam/planar-model/facility-type-data')) {
       const params = new URL('http://localhost' + url.slice('/api/proxy/gis'.length)).searchParams;
       const type = params.get('type');
@@ -227,7 +230,7 @@ test('loadForFacility renders the official LT_F1 map with authoritative counts',
   const result = await G.loadForFacility('LT_F1', 'Valley View');
   assert.equal(result.status, 'official');
   assert.equal(result.warehouseId, 12);
-  assert.equal(result.source, 'facility-search');
+  assert.equal(result.source, 'warehouse.facilityId', 'primary facilityId resolution wins over facility-search');
   assert.equal(result.counts.rack, 100, 'paginated rack pages merged');
   assert.equal(result.counts.bulk, 30);
   assert.equal(result.counts.aisles, 5);
@@ -428,4 +431,86 @@ test('DOM-less sandbox still reports official geometry without a map', async () 
   assert.equal(result.status, 'official');
   assert.equal(G.state.mapReady, false, 'no Leaflet in the sandbox, geometry still authoritative');
   assert.equal(G.state.featureByName.size, 130, 'rack + bulk planars indexed by exact name');
+});
+
+
+// ── Repeated-envelope normalization regression (live GIS response shapes) ──
+
+test('gisUnwrapData unwraps repeated {data} envelopes but never guesses keys', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+  assert.deepEqual(p.gisUnwrapData([1, 2]), [1, 2], 'direct array passes through');
+  assert.deepEqual(p.gisUnwrapData({ code: 0, success: true, msg: 'OK', data: [1] }), [1], 'single envelope unwraps');
+  assert.deepEqual(p.gisUnwrapData({ data: { code: 0, success: true, data: [1] } }), [1], 'double envelope unwraps');
+  assert.deepEqual(p.gisUnwrapData({ data: { data: { data: [1] } } }), [1], 'triple envelope unwraps');
+  assert.deepEqual(p.gisUnwrapData({ a: 1 }), { a: 1 }, 'non-envelope object is left intact');
+  assert.equal(p.gisUnwrapData(null), null);
+  // The normalizer must NOT accept arbitrary list/record keys as arrays.
+  assert.equal(Array.isArray(p.gisUnwrapData({ list: [1] })), false);
+  assert.equal(Array.isArray(p.gisUnwrapData({ records: [1] })), false);
+});
+
+test('LT_F1 resolves to warehouse 12 from direct, single- and double-wrapped payloads', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+  const facilityRecord = { id: 'LT_F1', facilityCode: 'FAC242', name: 'Valley View', accountingCode: '889', timeZone: 'America/Los_Angeles', legacyId: 'F1' };
+  const warehouseRecord = { id: 12, facilityId: 'LT_F1', name: 'VALLEY VIEW', accountingCode: '889' };
+  // Direct arrays.
+  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [facilityRecord], [warehouseRecord]);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.facilityId');
+  // Single-wrapped {code,success,msg,data:[...]} — the live service shape.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
+    p.gisUnwrapData({ code: 0, success: true, msg: 'OK', data: [facilityRecord] }),
+    p.gisUnwrapData({ code: 0, success: true, msg: 'OK', data: [warehouseRecord] }));
+  assert.equal(resolved.warehouseId, 12);
+  // Double-wrapped (service + proxy envelopes).
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
+    p.gisUnwrapData({ data: { code: 0, success: true, data: [facilityRecord] } }),
+    p.gisUnwrapData({ data: { code: 0, success: true, data: [warehouseRecord] } }));
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.facilityId', 'primary facilityId match wins');
+});
+
+test('accounting code and normalized name are explicit fallbacks, never guesses', () => {
+  const sandbox = { window: {}, Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console };
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(officialSource, sandbox);
+  const p = sandbox.window.GISOfficial.pure;
+  // Accounting fallback: warehouse has no facilityId but shares the code.
+  let resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
+    [{ id: 'LT_F1', accountingCode: '889', name: 'Valley View' }],
+    [{ id: 12, name: 'VALLEY VIEW', accountingCode: '889' }]);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.accountingCode');
+  // Name fallback: normalized VALLEY VIEW === VALLEY VIEW.
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View', [], [{ id: 12, name: 'VALLEY VIEW' }]);
+  assert.equal(resolved.warehouseId, 12);
+  assert.equal(resolved.source, 'warehouse.name');
+  // Different accounting codes never match (name also differs).
+  resolved = p.gisResolveWarehouse('LT_F1', 'Valley View',
+    [{ id: 'LT_F1', accountingCode: '889' }],
+    [{ id: 12, accountingCode: '777', name: 'Other Warehouse' }]);
+  assert.equal(resolved, null);
+});
+
+test('loadForFacility loads official geometry from double-wrapped live payloads', async () => {
+  const G = loadOfficial(buildFetchStub({ wrapEnvelopes: true }));
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'official');
+  assert.equal(result.warehouseId, 12);
+  assert.equal(result.source, 'warehouse.facilityId');
+  assert.equal(result.counts.rack, 100);
+  assert.equal(result.counts.bulk, 30);
+  assert.equal(result.counts.aisles, 5);
+  assert.equal(G.state.projected.length, 130);
+  assert.equal(G.state.active, true);
+  G.reset();
 });

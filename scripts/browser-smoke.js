@@ -76,11 +76,15 @@ const GIS_WAREHOUSE_FIXTURE = {
 function gisMockResponse(requestUrl, postData) {
   const marker = '/api/proxy/gis';
   const gisPath = requestUrl.slice(requestUrl.indexOf(marker) + marker.length);
+  // The live service returns {code:0,success:true,msg:'OK',data:[...]} and the
+  // proxy can wrap that again, so the resolver-facing responses are mocked
+  // double-wrapped to exercise the repeated-envelope normalizer.
+  const envelope = payload => ({ data: { code: 0, success: true, msg: 'OK', data: payload } });
   if (gisPath.startsWith('/gis-bam/facility-search')) {
-    return { success: true, data: [{ facilityId: 'LT_F1', warehouseId: 12, name: 'Valley View' }] };
+    return envelope([{ id: 'LT_F1', facilityCode: 'FAC242', name: 'Valley View', accountingCode: '889', timeZone: 'America/Los_Angeles', legacyId: 'F1' }]);
   }
   if (gisPath === '/gis-app/warehouse') {
-    return { success: true, data: [GIS_WAREHOUSE_FIXTURE] };
+    return envelope([GIS_WAREHOUSE_FIXTURE]);
   }
   if (gisPath.startsWith('/gis-bam/planar-model/facility-type-data')) {
     const type = new URL(requestUrl).searchParams.get('type');
@@ -92,7 +96,7 @@ function gisMockResponse(requestUrl, postData) {
     return { success: true, data: { list: pool.slice(start, start + 25), currentPage, pageSize: 25, totalCount } };
   }
   if (gisPath.startsWith('/gis-app/warehouse-aisles/warehouse/')) {
-    return { success: true, data: GIS_AISLE_FIXTURES };
+    return envelope(GIS_AISLE_FIXTURES);
   }
   if (gisPath.startsWith('/gis-bam/location-inventory/customers-by-planars')) {
     const body = postData ? JSON.parse(postData) : {};
