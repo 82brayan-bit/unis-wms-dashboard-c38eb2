@@ -17,6 +17,37 @@ function _extractTokens(obj) {
   return { at, rt };
 }
 
+// ═══ PRESENCE COLLECTOR ═══
+// Best-effort live-presence reporting to the configured tracker origin.
+// Every call is a safe no-op when the collector is missing, disabled or
+// failing: presence never blocks WMS login, switching, refresh or logout.
+let _presenceCollector = null;
+function getPresenceCollector() {
+  if (_presenceCollector || !window.WarehousePresence) return _presenceCollector;
+  try {
+    _presenceCollector = window.WarehousePresence.initialize({
+      getAccessToken: function () { return WISE_TOKEN || ''; },
+      getFacilityId: function () { return FACILITY_ID || ''; }
+    });
+  } catch(_) {
+    console.warn('[presence] collector initialization failed; WMS activity is unaffected');
+  }
+  return _presenceCollector;
+}
+function startPresenceCollection() {
+  const collector = getPresenceCollector();
+  try { if (collector) collector.start(); }
+  catch(_) { console.warn('[presence] start failed; WMS activity is unaffected'); }
+}
+function stopPresenceCollection() {
+  try { if (_presenceCollector) _presenceCollector.stop(); }
+  catch(_) { console.warn('[presence] stop failed; WMS logout will continue'); }
+}
+function reportPresenceFacilityChange() {
+  try { if (_presenceCollector) _presenceCollector.facilityChanged(); }
+  catch(_) { console.warn('[presence] facility update failed; WMS switching will continue'); }
+}
+
 // ═══ LOGIN ═══
 async function doLogin() {
   const btn = document.getElementById('login-btn');
@@ -94,6 +125,11 @@ async function showDash() {
   // near (or past) expiry (e.g. tab was left open overnight).
   tickTokenRefresh();
   await populateFacilitySwitcher();
+  // Presence collection starts only once the access token is usable and the
+  // selected facility has actually resolved above. showDash() can run again
+  // later (session restore, login retry): start() is idempotent, so a
+  // duplicate start never creates a second collector or heartbeat timer.
+  startPresenceCollection();
   const initialActiveView = document.querySelector('.view.active');
   const initialActiveName = initialActiveView ? initialActiveView.id.replace(/^view-/, '') : 'dashboard';
   if (initialActiveName === 'robots' || initialActiveName === 'gis') showView(initialActiveName);
@@ -203,6 +239,9 @@ async function switchFacility(newId) {
   FACILITY_ID = fac.id;
   FACILITY_NAME = fac.name;
   try { localStorage.setItem('facility_id', newId); } catch(_) {}
+  // Presence follows the selection: report only after FACILITY_ID above is
+  // actually updated, so the tracker never sees a stale facility.
+  reportPresenceFacilityChange();
 
   // The dashboard selector is the authoritative GIS context. Clear the old
   // warehouse immediately, before the next lazy facility chunk can resolve.
@@ -766,6 +805,10 @@ function closeUserMenu() {
 }
 function doLogout() {
   closeUserMenu();
+  // Best-effort presence termination while the bearer token is still set:
+  // the keepalive request carries the current credentials, which are cleared
+  // immediately below.
+  stopPresenceCollection();
   // Clear stored credentials and per-user state
   try {
     localStorage.removeItem('wise_token');
@@ -914,6 +957,9 @@ async function showReconnect() {
     return;
   }
   // No usable refresh token — clear session and return to sign-in
+  // Terminate presence first, while the current token is still available for
+  // the keepalive request; credentials are cleared immediately after.
+  stopPresenceCollection();
   try {
     localStorage.removeItem('wise_token');
     localStorage.removeItem('wise_refresh_token');

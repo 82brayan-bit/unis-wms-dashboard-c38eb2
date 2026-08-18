@@ -10,6 +10,27 @@ const ROOT = __dirname;
 const DIST_ROOT = path.join(ROOT, 'dist');
 const HAS_DIST = fs.existsSync(path.join(DIST_ROOT, 'index.html'));
 
+// Optional presence-tracker origin for the browser presence collector.
+// Served to the client via the same-origin /api/runtime-config endpoint so no
+// secret or configuration detail ever ships in static assets. Empty or
+// invalid values disable collection entirely (the collector becomes a no-op).
+// Strictly http/https with no credentials, query or fragment, trailing slash
+// stripped. Never expose tokens or keys here.
+function normalizePresenceTrackerBaseUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value.trim());
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash) return '';
+    return url.origin + url.pathname.replace(/\/+$/, '');
+  } catch (_) {
+    return '';
+  }
+}
+const PRESENCE_TRACKER_BASE_URL = normalizePresenceTrackerBaseUrl(process.env.PRESENCE_TRACKER_BASE_URL || '');
+if (process.env.PRESENCE_TRACKER_BASE_URL && !PRESENCE_TRACKER_BASE_URL) {
+  console.warn('[presence] PRESENCE_TRACKER_BASE_URL is invalid; collection is disabled.');
+}
+
 const ROBOT_COUNT_API_URL = process.env.ROBOT_COUNT_API_URL || 'https://pget47t1vc.execute-api.us-west-2.amazonaws.com/prd/download_object';
 const ROBOT_COUNT_API_KEY = process.env.ROBOT_COUNT_API_KEY || '';
 
@@ -779,6 +800,11 @@ if (SMTP_CONFIGURED) {
 
 const server = http.createServer((req,res) => {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  // Same-origin, no-store runtime config for the presence collector. Only the
+  // normalized public tracker URL is exposed — never any secret or key.
+  if (req.method === 'GET' && url.pathname === '/api/runtime-config') {
+    return send(res, 200, {presenceTrackerBaseUrl: PRESENCE_TRACKER_BASE_URL});
+  }
   if (url.pathname === '/api/notification/email-health') {
     return send(res, 200, {configured: SMTP_CONFIGURED, status: SMTP_CONFIGURED ? 'CONNECTED' : 'NOT_CONFIGURED', fromConfigured: !!SMTP_FROM});
   }
@@ -815,7 +841,11 @@ if (require.main === module) {
 
 // Exported for tests: the full app server can be listened on an ephemeral
 // port in-process, and the GIS route allow-list can be unit-tested directly.
-module.exports = { server, handleApi, gisResolveProxyRoute, gisNormalizeBasePath, gisUpstreamUrlPath, gisScopeHeaders };
+module.exports = {
+  server, handleApi,
+  gisResolveProxyRoute, gisNormalizeBasePath, gisUpstreamUrlPath, gisScopeHeaders,
+  normalizePresenceTrackerBaseUrl, presenceTrackerBaseUrl: PRESENCE_TRACKER_BASE_URL,
+};
 
 async function handleSendNotification(req, res) {
   try {
