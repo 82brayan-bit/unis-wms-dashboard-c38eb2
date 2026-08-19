@@ -1,4 +1,36 @@
+function moduleT(key, fallback, options) {
+  return window.ItemI18n ? window.ItemI18n.t('modules.' + key, Object.assign({defaultValue:fallback}, options || {})) : fallback;
+}
 
+function moduleHtml(key, fallback, options) {
+  if (!window.ItemI18n) return fallback;
+  return window.ItemI18n.html('modules.' + key, Object.assign({defaultValue:fallback}, options || {}));
+}
+
+function moduleLocale() {
+  return window.ItemI18n ? window.ItemI18n.currentLocale() : 'en';
+}
+
+function moduleEnumAttrs(namespace, raw) {
+  return ' data-i18n-enum="' + escAttr(namespace || 'status') + '" data-i18n-value="' + escAttr(String(raw == null ? '' : raw)) + '"';
+}
+
+const MODULE_STATUS_KEYS = Object.freeze({
+  ACTIVE:'robots.active', CHARGING:'robots.charging', IDLE:'robots.idle', OUT_OF_SERVICE:'robots.outOfService',
+  DRIVE_FAULT:'robots.driveFault', COMPLETED:'cycle.completed', COMPLETE:'cycle.completed', CLOSED:'cycle.completed',
+  IN_PROGRESS:'dashboard.inProgress', PROGRESS:'dashboard.inProgress', PENDING:'cycle.pending', OPEN:'cycle.open',
+  CANCELLED:'dashboard.cancelled', CANCELED:'dashboard.cancelled', APPROVED:'cycle.approved', REJECTED:'cycle.rejected',
+  SCHEDULED:'cycle.scheduled', COLLECTED:'replenishment.collected', DROPPED:'replenishment.dropped'
+});
+
+function moduleStatusKey(raw) {
+  return MODULE_STATUS_KEYS[String(raw == null ? '' : raw).trim().toUpperCase()] || '';
+}
+
+function moduleStatusLabel(raw) {
+  const key = moduleStatusKey(raw);
+  return key ? moduleT(key, String(raw)) : (window.ItemI18n ? window.ItemI18n.enumLabel('status', raw) : String(raw == null ? '' : raw));
+}
 
 // Fallback option lists used when the WMS endpoint is unreachable
 // (CORS / not authenticated / wrong path). Replace freely.
@@ -2492,6 +2524,7 @@ async function loadCycleCountView() {
       : '—';
     const sched = r.scheduleDate ? new Date(r.scheduleDate).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}) : '—';
     const status = r.status || '—';
+    const statusLabel = moduleStatusLabel(status);
 
     // Count evidence logic: do not imply counted unless results exist
     let badge, statusDisplay;
@@ -2500,22 +2533,22 @@ async function loadCycleCountView() {
     const hasResults = resultStats.total > 0;
     if (isCancelled) {
       badge = 'over';
-      statusDisplay = hasResults ? status : '<span title="Cancelled with no count results submitted">' + esc(status) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count</span>';
+      statusDisplay = hasResults ? esc(statusLabel) : '<span title="Cancelled with no count results submitted">' + esc(statusLabel) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count</span>';
     } else if (isClosed && !hasResults) {
       badge = 'over';
-      statusDisplay = '<span title="Closed without count results — review Close/Report Empty/Force Close history">' + esc(status) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count results</span>';
+      statusDisplay = '<span title="Closed without count results — review Close/Report Empty/Force Close history">' + esc(statusLabel) + '</span> <span style="font-size:10px;color:var(--destructive);font-weight:400">· no count results</span>';
     } else if (isClosed && hasResults) {
       badge = 'done';
-      statusDisplay = esc(status) + ' <span style="font-size:10px;color:var(--chart-3);font-weight:400">· counted</span>';
+      statusDisplay = esc(statusLabel) + ' <span style="font-size:10px;color:var(--chart-3);font-weight:400">· counted</span>';
     } else if (/NEW|OPEN|PENDING|READY/i.test(status)) {
       badge = 'pend';
-      statusDisplay = esc(status);
+      statusDisplay = esc(statusLabel);
     } else if (/PROGRESS|IN_|COUNTING/i.test(status)) {
       badge = 'ip';
-      statusDisplay = esc(status);
+      statusDisplay = esc(statusLabel);
     } else {
       badge = 'idle';
-      statusDisplay = esc(status);
+      statusDisplay = esc(statusLabel);
     }
 
     // Diagnostic guidance for suspicious tasks
@@ -2743,7 +2776,7 @@ async function loadCountApprovalView() {
     const sysQty = r.systemItemQty ?? r.systemBaseQty ?? r.systemUomQty ?? '—';
     const diff = r.itemDiffBaseQty ?? r.diffBaseQty ?? r.qtyDiff ?? '—';
     return '<tr>'+
-      '<td><input type="checkbox" class="cra-row" value="'+escAttr(id)+'"/></td>'+ '<td>'+esc(r.taskId||'—')+'</td>'+ '<td>'+esc(r.ticketId||'—')+'</td>'+ '<td>'+craDisplayLocation(r)+'</td>'+ '<td>'+esc(r.status||'—')+'</td>'+ '<td>'+esc(r.countTicketType||r.countType||'—')+'</td>'+ '<td>'+esc(r.type||'—')+'</td>'+ '<td>'+esc(r.adjustmentId||'—')+'</td>'+ '<td>'+craDisplayItem(r)+'</td>'+ '<td>'+esc(countQty)+'</td>'+ '<td>'+esc(sysQty)+'</td>'+ '<td>'+esc(diff)+'</td></tr>';
+      '<td><input type="checkbox" class="cra-row" value="'+escAttr(id)+'"/></td>'+ '<td>'+esc(r.taskId||'—')+'</td>'+ '<td>'+esc(r.ticketId||'—')+'</td>'+ '<td>'+craDisplayLocation(r)+'</td>'+ '<td' + moduleEnumAttrs('status', r.status || '—') + '>'+esc(moduleStatusLabel(r.status||'—'))+'</td>'+ '<td>'+esc(r.countTicketType||r.countType||'—')+'</td>'+ '<td>'+esc(r.type||'—')+'</td>'+ '<td>'+esc(r.adjustmentId||'—')+'</td>'+ '<td>'+craDisplayItem(r)+'</td>'+ '<td>'+esc(countQty)+'</td>'+ '<td>'+esc(sysQty)+'</td>'+ '<td>'+esc(diff)+'</td></tr>';
   }).join('');
 
 }
@@ -4390,13 +4423,62 @@ function refreshGisView() {
 }
 
 
-async function loadRobotWarehouseInventory() {
+const ROBOT_VIEW_STATE = {scanKind:'prompt', scanData:null, ontologyBusy:false, ontologyKpis:{}};
+
+function robotNumber(value) {
+  return Number(value || 0).toLocaleString(moduleLocale());
+}
+
+function renderRobotWarehouseInventory() {
   const status = document.getElementById('robot-inventory-status');
   const summaryEl = document.getElementById('robot-inventory-summary');
   const tableEl = document.getElementById('robot-inventory-table');
+  if (ROBOT_VIEW_STATE.scanKind === 'loading') {
+    if (status) status.textContent = moduleT('robots.loadingScan', 'Loading warehouse inventory scan…');
+    if (summaryEl) summaryEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = 'none';
+    return;
+  }
+  if (ROBOT_VIEW_STATE.scanKind === 'unavailable') {
+    if (status) status.textContent = moduleT('robots.scanUnavailable', 'Robot inventory scan is currently unavailable.');
+    if (summaryEl) summaryEl.style.display = 'none';
+    if (tableEl) tableEl.style.display = 'none';
+    return;
+  }
+  if (ROBOT_VIEW_STATE.scanKind !== 'loaded' || !ROBOT_VIEW_STATE.scanData) {
+    if (status) status.textContent = moduleT('robots.scanPrompt', 'Click Load Scan to fetch robot count inventory.');
+    return;
+  }
+  const data = ROBOT_VIEW_STATE.scanData;
+  const summary = data.summary || {};
+  const rows = (data.list || []).slice(0, 200);
+  if (status) status.textContent = rows.length
+    ? moduleT('robots.scanLoadedSummary', 'Warehouse inventory scan loaded. {{count}} locations. WMS: {{updated}}', {count:robotNumber(summary.totalLocations), updated:summary.lastWiseUpdate || '—'})
+    : moduleT('robots.noScanRecords', 'No robot inventory scan records found.');
+  if (summaryEl) {
+    summaryEl.style.display = '';
+    summaryEl.innerHTML = [
+      ['locations', 'Locations', summary.totalLocations], ['occupied', 'Occupied', summary.occupied],
+      ['empty', 'Empty', summary.empty], ['licensePlates', 'LPs', summary.lpCount],
+      ['totalUnits', 'Total Units', summary.totalQty]
+    ].map(value => '<div class="kpi"><div><div class="kpi-lbl" data-i18n="modules.robots.' + value[0] + '">' + esc(moduleT('robots.' + value[0], value[1])) + '</div><div class="kpi-val">' + esc(robotNumber(value[2])) + '</div></div></div>').join('');
+  }
+  if (!tableEl) return;
+  tableEl.style.display = '';
+  if (!rows.length) {
+    tableEl.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted-foreground)" data-i18n="modules.robots.noScanRecords">' + esc(moduleT('robots.noScanRecords', 'No robot inventory scan records found.')) + '</div>';
+    return;
+  }
+  tableEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--accent)"><th style="padding:8px;text-align:left">' + esc(moduleT('robots.location', 'Location')) + '</th><th style="padding:8px;text-align:left">' + esc(moduleT('robots.occupied', 'Occupied')) + '</th><th style="padding:8px;text-align:left">' + esc(moduleT('robots.licensePlate', 'LP')) + '</th><th style="padding:8px;text-align:right">' + esc(moduleT('robots.quantity', 'Quantity')) + '</th><th style="padding:8px;text-align:left">' + esc(moduleT('robots.status', 'Status')) + '</th><th style="padding:8px;text-align:left">' + esc(moduleT('robots.updated', 'Updated')) + '</th></tr></thead><tbody>' +
+    rows.map(row => '<tr style="border-top:1px solid var(--muted)"><td style="padding:7px;font-family:monospace">' + esc(row.location_ip_format || '—') + '</td><td style="padding:7px"><span class="badge ' + (Number(row.is_occupied) === 1 ? 'ok' : 'idle') + '">' + esc(moduleT(Number(row.is_occupied) === 1 ? 'robots.yes' : 'robots.no', Number(row.is_occupied) === 1 ? 'Yes' : 'No')) + '</span></td><td style="padding:7px">' + esc(row.lp_id || '—') + '</td><td style="padding:7px;text-align:right">' + esc(row.qty == null ? '—' : String(row.qty)) + '</td><td style="padding:7px"' + moduleEnumAttrs('status', row.status || '—') + '>' + esc(moduleStatusLabel(row.status || '—')) + '</td><td style="padding:7px">' + esc(row.wise_update_time || row.update_time || '—') + '</td></tr>').join('') +
+    '</tbody></table>' + ((data.list || []).length > 200 ? '<div style="padding:8px;color:var(--muted-foreground);font-size:11px">' + moduleHtml('robots.showingRecords', 'Showing the first {{count}} records.', {count:200}) + '</div>' : '');
+}
+
+async function loadRobotWarehouseInventory() {
   const btn = document.getElementById('robot-inventory-refresh');
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  if (status) status.textContent = 'Loading robot count warehouse inventory…';
+  ROBOT_VIEW_STATE.scanKind = 'loading';
+  renderRobotWarehouseInventory();
+  if (btn) { btn.disabled = true; btn.textContent = moduleT('robots.loadingScan', 'Loading warehouse inventory scan…'); }
   try {
     const payload = {
       date_time: (document.getElementById('robot-scan-date') || {}).value || '2026-07-09',
@@ -4409,31 +4491,14 @@ async function loadRobotWarehouseInventory() {
     });
     const data = await resp.json();
     if (!resp.ok || !data.success) throw new Error(data.msg || 'Robot count data unavailable');
-    const s = data.summary || {};
-    if (status) status.textContent = 'Loaded ' + (s.totalLocations || 0).toLocaleString() + ' scanned location(s). Last WMS sync: ' + (s.lastWiseUpdate || '—');
-    if (summaryEl) {
-      summaryEl.style.display = '';
-      summaryEl.innerHTML = [
-        ['Locations', s.totalLocations || 0, 'total scanned'],
-        ['Occupied', s.occupied || 0, 'robot detected inventory'],
-        ['Empty', s.empty || 0, 'open locations'],
-        ['LPs', s.lpCount || 0, 'distinct license plates'],
-        ['Qty', s.totalQty || 0, 'total units']
-      ].map(x => '<div class="kpi"><div><div class="kpi-lbl">' + esc(x[0]) + '</div><div class="kpi-val">' + Number(x[1]).toLocaleString() + '</div><div class="kpi-chg neutral">' + esc(x[2]) + '</div></div></div>').join('');
-    }
-    const rows = (data.list || []).slice(0, 200);
-    if (tableEl) {
-      tableEl.style.display = '';
-      tableEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--accent)"><th style="padding:8px;text-align:left">Location</th><th style="padding:8px;text-align:left">Occupied</th><th style="padding:8px;text-align:left">LP</th><th style="padding:8px;text-align:right">Qty</th><th style="padding:8px;text-align:left">Status</th><th style="padding:8px;text-align:left">Update</th></tr></thead><tbody>' +
-        rows.map(r => '<tr style="border-top:1px solid var(--muted)"><td style="padding:7px;font-family:monospace">' + esc(r.location_ip_format || '—') + '</td><td style="padding:7px">' + (Number(r.is_occupied) === 1 ? '<span class="badge ok">Yes</span>' : '<span class="badge idle">No</span>') + '</td><td style="padding:7px">' + esc(r.lp_id || '—') + '</td><td style="padding:7px;text-align:right">' + esc(r.qty == null ? '—' : String(r.qty)) + '</td><td style="padding:7px">' + esc(r.status || '—') + '</td><td style="padding:7px">' + esc(r.wise_update_time || r.update_time || '—') + '</td></tr>').join('') +
-        '</tbody></table>' + ((data.list || []).length > 200 ? '<div style="padding:8px;color:var(--muted-foreground);font-size:11px">Showing first 200 records.</div>' : '');
-    }
+    ROBOT_VIEW_STATE.scanKind = 'loaded';
+    ROBOT_VIEW_STATE.scanData = data;
   } catch(e) {
-    if (status) status.textContent = 'Robot count data could not be loaded. Confirm integration settings or try again.';
-    if (summaryEl) summaryEl.style.display = 'none';
-    if (tableEl) tableEl.style.display = 'none';
+    ROBOT_VIEW_STATE.scanKind = 'unavailable';
+    ROBOT_VIEW_STATE.scanData = null;
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Load Scan'; }
+    renderRobotWarehouseInventory();
+    if (btn) { btn.disabled = false; btn.textContent = moduleT('robots.loadScan', '↻ Load Scan'); }
   }
 }
 
@@ -4460,10 +4525,10 @@ function refreshOntologyStatus() {
   if (!el) return;
   const c = ontoConfig();
   if (c.url && c.token) {
-    el.textContent = 'configured · ' + c.url.replace(/^https?:\/\//,'').slice(0,40);
+    el.textContent = moduleT('robots.configuredHost', 'configured · {{host}}', {host:c.url.replace(/^https?:\/\//,'').slice(0,40)});
     el.style.color = 'var(--chart-3)';
   } else {
-    el.textContent = 'not configured — click Configure to paste URL + token';
+    el.textContent = moduleT('robots.notConfiguredHelp', 'not configured — click Configure to paste URL + token');
     el.style.color = 'var(--muted-foreground)';
   }
 }
@@ -4471,15 +4536,12 @@ function refreshOntologyStatus() {
 function configureOntology() {
   const cur = ontoConfig();
   const url = prompt(
-    'Paste the Ontology API URL (the $ONTOLOGY_API_URL value from your curl).\n' +
-    'Example: https://ontology-studio.item.com/api/something/retrieval\n\n' +
-    'Current: ' + (cur.url || '(not set)'),
+    moduleT('robots.configureUrlPrompt', 'Paste the Ontology API URL.\nExample: https://ontology-studio.item.com/api/something/retrieval\n\nCurrent: {{current}}', {current:cur.url || moduleT('robots.notSet', '(not set)')}),
     cur.url || ''
   );
   if (url === null) return;
   const token = prompt(
-    'Paste the Ontology API bearer token (the $ONTOLOGY_API_TOKEN value).\n\n' +
-    'Current: ' + (cur.token ? cur.token.substring(0,16) + '… (' + cur.token.length + ' chars)' : '(not set)'),
+    moduleT('robots.configureTokenPrompt', 'Paste the Ontology API bearer token.\n\nCurrent: {{current}}', {current:cur.token ? cur.token.substring(0,16) + '… (' + cur.token.length + ' ' + moduleT('robots.characters', 'characters') + ')' : moduleT('robots.notSet', '(not set)')}),
     cur.token || ''
   );
   if (token === null) return;
@@ -4541,10 +4603,11 @@ async function loadRobotKpisFromOntology() {
   const c = ontoConfig();
   const btn = document.getElementById('onto-refresh-btn');
   if (!c.url || !c.token) {
-    if (btn) btn.textContent = '⚙ Configure first';
+    if (btn) btn.textContent = moduleT('robots.configureFirst', '⚙ Configure first');
     return;
   }
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading from Ontology…'; }
+  ROBOT_VIEW_STATE.ontologyBusy = true;
+  if (btn) { btn.disabled = true; btn.textContent = moduleT('robots.loadingOntology', 'Loading from Ontology…'); }
   // Tag each KPI as loading
   ['rk-fleet','rk-active','rk-charging','rk-down'].forEach(id => {
     const el = document.getElementById(id);
@@ -4565,23 +4628,41 @@ async function loadRobotKpisFromOntology() {
     if (!el) return;
     if (!r || r.success === false) {
       el.textContent = '—';
-      if (sub) sub.textContent = (r && r.msg) ? r.msg : 'unreachable';
+      ROBOT_VIEW_STATE.ontologyKpis[q.sub] = {kind:'unreachable'};
+      if (sub) sub.textContent = moduleT('robots.unreachable', 'unreachable');
       fail++;
     } else {
       const n = pickNumber(r);
       if (n != null) {
         el.textContent = n.toLocaleString();
-        if (sub) sub.textContent = 'Ontology · ' + new Date().toLocaleTimeString();
+        const time = new Date();
+        ROBOT_VIEW_STATE.ontologyKpis[q.sub] = {kind:'updated', time};
+        if (sub) sub.textContent = moduleT('robots.ontologyUpdated', 'Ontology · {{time}}', {time:time.toLocaleTimeString(moduleLocale())});
         ok++;
       } else {
-        // Show the answer text inline if we couldn't extract a number
-        const txt = (r.data && (r.data.text || r.data.answer)) || r.text || r.answer || JSON.stringify(r).slice(0,40);
         el.textContent = '?';
-        if (sub) sub.textContent = String(txt).slice(0,40);
+        ROBOT_VIEW_STATE.ontologyKpis[q.sub] = {kind:'unreadable'};
+        if (sub) sub.textContent = moduleT('robots.unreadableKpi', 'KPI value could not be read');
       }
     }
   });
-  if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh KPIs'; }
+  ROBOT_VIEW_STATE.ontologyBusy = false;
+  if (btn) { btn.disabled = false; btn.textContent = moduleT('robots.refreshKpis', '↻ Refresh KPIs'); }
+}
+
+function renderRobotOntologyLanguage() {
+  refreshOntologyStatus();
+  const btn = document.getElementById('onto-refresh-btn');
+  if (btn) btn.textContent = ROBOT_VIEW_STATE.ontologyBusy
+    ? moduleT('robots.loadingOntology', 'Loading from Ontology…')
+    : moduleT('robots.refreshKpis', '↻ Refresh KPIs');
+  Object.entries(ROBOT_VIEW_STATE.ontologyKpis).forEach(([id, state]) => {
+    const sub = document.getElementById(id);
+    if (!sub) return;
+    if (state.kind === 'updated') sub.textContent = moduleT('robots.ontologyUpdated', 'Ontology · {{time}}', {time:new Date(state.time).toLocaleTimeString(moduleLocale())});
+    else if (state.kind === 'unreadable') sub.textContent = moduleT('robots.unreadableKpi', 'KPI value could not be read');
+    else sub.textContent = moduleT('robots.unreachable', 'unreachable');
+  });
 }
 
 function extractCycleProgressStats(payload) {
@@ -9657,9 +9738,12 @@ function ltrSaveEdit(idx) {
 // DASHBOARD — Live WMS summary
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DASH_STATE = {inventoryRows: [], tickets: [], customerInventory: []};
+const DASH_STATE = {
+  inventoryRows:[], tickets:[], customerInventory:[], ownershipEmployees:[],
+  liveKind:'idle', liveLoaded:false, cycleKpiKind:'prompt', cycleKpiTickets:[], ownershipDetail:null
+};
 function dashNum(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
-function dashFmt(v) { return Number(v || 0).toLocaleString(); }
+function dashFmt(v) { return Number(v || 0).toLocaleString(moduleLocale()); }
 function dashSet(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
 function dashRows(resp) {
   const d = resp && (resp.data || resp);
@@ -9716,9 +9800,9 @@ function dashRenderInventory(rows, customersChecked) {
   const out = rows.filter(r => dashAvail(r) <= 0).length;
   const total = Math.max(1, rows.length);
   dashSet('dash-kpi-inv-qty', dashFmt(totalAvail));
-  dashSet('dash-kpi-inv-sub', customersChecked ? ('Live from ' + customersChecked + ' customer sample') : 'No customers loaded');
+  dashSet('dash-kpi-inv-sub', customersChecked ? moduleT('dashboard.liveCustomerSample', 'Live from {{count}} customer sample', {count:customersChecked}) : moduleT('dashboard.noCustomersLoaded', 'No customers loaded'));
   dashSet('dash-kpi-items', dashFmt(skus.size));
-  dashSet('dash-kpi-items-sub', rows.length + ' live inventory rows');
+  dashSet('dash-kpi-items-sub', moduleT('dashboard.liveInventoryRows', '{{count}} live inventory rows', {count:dashFmt(rows.length)}));
   dashSet('dash-donut-total', dashFmt(skus.size));
   dashSet('dash-legend-in', dashFmt(inStock)); dashSet('dash-legend-in-pct', ' (' + Math.round(inStock/total*100) + '%)');
   dashSet('dash-legend-low', dashFmt(low)); dashSet('dash-legend-low-pct', ' (' + Math.round(low/total*100) + '%)');
@@ -9731,18 +9815,20 @@ function dashRenderInventory(rows, customersChecked) {
   const chartRows = Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0, 7);
   if (lineChart && chartRows.length) {
     lineChart.data.labels = chartRows.map(([cid]) => String(custNames[cid] || cid).slice(0, 16));
-    lineChart.data.datasets[0].label = 'Available Qty';
+    lineChart.$itemDatasetKey = 'availableQty';
+    lineChart.data.datasets[0].label = moduleT('dashboard.availableQty', 'Available Qty');
     lineChart.data.datasets[0].data = chartRows.map(x => Math.round(x[1]));
-    lineChart.options.plugins.tooltip.callbacks.label = c => ' Available Qty: ' + Number(c.raw || 0).toLocaleString();
-    lineChart.options.scales.y.ticks.callback = v => Number(v).toLocaleString();
+    lineChart.options.plugins.tooltip.callbacks.label = c => ' ' + moduleT('dashboard.availableQtyValue', 'Available Qty: {{count}}', {count:Number(c.raw || 0).toLocaleString(moduleLocale())});
+    lineChart.options.scales.y.ticks.callback = v => Number(v).toLocaleString(moduleLocale());
     lineChart.update();
   }
   const lowRows = rows.filter(r => dashAvail(r) <= 10).sort((a,b)=>dashAvail(a)-dashAvail(b)).slice(0,5);
   const body = document.getElementById('dash-low-stock-body');
   if (body) body.innerHTML = lowRows.length ? lowRows.map(r => {
-    const qty = dashAvail(r); const cls = qty <= 0 ? 'out' : qty <= 3 ? 'vlow' : 'low'; const label = qty <= 0 ? 'Out' : qty <= 3 ? 'Very Low' : 'Low';
+    const qty = dashAvail(r); const cls = qty <= 0 ? 'out' : qty <= 3 ? 'vlow' : 'low';
+    const label = qty <= 0 ? moduleT('dashboard.out', 'Out') : qty <= 3 ? moduleT('dashboard.veryLow', 'Very Low') : moduleT('dashboard.low', 'Low');
     return '<tr><td>' + esc(r.itemName || r.itemCode || r.itemId || '—') + '</td><td style="color:var(--muted-foreground)">' + esc(dashInvSku(r) || '—') + '</td><td><span class="' + (qty <= 3 ? 'num-red' : 'num-amber') + '">' + esc(qty) + '</span></td><td>≤ 10</td><td><span class="badge ' + cls + '">' + label + '</span></td></tr>';
-  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)">No low-stock rows in the live sample.</td></tr>';
+  }).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.noLowStockRows', 'No low-stock rows in the live sample.')) + '</td></tr>';
 }
 const HRM_ASSIGNMENT_LABELS = {1:'Driver',2:'General Labor',3:'Inventory',4:'Quality Control',5:'Housekeeping',6:'CSR',7:'Gate / Security',8:'Yard Jockey',9:'IT',10:'Lead',11:'Supervisor',12:'General Manager'};
 function dashOwnershipRows(resp) {
@@ -9832,18 +9918,18 @@ function dashRenderEmployeeOwnership(rows) {
   const strip = document.getElementById('dash-ownership-strip');
   if (!strip) return;
   if (!rows || !rows.length) {
-    strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">No HRM ownership employees returned. Open HRM Card to create or update records.</div>';
+    strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">' + esc(moduleT('dashboard.noOwnershipEmployees', 'No HRM ownership employees returned. Open HRM Card to create or update records.')) + '</div>';
     return;
   }
   strip.innerHTML = rows.slice(0, 40).map((r, idx) => {
-    const name = r.fullName || r.employeeName || r.employeeCode || 'Employee';
+    const name = r.fullName || r.employeeName || r.employeeCode || moduleT('dashboard.employee', 'Employee');
     const color = dashOwnershipStatusColor(r);
     const initials = dashEmployeeInitials(name).toUpperCase();
     const photo = dashOwnershipPhotoUrl(r);
     const avatarHtml = photo
       ? '<img src="' + escAttr(photo) + '" alt="' + escAttr(name) + '" onerror="this.style.display=\'none\';this.parentNode.textContent=\'' + escAttr(initials || '👤') + '\'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>'
       : esc(initials || '👤');
-    return '<div onclick="dashOpenOwnershipDetail(' + idx + ')" style="width:92px;flex:0 0 92px;text-align:center;cursor:pointer;position:relative" title="' + escAttr(name) + '">' +
+    return '<div onclick="dashOpenOwnershipDetail(' + idx + ')" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();dashOpenOwnershipDetail(' + idx + ')}" aria-label="' + escAttr(moduleT('dashboard.viewOwnershipCard', 'View ownership card for {{name}}', {name})) + '" style="width:92px;flex:0 0 92px;text-align:center;cursor:pointer;position:relative" title="' + escAttr(name) + '">' +
       '<div style="width:72px;height:72px;margin:0 auto 6px;border:3px solid ' + color + ';border-radius:50%;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 10%,var(--card)),color-mix(in srgb,var(--chart-3) 14%,var(--card)));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--foreground);box-shadow:0 2px 8px color-mix(in srgb,var(--foreground) 8%,transparent);overflow:hidden">' + avatarHtml + '</div>' +
       '<span style="position:absolute;right:12px;top:54px;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid var(--card)"></span>' +
       '<div style="font-size:11px;line-height:1.15;font-weight:800;color:var(--foreground);white-space:normal;min-height:26px">' + esc(String(name).split(/\s+/).slice(0,2).join(' ')) + '</div>' +
@@ -9857,9 +9943,38 @@ function dashListText(arr, fallback) {
 }
 function dashScheduleText(detail) {
   const shifts = detail && (detail.shifts || detail.dayConfigs || []);
-  if (!Array.isArray(shifts) || !shifts.length) return 'Schedule not configured';
-  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  return shifts.slice(0,5).map(s => (days[s.workDay] || s.weekLabel || 'DAY') + ' ' + (s.startTime || '') + '-' + (s.endTime || '')).join(' · ');
+  if (!Array.isArray(shifts) || !shifts.length) return moduleT('dashboard.scheduleNotConfigured', 'Schedule not configured');
+  const locale = moduleLocale();
+  const days = Array.from({length:7}, (_, day) => new Date(Date.UTC(2026, 7, 16 + day)).toLocaleDateString(locale, {weekday:'short', timeZone:'UTC'}));
+  return shifts.slice(0,5).map(s => (days[s.workDay] || s.weekLabel || moduleT('dashboard.day', 'Day')) + ' ' + (s.startTime || '') + '-' + (s.endTime || '')).join(' · ');
+}
+
+function dashAssignmentLabel(value) {
+  const labels = {1:'driver',2:'generalLabor',3:'inventory',4:'qualityControl',5:'housekeeping',6:'csr',7:'gateSecurity',8:'yardJockey',9:'it',10:'lead',11:'supervisor',12:'generalManager'};
+  const key = labels[value];
+  return key ? moduleT('dashboard.assignments.' + key, HRM_ASSIGNMENT_LABELS[value]) : (value || '—');
+}
+
+function dashRenderOwnershipDetail(detail) {
+  dashCloseOwnershipDetail();
+  if (!detail) return;
+  DASH_STATE.ownershipDetail = detail;
+  const name = detail.fullName || detail.employeeName || detail.employeeCode || moduleT('dashboard.employee', 'Employee');
+  const assignment = dashAssignmentLabel(detail.assignment);
+  const status = Number(detail.status) === 1 ? moduleT('dashboard.activeCard', 'Active Card') : moduleT('dashboard.needsCard', 'Needs Card');
+  const rank = detail.rankBadge || '—';
+  const years = detail.yearsOfService || (detail.hireDate ? Math.max(0, Math.floor((Date.now() - new Date(detail.hireDate).getTime()) / 31557600000)) : '—');
+  const detailPhoto = dashOwnershipPhotoUrl(detail);
+  const avatar = detailPhoto ? '<img src="' + escAttr(detailPhoto) + '" alt="' + escAttr(name) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
+  const html = '<div class="modal-overlay open" id="dash-owner-modal" onclick="if(event.target===this)dashCloseOwnershipDetail()"><div class="modal" style="max-width:980px"><div class="modal-hdr"><h2>' + esc(moduleT('dashboard.ownershipCard', 'Employee Ownership Card')) + '</h2><button class="modal-x" onclick="dashCloseOwnershipDetail()" aria-label="' + escAttr(window.ItemI18n ? window.ItemI18n.t('common.close') : 'Close') + '">×</button></div>' +
+    '<div class="modal-body" style="display:grid;grid-template-columns:260px 1fr;gap:18px">' +
+      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:var(--foreground);color:var(--card);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:var(--foreground);margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:var(--muted-foreground);margin-top:4px">' + esc(moduleT('dashboard.employeeCode', 'Employee Code')) + ' ' + esc(detail.employeeCode || '—') + '</div></div>' +
+      '<div style="display:grid;gap:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">' + esc(moduleT('dashboard.rank', 'Rank')) + '</div><div style="font-size:36px;font-weight:900">' + esc(rank) + '</div></div><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">' + esc(moduleT('dashboard.year', 'Year')) + '</div><div style="font-size:36px;font-weight:900">' + esc(years) + '</div><div style="font-size:10px">' + esc(moduleT('dashboard.ofService', 'of service')) + '</div></div></div>' +
+      '<div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">' + esc(moduleT('dashboard.schedule', 'Schedule')) + '</div><div style="font-size:13px">' + esc(dashScheduleText(detail)) + '</div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">' + esc(moduleT('dashboard.skills', 'Skills')) + '</div><div style="font-size:12px">' + esc(dashListText(detail.skills)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">' + esc(moduleT('dashboard.equipment', 'Equipment')) + '</div><div style="font-size:12px">' + esc(dashListText(detail.equipments || detail.equipment)) + '</div></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">' + esc(moduleT('dashboard.technology', 'Technology')) + '</div><div style="font-size:12px">' + esc(dashListText(detail.technology)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">' + esc(moduleT('dashboard.tools', 'Tools')) + '</div><div style="font-size:12px">' + esc(dashListText(detail.tools)) + '</div></div></div>' +
+      '<div style="font-size:12px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.supervisor', 'Supervisor')) + ': ' + esc(detail.supervisorName || '—') + ' · ' + esc(moduleT('dashboard.cardStatus', 'Status')) + ': ' + esc(status) + '</div></div></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
 }
 async function dashOpenOwnershipDetail(idx) {
   dashCloseOwnershipDetail();
@@ -9871,24 +9986,13 @@ async function dashOpenOwnershipDetail(idx) {
     const live = await dashFetchOwnershipDetail(base.empEmployeeId || base.id);
     if (live) detail = Object.assign({}, base, live);
   } catch(_) {}
-  const name = detail.fullName || base.fullName || base.employeeCode || 'Employee';
-  const assignment = HRM_ASSIGNMENT_LABELS[detail.assignment] || detail.assignment || '—';
-  const status = Number(detail.status) === 1 ? 'Active Card' : 'Needs Card';
-  const rank = detail.rankBadge || '—';
-  const years = detail.yearsOfService || (detail.hireDate ? Math.max(0, Math.floor((Date.now() - new Date(detail.hireDate).getTime()) / 31557600000)) : '—');
-  const detailPhoto = dashOwnershipPhotoUrl(detail);
-  const avatar = detailPhoto ? '<img src="' + escAttr(detailPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>' : '<div style="font-size:44px;font-weight:900">' + esc(dashEmployeeInitials(name).toUpperCase()) + '</div>';
-  const html = '<div class="modal-overlay open" id="dash-owner-modal" onclick="if(event.target===this)dashCloseOwnershipDetail()"><div class="modal" style="max-width:980px"><div class="modal-hdr"><h2>Employee Ownership Card</h2><button class="modal-x" onclick="dashCloseOwnershipDetail()">×</button></div>' +
-    '<div class="modal-body" style="display:grid;grid-template-columns:260px 1fr;gap:18px">' +
-      '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center"><div style="height:190px;background:var(--foreground);color:var(--card);border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden">' + avatar + '</div><div style="font-size:20px;font-weight:900;line-height:1.1">' + esc(name) + '</div><div style="font-size:13px;font-weight:800;color:var(--foreground);margin-top:4px">' + esc(assignment) + '</div><div style="font-size:11px;color:var(--muted-foreground);margin-top:4px">Employee Code ' + esc(detail.employeeCode || '—') + '</div></div>' +
-      '<div style="display:grid;gap:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">RANK</div><div style="font-size:36px;font-weight:900">' + esc(rank) + '</div></div><div style="background:var(--foreground);color:var(--card);border-radius:8px;padding:12px;text-align:center"><div style="font-size:12px;font-weight:900">YEAR</div><div style="font-size:36px;font-weight:900">' + esc(years) + '</div><div style="font-size:10px">OF SERVICE</div></div></div>' +
-      '<div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">SCHEDULE</div><div style="font-size:13px">' + esc(dashScheduleText(detail)) + '</div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">SKILLS</div><div style="font-size:12px">' + esc(dashListText(detail.skills)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">EQUIPMENTS</div><div style="font-size:12px">' + esc(dashListText(detail.equipments || detail.equipment)) + '</div></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">TECHNOLOGY</div><div style="font-size:12px">' + esc(dashListText(detail.technology)) + '</div></div><div style="border:1px solid var(--foreground);border-radius:8px;padding:10px"><div style="font-weight:900;text-align:center;background:var(--foreground);color:var(--card);margin:-10px -10px 8px;padding:4px">TOOLS</div><div style="font-size:12px">' + esc(dashListText(detail.tools)) + '</div></div></div>' +
-      '<div style="font-size:12px;color:var(--muted-foreground)">Supervisor: ' + esc(detail.supervisorName || '—') + ' · Status: ' + esc(status) + '</div></div></div></div></div>';
-  document.body.insertAdjacentHTML('beforeend', html);
+  dashRenderOwnershipDetail(detail);
 }
-function dashCloseOwnershipDetail() { const m = document.getElementById('dash-owner-modal'); if (m) m.remove(); }
+function dashCloseOwnershipDetail(options) {
+  const m = document.getElementById('dash-owner-modal');
+  if (m) m.remove();
+  if (!options || !options.keepState) DASH_STATE.ownershipDetail = null;
+}
 function dashRenderTasks(tickets) {
   const counts = {total:tickets.length, completed:0, progress:0, pending:0, overdue:0};
   const today = new Date(); today.setHours(0,0,0,0);
@@ -9912,18 +10016,20 @@ function dashRenderTasks(tickets) {
     const k = dashTicketStatus(t); const badge = k === 'completed' ? 'done' : k === 'progress' ? 'ip' : 'pend';
     const who = t.counter || t.assignedUser || t.createdBy || '—'; const initials = String(who).split(/\s+/).map(x=>x[0]).join('').slice(0,2).toUpperCase() || '—';
     const date = (t.scheduleDate || t.createdTime || t.updatedTime || '').slice(0,10) || '—';
-    return '<div class="task-row"><div class="task-name">' + esc(t.id || t.ticketId || t.name || 'Cycle count ticket') + '</div><span class="badge ' + badge + '">' + esc(k) + '</span><div class="t-who"><div class="t-avatar">' + esc(initials) + '</div>' + esc(who) + '</div><div class="t-date">' + esc(date) + '</div></div>';
-  }).join('') || '<div class="tasks-empty">No live cycle count tasks found for this facility.</div>';
+    return '<div class="task-row"><div class="task-name">' + esc(t.id || t.ticketId || t.name || moduleT('dashboard.cycleCountTicket', 'Cycle count ticket')) + '</div><span class="badge ' + badge + '">' + esc(moduleStatusLabel(k)) + '</span><div class="t-who"><div class="t-avatar">' + esc(initials) + '</div>' + esc(who) + '</div><div class="t-date">' + esc(date) + '</div></div>';
+  }).join('') || '<div class="tasks-empty">' + esc(moduleT('dashboard.noRecentTasks', 'No recent cycle count tasks found.')) + '</div>';
 }
 async function loadDashboardLiveData() {
+  DASH_STATE.liveKind = 'loading';
   ['dash-kpi-inv-qty','dash-kpi-items','dash-kpi-completed','dash-kpi-pending'].forEach(id => dashSet(id, '…'));
   const strip = document.getElementById('dash-ownership-strip');
-  if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">Loading HRM ownership employees…</div>';
+  if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">' + esc(moduleT('dashboard.loadingOwnership', 'Loading HRM ownership employees…')) + '</div>';
   const ok = await ensureWiseToken(false);
   if (!ok) {
-    dashSet('dash-kpi-inv-sub', 'Sign in to load live WMS data');
-    if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--destructive);padding:24px">Sign in to load HRM ownership employees.</div>';
-    const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--destructive)">Please sign in to load live WMS inventory.</td></tr>';
+    DASH_STATE.liveKind = 'signIn';
+    dashSet('dash-kpi-inv-sub', moduleT('dashboard.signInLiveData', 'Sign in to load live WMS data'));
+    if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--destructive);padding:24px">' + esc(moduleT('dashboard.signInOwnership', 'Sign in to load HRM ownership employees.')) + '</div>';
+    const low = document.getElementById('dash-low-stock-body'); if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--destructive)">' + esc(moduleT('dashboard.signInInventory', 'Please sign in to load live WMS inventory.')) + '</td></tr>';
     return;
   }
   const [ticketsResult, invResult, ownershipResult] = await Promise.allSettled([dashFetchTickets(), dashFetchInventorySample(), dashFetchOwnershipEmployees()]);
@@ -9931,6 +10037,8 @@ async function loadDashboardLiveData() {
   const inv = invResult.status === 'fulfilled' ? invResult.value : {rows:[], customersChecked:0};
   const ownershipEmployees = ownershipResult.status === 'fulfilled' ? ownershipResult.value : [];
   DASH_STATE.tickets = tickets; DASH_STATE.inventoryRows = inv.rows; DASH_STATE.customerInventory = inv.rows; DASH_STATE.ownershipEmployees = ownershipEmployees;
+  DASH_STATE.liveKind = 'loaded';
+  DASH_STATE.liveLoaded = true;
   dashRenderEmployeeOwnership(ownershipEmployees);
   dashRenderTasks(tickets);
   dashRenderInventory(inv.rows, inv.customersChecked);
@@ -9941,23 +10049,15 @@ async function loadDashboardLiveData() {
 // DASHBOARD — Cycle Count KPI by Customer
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function loadDashCycleCountKpi() {
+function dashRenderCycleCountKpi() {
   const container = document.getElementById('dash-cc-kpi');
   if (!container) return;
-  if (!WISE_TOKEN) { container.innerHTML = '<span style="color:var(--muted-foreground)">Sign in to view cycle count metrics.</span>'; return; }
-  container.innerHTML = '<span class="spinner"></span> Loading cycle count records…';
-
-  const resp = await safeFetch(WMS_BASE + '/api/cyclecount-app/cycle-count/count-ticket/search-by-paging', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json','Accept':'application/json'},
-    body: JSON.stringify({currentPage:1, pageSize:100, facilityId: FACILITY_ID, warehouseId: FACILITY_ID}),
-  });
-
-  if (!resp || resp._needsAuth) { container.innerHTML = '<span style="color:var(--destructive)">Authentication required. Please sign in.</span>'; return; }
-  const d = resp.data || resp;
-  const tickets = d.list || d.records || [];
-
-  if (tickets.length === 0) { container.innerHTML = '<span style="color:var(--muted-foreground)">No cycle count records found for ' + esc(FACILITY_NAME || FACILITY_ID) + '.</span>'; return; }
+  if (DASH_STATE.cycleKpiKind === 'prompt') { container.textContent = moduleT('dashboard.loadCycleKpis', 'Click Refresh or sign in to load cycle count KPIs.'); return; }
+  if (DASH_STATE.cycleKpiKind === 'signIn') { container.innerHTML = '<span style="color:var(--muted-foreground)">' + esc(moduleT('dashboard.signInCycleMetrics', 'Sign in to view cycle count metrics.')) + '</span>'; return; }
+  if (DASH_STATE.cycleKpiKind === 'loading') { container.innerHTML = '<span class="spinner"></span> ' + esc(moduleT('dashboard.loadingCycleRecords', 'Loading cycle count records…')); return; }
+  if (DASH_STATE.cycleKpiKind === 'auth') { container.innerHTML = '<span style="color:var(--destructive)">' + esc(moduleT('dashboard.authRequired', 'Authentication required. Please sign in.')) + '</span>'; return; }
+  const tickets = DASH_STATE.cycleKpiTickets || [];
+  if (!tickets.length) { container.innerHTML = '<span style="color:var(--muted-foreground)">' + moduleHtml('dashboard.noCycleRecords', 'No cycle count records found for {{facility}}.', {facility:FACILITY_NAME || FACILITY_ID}) + '</span>'; return; }
 
   // Group by customer
   const custLookup = {};
@@ -9983,25 +10083,25 @@ async function loadDashCycleCountKpi() {
   const completedAll = rows.reduce((s, r) => s + r.completed, 0);
 
   let html = '<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">' +
-    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--primary) 10%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--primary)">' + totalAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Total Tickets</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-3)">' + completedAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Completed</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-4)">' + openAll + '</div><div style="font-size:10px;color:var(--muted-foreground)">Open / In Progress</div></div>' +
-    '<div style="text-align:center;padding:8px 16px;background:var(--muted);border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--foreground)">' + rows.length + '</div><div style="font-size:10px;color:var(--muted-foreground)">Customers</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--primary) 10%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--primary)">' + dashFmt(totalAll) + '</div><div style="font-size:10px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.totalTickets', 'Total Tickets')) + '</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-3) 14%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-3)">' + dashFmt(completedAll) + '</div><div style="font-size:10px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.completed', 'Completed')) + '</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:color-mix(in srgb,var(--chart-4) 20%,var(--card));border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--chart-4)">' + dashFmt(openAll) + '</div><div style="font-size:10px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.openInProgress', 'Open / In Progress')) + '</div></div>' +
+    '<div style="text-align:center;padding:8px 16px;background:var(--muted);border-radius:8px"><div style="font-size:18px;font-weight:700;color:var(--foreground)">' + dashFmt(rows.length) + '</div><div style="font-size:10px;color:var(--muted-foreground)">' + esc(moduleT('dashboard.customers', 'Customers')) + '</div></div>' +
     '</div>';
 
   html += '<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--accent);border-bottom:1px solid var(--border)">' +
-    '<th style="padding:6px 8px;text-align:left">Customer</th>' +
-    '<th style="padding:6px 8px;text-align:center">Total</th>' +
-    '<th style="padding:6px 8px;text-align:center">Open</th>' +
-    '<th style="padding:6px 8px;text-align:center">Completed</th>' +
-    '<th style="padding:6px 8px;text-align:center">Cancelled</th>' +
-    '<th style="padding:6px 8px;text-align:center">Completion %</th>' +
+    '<th style="padding:6px 8px;text-align:left">' + esc(moduleT('dashboard.customerAccount', 'Customer / Account')) + '</th>' +
+    '<th style="padding:6px 8px;text-align:center">' + esc(moduleT('dashboard.total', 'Total')) + '</th>' +
+    '<th style="padding:6px 8px;text-align:center">' + esc(moduleT('dashboard.open', 'Open')) + '</th>' +
+    '<th style="padding:6px 8px;text-align:center">' + esc(moduleT('dashboard.completed', 'Completed')) + '</th>' +
+    '<th style="padding:6px 8px;text-align:center">' + esc(moduleT('dashboard.cancelled', 'Cancelled')) + '</th>' +
+    '<th style="padding:6px 8px;text-align:center">' + esc(moduleT('dashboard.completion', 'Completion %')) + '</th>' +
     '</tr></thead><tbody>';
 
   rows.forEach(r => {
     const pct = r.total > 0 ? Math.round((r.completed / r.total) * 100) : 0;
     const pctColor = pct >= 80 ? 'var(--chart-3)' : pct >= 50 ? 'var(--chart-4)' : 'var(--destructive)';
-    const nameDisplay = r.name === 'UNASSIGNED' ? '<span style="color:var(--muted-foreground);font-style:italic">Unassigned</span>' : esc(String(r.name).slice(0, 30));
+    const nameDisplay = r.name === 'UNASSIGNED' ? '<span style="color:var(--muted-foreground);font-style:italic">' + esc(moduleT('dashboard.unassigned', 'Unassigned')) + '</span>' : esc(String(r.name).slice(0, 30));
     html += '<tr style="border-bottom:1px solid var(--muted)">' +
       '<td style="padding:5px 8px;font-weight:600">' + nameDisplay + '</td>' +
       '<td style="padding:5px 8px;text-align:center">' + r.total + '</td>' +
@@ -10013,9 +10113,53 @@ async function loadDashCycleCountKpi() {
   });
 
   html += '</tbody></table>';
-  html += '<div style="font-size:10px;color:var(--muted-foreground);margin-top:8px">Based on ' + totalAll + ' cycle count tickets at ' + esc(FACILITY_NAME || FACILITY_ID) + '. Refresh for latest data.</div>';
+  html += '<div style="font-size:10px;color:var(--muted-foreground);margin-top:8px">' + moduleHtml('dashboard.basedOnTickets', 'Based on {{count}} cycle count tickets at {{facility}}. Refresh for latest data.', {count:dashFmt(totalAll), facility:FACILITY_NAME || FACILITY_ID}) + '</div>';
   container.innerHTML = html;
 }
+
+async function loadDashCycleCountKpi() {
+  const container = document.getElementById('dash-cc-kpi');
+  if (!container) return;
+  if (!WISE_TOKEN) { DASH_STATE.cycleKpiKind = 'signIn'; dashRenderCycleCountKpi(); return; }
+  DASH_STATE.cycleKpiKind = 'loading';
+  dashRenderCycleCountKpi();
+  const resp = await safeFetch(WMS_BASE + '/api/cyclecount-app/cycle-count/count-ticket/search-by-paging', {
+    method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({currentPage:1, pageSize:100, facilityId:FACILITY_ID, warehouseId:FACILITY_ID})
+  });
+  if (!resp || resp._needsAuth) { DASH_STATE.cycleKpiKind = 'auth'; dashRenderCycleCountKpi(); return; }
+  const data = resp.data || resp;
+  DASH_STATE.cycleKpiTickets = data.list || data.records || [];
+  DASH_STATE.cycleKpiKind = 'loaded';
+  dashRenderCycleCountKpi();
+}
+
+function rerenderDashboardRobotLanguage() {
+  if (DASH_STATE.liveKind === 'loaded') {
+    dashRenderEmployeeOwnership(DASH_STATE.ownershipEmployees);
+    dashRenderTasks(DASH_STATE.tickets);
+    dashRenderInventory(DASH_STATE.inventoryRows, new Set(DASH_STATE.inventoryRows.map(dashInvCust).filter(Boolean)).size);
+  } else if (DASH_STATE.liveKind === 'loading') {
+    const strip = document.getElementById('dash-ownership-strip');
+    if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--muted-foreground);padding:24px">' + esc(moduleT('dashboard.loadingOwnership', 'Loading HRM ownership employees…')) + '</div>';
+  } else if (DASH_STATE.liveKind === 'signIn') {
+    dashSet('dash-kpi-inv-sub', moduleT('dashboard.signInLiveData', 'Sign in to load live WMS data'));
+    const strip = document.getElementById('dash-ownership-strip');
+    if (strip) strip.innerHTML = '<div style="font-size:12px;color:var(--destructive);padding:24px">' + esc(moduleT('dashboard.signInOwnership', 'Sign in to load HRM ownership employees.')) + '</div>';
+    const low = document.getElementById('dash-low-stock-body');
+    if (low) low.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--destructive)">' + esc(moduleT('dashboard.signInInventory', 'Please sign in to load live WMS inventory.')) + '</td></tr>';
+  }
+  dashRenderCycleCountKpi();
+  if (DASH_STATE.ownershipDetail) dashRenderOwnershipDetail(DASH_STATE.ownershipDetail);
+  renderRobotWarehouseInventory();
+  renderRobotOntologyLanguage();
+  const scanButton = document.getElementById('robot-inventory-refresh');
+  if (scanButton) scanButton.textContent = ROBOT_VIEW_STATE.scanKind === 'loading'
+    ? moduleT('robots.loadingScan', 'Loading warehouse inventory scan…')
+    : moduleT('robots.loadScan', '↻ Load Scan');
+}
+
+window.addEventListener('item-language-change', rerenderDashboardRobotLanguage);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INVENTORY — Live warehouse-scoped inventory view
@@ -10028,18 +10172,18 @@ async function loadLiveInventory() {
   const tbody = document.getElementById('inv-tbody');
   const facLabel = document.getElementById('inv-facility-label');
   // diagnostics moved to console only
-  if (facLabel) facLabel.textContent = 'Loading inventory for ' + (FACILITY_NAME || FACILITY_ID) + '…';
-  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
-  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> Fetching live inventory for ' + esc(FACILITY_NAME || FACILITY_ID) + '…</td></tr>';
+  if (facLabel) facLabel.textContent = moduleT('inventory.loadingFor', 'Loading inventory for {{facility}}…', {facility:FACILITY_NAME || FACILITY_ID});
+  if (btn) { btn.disabled = true; btn.textContent = moduleT('inventory.loading', 'Loading…'); }
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)"><span class="spinner"></span> ' + moduleHtml('inventory.fetchingFor', 'Fetching live inventory for {{facility}}…', {facility:FACILITY_NAME || FACILITY_ID}) + '</td></tr>';
 
   // Use the same session flow as the rest of the WMS dashboard. The access
   // token may not be present yet even when a refresh token exists, so try the
   // shared silent-renew path before deciding the user must sign in again.
   const hasSession = await ensureWiseToken(false);
   if (!hasSession) {
-    if (facLabel) facLabel.textContent = 'Sign in to view live inventory for ' + (FACILITY_NAME || FACILITY_ID);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in again to view live inventory.</td></tr>';
-    if (btn) { btn.disabled = false; btn.textContent = 'Load Live Inventory'; }
+    if (facLabel) facLabel.textContent = moduleT('inventory.signInFor', 'Sign in to view live inventory for {{facility}}', {facility:FACILITY_NAME || FACILITY_ID});
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">' + moduleT('inventory.pleaseSignIn', 'Please sign in again to view live inventory.') + '</td></tr>';
+    if (btn) { btn.disabled = false; btn.textContent = moduleT('inventory.loadLive', 'Load Live Inventory'); }
     return;
   }
 
@@ -10050,14 +10194,14 @@ async function loadLiveInventory() {
     body: JSON.stringify({currentPage: 1, pageSize: 100}),
   });
 
-  if (btn) { btn.disabled = false; btn.textContent = 'Load Live Inventory'; }
+  if (btn) { btn.disabled = false; btn.textContent = moduleT('inventory.loadLive', 'Load Live Inventory'); }
 
   if (!resp || resp._needsAuth) {
     if (facLabel) facLabel.textContent = '';
     if (!WISE_TOKEN) {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">Please sign in again to view live inventory.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--destructive)">' + moduleT('inventory.pleaseSignIn', 'Please sign in again to view live inventory.') + '</td></tr>';
     } else {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--chart-4)">Inventory data is currently unavailable. Your session may need to be refreshed — try signing in again.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--chart-4)">' + moduleT('inventory.unavailable', 'Inventory data is currently unavailable. Your session may need to be refreshed — try signing in again.') + '</td></tr>';
     }
     return;
   }
@@ -10067,8 +10211,8 @@ async function loadLiveInventory() {
   const total = d.totalCount || d.total || list.length;
 
   if (list.length === 0) {
-    if (facLabel) facLabel.textContent = 'No inventory records found for ' + (FACILITY_NAME || FACILITY_ID);
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No inventory data available for ' + esc(FACILITY_NAME || FACILITY_ID) + '. The warehouse may have no active inventory or API access may be restricted.</td></tr>';
+    if (facLabel) facLabel.textContent = moduleT('inventory.noRecordsFor', 'No inventory records found for {{facility}}', {facility:FACILITY_NAME || FACILITY_ID});
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">' + moduleHtml('inventory.noDataFor', 'No inventory data available for {{facility}}. The warehouse may have no active inventory or API access may be restricted.', {facility:FACILITY_NAME || FACILITY_ID}) + '</td></tr>';
     return;
   }
 
@@ -10088,12 +10232,12 @@ async function loadLiveInventory() {
   const uniqueItems = new Set(INV_DATA.map(r => r.itemId).filter(Boolean));
   const uniqueCusts = new Set(INV_DATA.map(r => r.customerName));
   document.getElementById('inv-kpi-total').textContent = total.toLocaleString();
-  document.getElementById('inv-kpi-total-sub').textContent = 'showing ' + INV_DATA.length + ' of ' + total;
+  document.getElementById('inv-kpi-total-sub').textContent = moduleT('inventory.showingCount', 'showing {{count}} of {{total}}', {count:INV_DATA.length,total});
   document.getElementById('inv-kpi-locs').textContent = uniqueLocs.size.toLocaleString();
   document.getElementById('inv-kpi-items').textContent = uniqueItems.size.toLocaleString();
   document.getElementById('inv-kpi-custs').textContent = uniqueCusts.size.toLocaleString();
 
-  if (facLabel) facLabel.textContent = 'Live inventory for ' + (FACILITY_NAME || FACILITY_ID);
+  if (facLabel) facLabel.textContent = moduleT('inventory.liveFor', 'Live inventory for {{facility}}', {facility:FACILITY_NAME || FACILITY_ID});
 
   invRenderTable();
 }
@@ -10104,10 +10248,12 @@ function invRenderTable() {
   const q = (document.getElementById('inv-search') || {}).value.toLowerCase().trim();
   const filtered = q ? INV_DATA.filter(r => [r.locationName, r.itemName, r.customerName, r.status, r.supportPickType].join(' ').toLowerCase().includes(q)) : INV_DATA;
 
-  document.getElementById('inv-sub-title').textContent = filtered.length + ' inventory record(s)' + (q ? ' matching "' + q + '"' : '');
+  document.getElementById('inv-sub-title').textContent = q
+    ? moduleT('inventory.matchingRecords', '{{count}} inventory record(s) matching "{{query}}"', {count:filtered.length,query:q})
+    : moduleT('inventory.recordCount', '{{count}} inventory record(s)', {count:filtered.length});
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">No records match the filter.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted-foreground)">' + moduleT('inventory.noFilterMatch', 'No records match the filter.') + '</td></tr>';
     return;
   }
 
@@ -10119,8 +10265,8 @@ function invRenderTable() {
       '<td style="font-size:11px">' + esc(String(r.customerName).slice(0,25)) + '</td>' +
       '<td style="font-weight:600">' + r.qty + '</td>' +
       '<td style="font-size:11px;color:var(--muted-foreground)">' + esc(r.uom) + '</td>' +
-      '<td><span class="badge ' + (r.status === 'USABLE' ? 'ok' : 'idle') + '">' + esc(r.status) + '</span></td>' +
-      '<td style="font-size:11px">' + esc(pickLabel) + '</td>' +
+      '<td><span class="badge ' + (r.status === 'USABLE' ? 'ok' : 'idle') + '"' + moduleEnumAttrs('status', r.status) + '>' + esc(window.ItemI18n ? window.ItemI18n.enumLabel('status', r.status) : r.status) + '</span></td>' +
+      '<td style="font-size:11px">' + esc(window.ItemI18n ? window.ItemI18n.enumLabel('pickType', pickLabel) : pickLabel) + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -10508,7 +10654,7 @@ function consolRenderTaskTable(tab, list) {
       '<td style="font-family:monospace;font-size:11px">' + esc(t.toLocationId || '\u2014') + '</td>' +
       '<td>' + (itemCount > 0 ? itemCount + ' line' + (itemCount > 1 ? 's' : '') : '\u2014') + '</td>' +
       '<td>' + (priority !== '\u2014' ? '<span style="font-weight:600">' + esc(String(priority)) + '</span>' : '\u2014') + '</td>' +
-      '<td><span class="consol-status ' + statusCls + '">' + statusLabel + '</span></td>' +
+      '<td><span class="consol-status ' + statusCls + '"' + moduleEnumAttrs('status', r.status || '') + '>' + statusLabel + '</span></td>' +
       '<td style="font-size:12px">' + esc(String(assignee)) + '</td>' +
       '<td style="font-size:11px;color:var(--muted-foreground)">' + updated + '</td>' +
     '</tr>';
@@ -10864,7 +11010,7 @@ let REPL_TOTAL = 0;
 async function loadReplenishView() {
   REPL_PAGE = (arguments[0] > 0) ? arguments[0] : REPL_PAGE;
   const tbody = document.getElementById('repl-table-body');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted-foreground)"><span class="spinner"></span> Loading replenishment data\u2026</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted-foreground)"><span class="spinner"></span> ' + moduleT('replenishment.loading', 'Loading replenishment data…') + '</td></tr>';
 
   const statusFilter = (document.getElementById('repl-filter-status') || {}).value || '';
   const daysFilter = parseInt((document.getElementById('repl-filter-days') || {}).value || '7');
@@ -10883,11 +11029,11 @@ async function loadReplenishView() {
   });
 
   if (!resp || resp._needsAuth) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">Please sign in to view replenishment data.</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">' + moduleT('replenishment.signIn', 'Please sign in to view replenishment data.') + '</td></tr>';
     return;
   }
   if (resp.success === false) {
-    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">Unable to load replenishment data.' + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--destructive)">' + moduleT('replenishment.loadError', 'Unable to load replenishment data.') + (resp.msg ? ' ' + esc(resp.msg) : '') + '</td></tr>';
     return;
   }
 
@@ -10917,15 +11063,15 @@ function replRenderTable(list) {
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted-foreground)">' +
       '<div style="margin-bottom:8px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--input)" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></div>' +
-      '<strong style="color:var(--muted-foreground)">No replenishment records</strong><br>' +
-      '<span style="font-size:12px;color:var(--muted-foreground)">No replenishment activity found for the selected time range and filters.</span>' +
+      '<strong style="color:var(--muted-foreground)">' + moduleT('replenishment.noRecords', 'No replenishment records') + '</strong><br>' +
+      '<span style="font-size:12px;color:var(--muted-foreground)">' + moduleT('replenishment.noActivity', 'No replenishment activity found for the selected time range and filters.') + '</span>' +
       '</td></tr>';
     return;
   }
 
   tbody.innerHTML = filtered.map(function(r, idx) {
     var statusCls = (r.status || '').toLowerCase();
-    var statusLabel = r.status === 'DROPPED' ? 'Dropped' : r.status === 'COLLECTED' ? 'Collected' : (r.status || '\u2014');
+    var statusLabel = window.ItemI18n ? window.ItemI18n.enumLabel('status', r.status || '') : (r.status || '\u2014');
     var qty = r.dropQty || r.collectQty || 0;
     var timeStr = r.updatedTime ? consolFormatTime(r.updatedTime) : (r.createdTime ? consolFormatTime(r.createdTime) : '\u2014');
     var fromLoc = r.fromLocationName || '\u2014';
@@ -10939,7 +11085,7 @@ function replRenderTable(list) {
       '<td style="font-family:monospace;font-size:11px">' + esc(fromLoc) + '</td>' +
       '<td style="font-family:monospace;font-size:11px">' + esc(toLoc) + '</td>' +
       '<td style="font-weight:600">' + qty + '</td>' +
-      '<td><span class="consol-status ' + statusCls + '">' + statusLabel + '</span></td>' +
+      '<td><span class="consol-status ' + statusCls + '"' + moduleEnumAttrs('status', r.status || '') + '>' + statusLabel + '</span></td>' +
       '<td style="font-size:12px">' + esc(operator) + '</td>' +
       '<td style="font-size:11px;color:var(--muted-foreground)">' + timeStr + '</td>' +
     '</tr>';
@@ -10951,25 +11097,25 @@ function replShowDetail(idx) {
   if (!r) return;
   var panel = document.getElementById('repl-detail-panel');
   var body = document.getElementById('repl-detail-body');
-  document.getElementById('repl-detail-title').textContent = 'Task ' + (r.taskId || '') + ' — Step Details';
+  document.getElementById('repl-detail-title').textContent = moduleT('replenishment.detailTitle', 'Task {{taskId}} — Step Details', {taskId:r.taskId || ''});
 
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;padding:8px 0">';
-  html += replField('Item / SKU', r.itemName || '\u2014');
-  html += replField('Description', r.description || r.shortDescription || '\u2014');
-  html += replField('Customer', r.customerName || '\u2014');
-  html += replField('From Location', r.fromLocationName || '\u2014');
-  html += replField('To Location', r.toLocationName || '\u2014');
-  html += replField('To Location Type', r.toLocationType || '\u2014');
-  html += replField('Collect Qty', String(r.collectQty || 0));
-  html += replField('Drop Qty', String(r.dropQty || 0));
-  html += replField('Status', r.status || '\u2014');
-  html += replField('From LP', r.fromDisplayLP || r.fromLPId || '\u2014');
-  html += replField('To LP', r.toDisplayLP || r.toLPId || '\u2014');
-  html += replField('Entire LP', r.isEntireLPReplenish ? 'Yes' : 'No');
-  html += replField('Operator', r.createdBy || '\u2014');
-  html += replField('Created', r.createdTime ? consolFormatTime(r.createdTime) : '\u2014');
-  html += replField('Updated', r.updatedTime ? consolFormatTime(r.updatedTime) : '\u2014');
-  html += replField('Item Code', r.itemCode || '\u2014');
+  html += replField(moduleT('replenishment.itemSku', 'Item / SKU'), r.itemName || '\u2014');
+  html += replField(moduleT('replenishment.description', 'Description'), r.description || r.shortDescription || '\u2014');
+  html += replField(moduleT('replenishment.customer', 'Customer'), r.customerName || '\u2014');
+  html += replField(moduleT('replenishment.fromLocation', 'From Location'), r.fromLocationName || '\u2014');
+  html += replField(moduleT('replenishment.toLocation', 'To Location'), r.toLocationName || '\u2014');
+  html += replField(moduleT('replenishment.toLocationType', 'To Location Type'), r.toLocationType || '\u2014');
+  html += replField(moduleT('replenishment.collectQty', 'Collect Qty'), String(r.collectQty || 0));
+  html += replField(moduleT('replenishment.dropQty', 'Drop Qty'), String(r.dropQty || 0));
+  html += replField(moduleT('cycle.status', 'Status'), window.ItemI18n ? window.ItemI18n.enumLabel('status', r.status || '') : (r.status || '\u2014'));
+  html += replField(moduleT('replenishment.fromLp', 'From LP'), r.fromDisplayLP || r.fromLPId || '\u2014');
+  html += replField(moduleT('replenishment.toLp', 'To LP'), r.toDisplayLP || r.toLPId || '\u2014');
+  html += replField(moduleT('replenishment.entireLp', 'Entire LP'), r.isEntireLPReplenish ? moduleT('replenishment.yes', 'Yes') : moduleT('replenishment.no', 'No'));
+  html += replField(moduleT('replenishment.operator', 'Operator'), r.createdBy || '\u2014');
+  html += replField(moduleT('replenishment.created', 'Created'), r.createdTime ? consolFormatTime(r.createdTime) : '\u2014');
+  html += replField(moduleT('replenishment.updated', 'Updated'), r.updatedTime ? consolFormatTime(r.updatedTime) : '\u2014');
+  html += replField(moduleT('replenishment.itemCode', 'Item Code'), r.itemCode || '\u2014');
   html += '</div>';
 
   body.innerHTML = html;
@@ -11001,7 +11147,7 @@ function replUpdateKpis() {
 
 function replUpdatePagination() {
   var totalPages = Math.max(1, Math.ceil(REPL_TOTAL / REPL_PAGE_SIZE));
-  document.getElementById('repl-page-info').textContent = 'Page ' + REPL_PAGE + ' of ' + totalPages + ' (' + REPL_TOTAL + ' records)';
+  document.getElementById('repl-page-info').textContent = moduleT('replenishment.pageStatus', 'Page {{page}} of {{pages}} ({{count}} records)', {page:REPL_PAGE,pages:totalPages,count:REPL_TOTAL});
   document.getElementById('repl-prev-btn').disabled = REPL_PAGE <= 1;
   document.getElementById('repl-next-btn').disabled = REPL_PAGE >= totalPages;
 }
@@ -11011,7 +11157,7 @@ function replUpdateResultCount() {
   var count = searchTerm.trim() ? REPL_DATA.filter(function(r) {
     return [r.taskId, r.itemName, r.description, r.customerName, r.fromLocationName, r.toLocationName, r.createdBy].filter(Boolean).join(' ').toLowerCase().includes(searchTerm.toLowerCase().trim());
   }).length : REPL_DATA.length;
-  document.getElementById('repl-result-count').textContent = count + ' of ' + REPL_TOTAL + ' records';
+  document.getElementById('repl-result-count').textContent = moduleT('replenishment.resultCount', '{{count}} of {{total}} records', {count,total:REPL_TOTAL});
 }
 
 function replPagePrev() {

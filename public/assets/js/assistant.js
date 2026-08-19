@@ -2,6 +2,10 @@
 let AI_OPEN = false;
 let AI_HISTORY = [];
 
+function aiT(key, fallback, options) {
+  return window.ItemI18n ? window.ItemI18n.t(key, Object.assign({defaultValue:fallback}, options || {})) : fallback;
+}
+
 function aiToggle() {
   AI_OPEN = !AI_OPEN;
   const panel = document.getElementById('ai-assist-panel');
@@ -10,20 +14,27 @@ function aiToggle() {
 }
 
 function aiShowWelcome() {
-  aiAddMsg('assistant', 'Hello! I\'m your WMS Dashboard Assistant. I can help with questions about physical inventory, cycle counts, customers, facilities, and dashboard features. What can I help you with?');
+  aiAddMsg('assistant', aiT('assistant.welcome', 'Hello! I\'m your WMS Dashboard Assistant. I can help with questions about physical inventory, cycle counts, customers, facilities, and dashboard features. What can I help you with?'));
   aiShowSuggestions();
 }
 
 function aiShowSuggestions() {
   const suggestions = [
-    'What PIs are scheduled this month?',
-    'Why did my PI ticket fail?',
-    'Which customer is selected?',
-    'How do I add a PI date?',
+    aiT('assistant.suggestions.scheduled', 'What PIs are scheduled this month?'),
+    aiT('assistant.suggestions.ticket', 'Why did my PI ticket fail?'),
+    aiT('assistant.suggestions.customer', 'Which customer is selected?'),
+    aiT('assistant.suggestions.addDate', 'How do I add a PI date?'),
   ];
   const el = document.getElementById('ai-suggestions');
   if (!el) return;
-  el.innerHTML = suggestions.map(s => '<span onclick="aiAsk(\'' + s.replace(/'/g,"\\'") + '\')" style="font-size:10px;padding:3px 8px;border-radius:12px;background:color-mix(in srgb,var(--primary) 10%,var(--card));color:var(--primary);cursor:pointer;white-space:nowrap">' + s + '</span>').join('');
+  el.replaceChildren(...suggestions.map(suggestion => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'ai-suggestion';
+    button.textContent = suggestion;
+    button.addEventListener('click', () => aiAsk(suggestion));
+    return button;
+  }));
 }
 
 function aiAddMsg(role, text) {
@@ -106,7 +117,8 @@ function aiGetContext() {
     facilityId: FACILITY_ID,
     facilityName: FACILITY_NAME || FACILITY_ID,
     monthPrefix: now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0'),
-    monthLabel: now.toLocaleDateString('en-US', {month:'long', year:'numeric'}),
+    monthLabel: now.toLocaleDateString(window.ItemI18n ? window.ItemI18n.currentLocale() : 'en', {month:'long', year:'numeric'}),
+    responseLanguageInstruction: window.ItemI18n ? window.ItemI18n.responseLanguageInstruction() : 'Respond in English. Preserve all identifiers, codes, and request field names exactly as provided.',
   };
 }
 
@@ -271,3 +283,7 @@ try {
   const saved = localStorage.getItem('ai_chat_' + (typeof FACILITY_ID !== 'undefined' ? FACILITY_ID : 'LT_F1'));
   if (saved) AI_HISTORY = JSON.parse(saved);
 } catch(_) {}
+
+window.addEventListener('item-language-change', () => {
+  if (AI_OPEN) aiShowSuggestions();
+});

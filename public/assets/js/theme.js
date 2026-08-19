@@ -33,16 +33,27 @@
     return 'light';
   }
 
+  function translate(key, fallback) {
+    const i18n = root.ItemI18n;
+    if (!i18n || typeof i18n.t !== 'function') return fallback;
+    return i18n.t(key, {defaultValue:fallback}) || fallback;
+  }
+
   function syncControls(theme) {
     const doc = root.document;
     if (!doc) return;
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     doc.querySelectorAll('[data-theme-toggle]').forEach(button => {
-      button.setAttribute('aria-label', 'Switch to ' + nextTheme + ' mode');
+      const switchLabel = nextTheme === 'light'
+        ? translate('theme.switchToLight', 'Switch to light mode')
+        : translate('theme.switchToDark', 'Switch to dark mode');
+      button.setAttribute('aria-label', switchLabel);
       button.setAttribute('aria-pressed', String(theme === 'dark'));
-      button.setAttribute('title', 'Switch to ' + nextTheme + ' mode');
+      button.setAttribute('title', switchLabel);
       const label = button.querySelector('[data-theme-label]');
-      if (label) label.textContent = theme === 'dark' ? 'Dark mode' : 'Light mode';
+      if (label) label.textContent = theme === 'dark'
+        ? translate('theme.dark', 'Dark mode')
+        : translate('theme.light', 'Light mode');
     });
     doc.querySelectorAll('[data-item-logo]').forEach(image => {
       image.src = theme === 'dark' ? DARK_LOGO : LIGHT_LOGO;
@@ -90,6 +101,10 @@
       if (preference.addEventListener) preference.addEventListener('change', handleChange);
       else if (preference.addListener) preference.addListener(handleChange);
       systemListenerBound = true;
+    }
+    if (!root.__itemThemeLanguageListenerBound && root.addEventListener) {
+      root.addEventListener('item-language-change', () => syncControls(currentTheme()));
+      root.__itemThemeLanguageListenerBound = true;
     }
   }
 

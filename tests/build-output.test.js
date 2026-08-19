@@ -16,6 +16,14 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
   assert.doesNotMatch(html, /facility-customer-locations\.js/);
   assert.match(html, /facility-data-loader\.[0-9a-f]{10}\.js/);
   assert.match(manifest['/assets/js/dashboard-runtime.js'], /dashboard-runtime\.[0-9a-f]{10}\.js$/);
+  assert.match(manifest['/assets/js/i18n.js'], /i18n\.[0-9a-f]{10}\.js$/);
+  assert.match(manifest['/assets/vendor/i18next/i18next.min.js'], /i18next\.min\.[0-9a-f]{10}\.js$/);
+  for (const locale of ['en','es','zh-CN','zh-TW','fr','de','pt','it','ja','ko','vi','fil','hi','ar']) {
+    assert.equal(manifest['/assets/locales/' + locale + '.json'], '/assets/locales/' + locale + '.json');
+    assert.equal(fs.existsSync(path.join(dist, 'assets/locales', locale + '.json')), true);
+    assert.equal(fs.existsSync(path.join(dist, 'assets/locales', locale + '.json.gz')), true);
+    assert.equal(fs.existsSync(path.join(dist, 'assets/locales', locale + '.json.br')), true);
+  }
   assert.match(manifest['/assets/data/facilities/lt-f1.js'], /lt-f1\.[0-9a-f]{10}\.js$/);
   // The official GIS renderer ships as its own lazy chunk: hashed in the
   // manifest, compressed, and never referenced statically by the page.

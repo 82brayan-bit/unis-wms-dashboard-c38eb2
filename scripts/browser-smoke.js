@@ -208,6 +208,11 @@ function assert(condition, message) {
 }
 
 async function main() {
+  const chartUrl = 'https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js';
+  const chartResponse = await fetch(chartUrl);
+  if (!chartResponse.ok) throw new Error('Pinned Chart.js asset could not be loaded for browser smoke');
+  const chartSource = Buffer.from(await chartResponse.arrayBuffer()).toString('base64');
+  process.stderr.write('[smoke] pinned Chart.js loaded\n');
   const targets = await retry(async () => {
     const response = await fetch('http://127.0.0.1:' + debuggingPort + '/json/list');
     if (!response.ok) throw new Error('Chrome debugging endpoint is not ready');
@@ -216,10 +221,12 @@ async function main() {
   const page = targets.find(target => target.type === 'page');
   if (!page) throw new Error('Chrome did not expose a page target');
   const cdp = await connectCdp(page.webSocketDebuggerUrl);
+  process.stderr.write('[smoke] connected to headless Chrome\n');
   const consoleErrors = [];
   const failedStaticRequests = [];
   const requests = [];
   const mutatingRequests = [];
+  const robotScanPayloads = [];
   const requestUrls = new Map();
   // Phase control: the first GIS phase runs with official data unavailable so
   // the aisle/bay fallback is exercised; the second phase enables the mocked
@@ -228,11 +235,16 @@ async function main() {
 
   cdp.on('Runtime.exceptionThrown', event => consoleErrors.push(event.exceptionDetails.text || 'Uncaught exception'));
   cdp.on('Runtime.consoleAPICalled', event => {
+    const message = event.args.map(arg => arg.value || arg.description || '').join(' ');
+    if (event.type === 'log' && message.startsWith('[smoke]')) process.stderr.write(message + '\n');
     if (event.type === 'error') consoleErrors.push(event.args.map(arg => arg.value || arg.description || '').join(' '));
   });
   cdp.on('Network.requestWillBeSent', event => {
     requests.push(event.request.url);
     requestUrls.set(event.requestId, event.request.url);
+    if (event.request.url.includes('/api/robot-count/warehouse-inventory') && event.request.postData) {
+      try { robotScanPayloads.push(JSON.parse(event.request.postData)); } catch (_) {}
+    }
     if (/\/api\//.test(event.request.url) && /^(POST|PUT|PATCH|DELETE)$/i.test(event.request.method) && !/search|statistics|detail|paging|facility-search|facility-type-data|customers-by-planars|location-inventory\/stat|\/robot-count\/warehouse-inventory/i.test(event.request.url)) {
       mutatingRequests.push(event.request.method + ' ' + event.request.url);
     }
@@ -248,7 +260,18 @@ async function main() {
   // 1x1 transparent PNG so basemap tiles never fail or hit the live network.
   const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
   cdp.on('Fetch.requestPaused', event => {
-    if (event.request.url.includes('/api/')) {
+    if (event.request.url === chartUrl) {
+      process.stderr.write('[smoke] fulfilling pinned Chart.js for headless Chrome\n');
+      cdp.send('Fetch.fulfillRequest', {
+        requestId:event.requestId, responseCode:200,
+        responseHeaders:[
+          {name:'Content-Type',value:'application/javascript; charset=utf-8'},
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Cross-Origin-Resource-Policy',value:'cross-origin'}
+        ],
+        body:chartSource
+      }).catch(error => consoleErrors.push(error.message));
+    } else if (event.request.url.includes('/api/')) {
       // The official GIS proxy reads are mocked with exact read-only responses
       // when the phase flag is on; everything else gets the generic empty data.
       const payload = officialMock.enabled && event.request.url.includes('/api/proxy/gis/')
@@ -276,13 +299,17 @@ async function main() {
     cdp.send('Runtime.enable'), cdp.send('Network.enable'), cdp.send('Page.enable'),
     cdp.send('Fetch.enable', {patterns:[
       {urlPattern:'*/api/*',requestStage:'Request'},
+      {urlPattern:'*://cdn.jsdelivr.net/*chart.umd.js',requestStage:'Request'},
       {urlPattern:'*://*.basemaps.cartocdn.com/*',requestStage:'Request'},
       {urlPattern:'*://server.arcgisonline.com/*',requestStage:'Request'}
     ]})
   ]);
+  process.stderr.write('[smoke] CDP interception enabled\n');
   const loaded = new Promise(resolve => cdp.on('Page.loadEventFired', resolve));
   await cdp.send('Page.navigate', {url:initialAppUrl.href});
-  await loaded;
+  process.stderr.write('[smoke] production page navigation started\n');
+  const loadCompleted = await Promise.race([loaded.then(() => true), delay(15000).then(() => false)]);
+  process.stderr.write(loadCompleted ? '[smoke] production page load event received\n' : '[smoke] continuing after page-load timeout\n');
   await retry(async () => {
     const ready = await cdp.send('Runtime.evaluate', {
       expression:"document.readyState === 'complete' && typeof ItemTheme === 'object' && typeof FacilityData === 'object' && typeof switchFacility === 'function'",
@@ -340,6 +367,69 @@ async function main() {
     const darkLogin = themeState('dark', 'login');
     const lightApp = themeState('light', 'app');
     const darkApp = themeState('dark', 'app');
+    await ItemI18n.init();
+    console.log('[smoke] i18n runtime initialized');
+    const languageTrigger = document.getElementById('language-trigger');
+    languageTrigger.click();
+    const languageSearch = document.getElementById('language-search');
+    languageSearch.value = 'españ';
+    languageSearch.dispatchEvent(new Event('input', {bubbles:true}));
+    const searchedOptions = Array.from(document.querySelectorAll('#language-options [role="option"]'));
+    searchedOptions[0].click();
+    await waitFor(() => document.documentElement.lang === 'es', 'Spanish language switch');
+    console.log('[smoke] selector switched to Spanish');
+    const spanish = {
+      lang:document.documentElement.lang,
+      dir:document.documentElement.dir,
+      dashboardLabel:document.querySelector('[data-view="dashboard"] [data-i18n="nav.dashboard"]').textContent,
+      themeLabel:document.querySelector('.topbar-theme-toggle').getAttribute('aria-label'),
+      stored:localStorage.getItem(ItemI18n.storageKey('guest'))
+    };
+    const preservedFacility = FACILITY_ID;
+    const localeSequence = ['en','es','zh-CN','en','ar'];
+    async function captureFocusedView(view) {
+      showView(view);
+      console.log('[smoke] capturing ' + view);
+      const snapshots = [];
+      for (const locale of localeSequence) {
+        await ItemI18n.changeLanguage(locale);
+        console.log('[smoke] ' + view + ' switched to ' + locale);
+        snapshots.push({
+          locale, lang:document.documentElement.lang, dir:document.documentElement.dir,
+          title:document.getElementById('tb-title').textContent,
+          heading:view === 'dashboard'
+            ? document.querySelector('#view-dashboard [data-i18n="modules.dashboard.employeeOwnership"]').textContent
+            : document.querySelector('#view-robots [data-i18n="modules.robots.scanTitle"]').textContent,
+          secondary:view === 'dashboard'
+            ? document.querySelector('#view-dashboard [data-i18n="modules.dashboard.cycleByCustomer"]').textContent
+            : document.querySelector('#view-robots [data-i18n="modules.robots.fleetStatus"]').textContent,
+          facilityId:FACILITY_ID,
+          yard:document.getElementById('robot-scan-yard').value,
+          zone:document.getElementById('robot-scan-zone').value,
+          robotId:document.querySelector('#view-robots .robot-name').textContent
+        });
+      }
+      return snapshots;
+    }
+    const dashboardSequence = await captureFocusedView('dashboard');
+    const robotSequence = await captureFocusedView('robots');
+    const arabic = {
+      lang:robotSequence[4].lang,
+      dir:robotSequence[4].dir,
+      dashboardLabel:document.querySelector('[data-view="dashboard"] [data-i18n="nav.dashboard"]').textContent,
+      facilityId:FACILITY_ID,
+      instruction:ItemI18n.responseLanguageInstruction()
+    };
+    await ItemI18n.changeLanguage('en');
+    const language = {
+      selectorCount:document.querySelectorAll('#language-selector').length,
+      searchedCount:searchedOptions.length,
+      searchedLocale:searchedOptions[0] ? searchedOptions[0].dataset.locale : '',
+      spanish,arabic,preservedFacility,dashboardSequence,robotSequence,
+      restoredLang:document.documentElement.lang,
+      restoredDir:document.documentElement.dir
+    };
+    console.log('[smoke] focused i18n sequences complete');
     const initialTrigger = document.getElementById('robot-menu-trigger');
     const initialSubmenu = document.getElementById('robot-sub');
     const initialOverview = initialSubmenu.querySelector('[data-view="robots"]');
@@ -372,6 +462,7 @@ async function main() {
     await populateFacilitySwitcher();
     await initGisView({facilityChanged:true});
     await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
+    console.log('[smoke] initial GIS fallback complete');
     const f1 = await FacilityData.load('LT_F1');
     const initialF1Groups = gisBuildBayGroups(GIS.records).groups;
     const initialGisFacility = {
@@ -622,7 +713,7 @@ async function main() {
     }
     document.getElementById('view-dashboard').classList.add('active');
     return {
-      lightLogin,darkLogin,lightApp,darkApp,views,initialRobotNavigation,
+      lightLogin,darkLogin,lightApp,darkApp,language,views,initialRobotNavigation,
       officialModuleNotLoaded,
       initialGisFacility,immediateF42Reset,immediateBackReset,backToF1State,staleLoadState,
       f1:{customers:f1.customers.length,presentCustomers:f1.customers.filter(customer => (f1.locations[customer.id] || []).length > 0).length,groups:Object.keys(f1.locations).length,cached:f1.cached},
@@ -937,6 +1028,22 @@ async function main() {
     assert(state.togglePressed === String(state.theme === 'dark'), 'Incorrect toggle state');
     assert(state.background && state.foreground && state.background !== state.foreground, 'Theme tokens are missing');
   }
+  assert(summary.language.selectorCount === 1 && summary.language.searchedCount === 1 && summary.language.searchedLocale === 'es', 'Language selector search or uniqueness failed: ' + JSON.stringify(summary.language));
+  assert(summary.language.spanish.lang === 'es' && summary.language.spanish.dir === 'ltr' && summary.language.spanish.dashboardLabel === 'Panel' && summary.language.spanish.stored === 'es', 'Spanish did not switch and persist immediately: ' + JSON.stringify(summary.language.spanish));
+  assert(summary.language.spanish.themeLabel === 'Cambiar al modo claro' || summary.language.spanish.themeLabel === 'Cambiar al modo oscuro', 'Theme control did not translate with Spanish');
+  assert(summary.language.arabic.lang === 'ar' && summary.language.arabic.dir === 'rtl' && summary.language.arabic.dashboardLabel === 'لوحة المعلومات', 'Arabic RTL did not apply: ' + JSON.stringify(summary.language.arabic));
+  assert(summary.language.arabic.facilityId === summary.language.preservedFacility && summary.language.arabic.instruction.includes('العربية'), 'Language switch changed an identifier or omitted assistant language context');
+  const expectedDashboardTitles = ['Dashboard','Panel','运营看板','Dashboard','لوحة المعلومات'];
+  const expectedRobotTitles = ['Robot Count','Conteo robotizado','机器人盘点','Robot Count','الجرد بالروبوت'];
+  assert(summary.language.dashboardSequence.map(state => state.title).join('|') === expectedDashboardTitles.join('|'), 'Dashboard English/Spanish/Chinese/English/Arabic sequence failed: ' + JSON.stringify(summary.language.dashboardSequence));
+  assert(summary.language.robotSequence.map(state => state.title).join('|') === expectedRobotTitles.join('|'), 'Robot Count English/Spanish/Chinese/English/Arabic sequence failed: ' + JSON.stringify(summary.language.robotSequence));
+  for (const state of [...summary.language.dashboardSequence, ...summary.language.robotSequence]) {
+    assert(state.facilityId === summary.language.preservedFacility && state.yard === 'yard-25' && state.zone === 'Bay1' && state.robotId === 'R-01', 'Language switch changed an operational identifier: ' + JSON.stringify(state));
+    assert(state.dir === (state.locale === 'ar' ? 'rtl' : 'ltr'), 'Language direction is wrong: ' + JSON.stringify(state));
+  }
+  assert(summary.language.dashboardSequence[1].heading === 'Participación de los empleados' && summary.language.dashboardSequence[2].secondary === '按客户进行周期盘点', 'Dashboard content did not rerender in Spanish and Chinese');
+  assert(summary.language.robotSequence[1].heading === 'Conteo robotizado · Escaneo de inventario del almacén' && summary.language.robotSequence[2].secondary === '机器人队列状态', 'Robot Count content did not rerender in Spanish and Chinese');
+  assert(summary.language.restoredLang === 'en' && summary.language.restoredDir === 'ltr', 'English language restoration failed');
   assert(Object.values(summary.views).every(Boolean), 'A representative production view did not render: ' + JSON.stringify(summary.views));
   const expectedInitialView = initialAppUrl.hash === '#gis' ? 'view-gis' : 'view-robots';
   const expectedInitialChildActive = initialAppUrl.hash === '#gis' ? summary.initialRobotNavigation.gisActive : summary.initialRobotNavigation.overviewActive;
@@ -997,6 +1104,8 @@ async function main() {
   assert(summary.mobileGis.mapFillsWorkspace && summary.mobileGis.drawerOverlaysMap && summary.mobileGis.drawerWidth <= summary.mobileGis.innerWidth, 'GIS mobile map or drawer layout is wrong: ' + JSON.stringify(summary.mobileGis));
   assert(summary.mobileGis.layerPanelInside, 'GIS mobile layer panel escaped the map area');
   assert(!summary.activeUsers && summary.employeeOwnership, 'Module presence regression');
+  assert(robotScanPayloads.length > 0, 'Robot Count smoke did not issue its read-only scan request');
+  assert(robotScanPayloads.every(payload => payload.date_time === '2026-07-09' && payload.project_name === 'warehouse_inventory' && payload.yard_code === 'yard-25' && payload.zone_code === 'Bay1'), 'Language switching changed a Robot Count API payload: ' + JSON.stringify(robotScanPayloads));
   await delay(250);
   assert(consoleErrors.length === 0, 'Browser console errors: ' + consoleErrors.join(' | '));
   assert(failedStaticRequests.length === 0, 'Failed browser requests: ' + failedStaticRequests.join(' | '));

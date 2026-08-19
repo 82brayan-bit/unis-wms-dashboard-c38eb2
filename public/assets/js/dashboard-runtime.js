@@ -17,6 +17,11 @@ function _extractTokens(obj) {
   return { at, rt };
 }
 
+function i18nT(key, fallback, options) {
+  if (!window.ItemI18n || typeof window.ItemI18n.t !== 'function') return fallback;
+  return window.ItemI18n.t(key, Object.assign({defaultValue:fallback}, options || {})) || fallback;
+}
+
 // ═══ LOGIN ═══
 async function doLogin() {
   const btn = document.getElementById('login-btn');
@@ -24,7 +29,7 @@ async function doLogin() {
   const pass = document.getElementById('inp-pass').value;
   const errEl = document.getElementById('login-err');
   errEl.style.display = 'none';
-  btn.disabled = true; btn.textContent = 'Connecting to Wise…';
+  btn.disabled = true; btn.textContent = i18nT('login.connecting', 'Connecting to WMS…');
   try {
     // Use IAM exchange-token via proxy — issues a JWT that Wise REST also accepts.
     const r = await fetch(API.passwordGrant, {
@@ -43,10 +48,10 @@ async function doLogin() {
       document.getElementById('wms-user').textContent = user;
       showDash();
     } else {
-      const errMsg = (d && (d.msg || d.error || d.error_description)) || 'Login failed — check your username and password.';
+      const errMsg = (d && (d.msg || d.error || d.error_description)) || i18nT('login.failure', 'Login failed — check your username and password.');
       errEl.textContent = errMsg;
       errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Sign In to WMS';
+      btn.disabled = false; btn.textContent = i18nT('login.signIn', 'Sign In to WMS');
     }
   } catch(e) {
     console.warn('login network error:', e);
@@ -55,9 +60,9 @@ async function doLogin() {
       document.getElementById('wms-user').textContent = user;
       showDash();
     } else {
-      errEl.textContent = 'Unable to start your WMS session. Please check your sign-in and try again.';
+      errEl.textContent = i18nT('login.unavailable', 'Unable to start your WMS session. Please check your sign-in and try again.');
       errEl.style.display = 'block';
-      btn.disabled = false; btn.textContent = 'Sign In to WMS';
+      btn.disabled = false; btn.textContent = i18nT('login.signIn', 'Sign In to WMS');
     }
   }
 }
@@ -69,7 +74,8 @@ function updateTopbarDateRange() {
   const day = now.getDay();
   const mon = new Date(now); mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
   const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-  const fmt = (d) => d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  const locale = window.ItemI18n ? window.ItemI18n.currentLocale() : 'en';
+  const fmt = (d) => d.toLocaleDateString(locale, {month:'short', day:'numeric'});
   el.textContent = fmt(mon) + ' – ' + fmt(sun) + ', ' + sun.getFullYear();
 }
 updateTopbarDateRange();
@@ -77,6 +83,11 @@ updateTopbarDateRange();
 async function showDash() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  const sessionPayload = decodeJwt(WISE_TOKEN);
+  const sessionIdentity = sessionPayload && sessionPayload.data
+    ? (sessionPayload.data.user_id || sessionPayload.data.user_name || 'guest')
+    : 'guest';
+  if (window.ItemI18n) await window.ItemI18n.setUserNamespace(sessionIdentity);
   // Show Admin Settings sidebar only for owner
   const admSb = document.getElementById('sb-admin-settings');
   if (admSb) admSb.style.display = admIsOwner() ? '' : 'none';
@@ -363,6 +374,21 @@ const INV_SUB_TITLES = {
   po: 'Purchase Orders'
 };
 
+function syncTranslatedChrome() {
+  const activeView = document.querySelector('.view.active');
+  const activeName = activeView ? activeView.id.replace(/^view-/, '') : 'dashboard';
+  const meta = VIEW_META[activeName];
+  if (meta) {
+    const title = document.getElementById('tb-title');
+    const subtitle = document.getElementById('tb-sub');
+    if (title) title.textContent = i18nT('views.' + activeName + '.title', meta.t);
+    if (subtitle) subtitle.textContent = i18nT('views.' + activeName + '.subtitle', meta.s);
+  }
+  updateTopbarDateRange();
+}
+
+window.addEventListener('item-language-change', syncTranslatedChrome);
+
 function showView(name, sub, options) {
   // hide all views
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -382,13 +408,15 @@ function showView(name, sub, options) {
   // topbar title
   const meta = VIEW_META[name];
   if (meta) {
-    document.getElementById('tb-title').textContent = meta.t;
-    document.getElementById('tb-sub').textContent = meta.s;
+    document.getElementById('tb-title').textContent = i18nT('views.' + name + '.title', meta.t);
+    document.getElementById('tb-sub').textContent = i18nT('views.' + name + '.subtitle', meta.s);
   }
 
   // inventory sub-section
   if (name === 'inventory' && sub) {
-    const t = INV_SUB_TITLES[sub] || 'All Items';
+    const inventoryKeys = {all:'nav.allItems',categories:'nav.categories',suppliers:'nav.suppliers',po:'nav.purchaseOrders'};
+    const fallbackTitle = INV_SUB_TITLES[sub] || 'All Items';
+    const t = i18nT(inventoryKeys[sub] || 'nav.allItems', fallbackTitle);
     const el = document.getElementById('inv-sub-title');
     if (el) el.textContent = t;
   }
@@ -606,6 +634,31 @@ function refreshChartTheme() {
   }
 }
 
+function refreshChartLanguage() {
+  if (lineChart) {
+    lineChart.data.datasets[0].label = lineChart.$itemDatasetKey === 'availableQty'
+      ? i18nT('modules.dashboard.availableQty', 'Available Qty')
+      : i18nT('modules.dashboard.inventoryValue', 'Inventory Value (USD)');
+    if (lineChart.$itemDatasetKey !== 'availableQty') lineChart.data.labels = dashboardDateLabels(lineChart.$itemPeriod || '7');
+    lineChart.options.plugins.tooltip.callbacks.label = lineChart.$itemDatasetKey === 'availableQty'
+      ? c => ' ' + i18nT('modules.dashboard.availableQtyValue', 'Available Qty: {{count}}', {count:Number(c.raw || 0).toLocaleString(window.ItemI18n ? window.ItemI18n.currentLocale() : 'en')})
+      : c => ' $' + Number(c.raw || 0).toLocaleString(window.ItemI18n ? window.ItemI18n.currentLocale() : 'en');
+  }
+  if (donutChart) {
+    donutChart.data.labels = [
+      i18nT('modules.dashboard.inStock', 'In Stock'),
+      i18nT('modules.dashboard.lowStock', 'Low Stock'),
+      i18nT('modules.dashboard.outOfStock', 'Out of Stock'),
+      i18nT('modules.dashboard.onOrder', 'On Order')
+    ];
+  }
+  if (robotChart) {
+    robotChart.data.datasets[0].label = i18nT('modules.robots.picksFleetAverage', 'Picks/hr (fleet avg)');
+    robotChart.options.plugins.tooltip.callbacks.label = c => ' ' + i18nT('modules.robots.picksPerHourValue', '{{count}} picks/hr', {count:c.raw});
+  }
+  [lineChart, donutChart, robotChart].forEach(chart => { if (chart) chart.update('none'); });
+}
+
 const DATA_7 = {
   labels: ['May 20','May 21','May 22','May 23','May 24','May 25','May 26'],
   values: [122000, 148000, 140000, 124000, 165000, 158000, 152450]
@@ -615,15 +668,23 @@ const DATA_30 = {
   values: [98000, 112000, 135000, 128000, 143000, 158000, 152450]
 };
 
+function dashboardDateLabels(days) {
+  const source = String(days) === '30'
+    ? ['2026-05-01','2026-05-05','2026-05-10','2026-05-15','2026-05-20','2026-05-24','2026-05-26']
+    : ['2026-05-20','2026-05-21','2026-05-22','2026-05-23','2026-05-24','2026-05-25','2026-05-26'];
+  const locale = window.ItemI18n ? window.ItemI18n.currentLocale() : 'en';
+  return source.map(value => new Date(value + 'T12:00:00Z').toLocaleDateString(locale, {month:'short', day:'numeric', timeZone:'UTC'}));
+}
+
 function initCharts() {
   const theme = chartTheme();
   const lctx = document.getElementById('lineChart').getContext('2d');
   lineChart = new Chart(lctx, {
     type: 'line',
     data: {
-      labels: DATA_7.labels,
+      labels: dashboardDateLabels('7'),
       datasets: [{
-        label: 'Inventory Value (USD)',
+        label: i18nT('modules.dashboard.inventoryValue', 'Inventory Value (USD)'),
         data: DATA_7.values,
         borderColor: theme.primary,
         backgroundColor: (ctx) => {
@@ -648,18 +709,24 @@ function initCharts() {
       }
     }
   });
+  lineChart.$itemPeriod = '7';
 
   const dctx = document.getElementById('donutChart').getContext('2d');
   donutChart = new Chart(dctx, {
     type: 'doughnut',
     data: {
-      labels:['In Stock','Low Stock','Out of Stock','On Order'],
+      labels:[
+        i18nT('modules.dashboard.inStock', 'In Stock'),
+        i18nT('modules.dashboard.lowStock', 'Low Stock'),
+        i18nT('modules.dashboard.outOfStock', 'Out of Stock'),
+        i18nT('modules.dashboard.onOrder', 'On Order')
+      ],
       datasets:[{data:[842,231,98,77], backgroundColor:[theme.primary,theme.chart2,theme.destructive,theme.chart3], borderWidth:0, hoverOffset:6}]
     },
     options:{
       responsive:false, cutout:'72%',
       color:theme.foreground,
-      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+c.label+': '+c.raw+' items'}})}
+      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+i18nT('modules.dashboard.itemsValue', '{{label}}: {{count}} items', {label:c.label,count:c.raw})}})}
     }
   });
 }
@@ -674,7 +741,7 @@ function initRobotChart() {
   robotChart = new Chart(el.getContext('2d'), {
     type: 'line',
     data: { labels, datasets: [{
-      label: 'Picks/hr (fleet avg)', data,
+      label: i18nT('modules.robots.picksFleetAverage', 'Picks/hr (fleet avg)'), data,
       borderColor: theme.chart3,
       backgroundColor: (ctx) => {
         const g = ctx.chart.ctx.createLinearGradient(0,0,0,200);
@@ -687,13 +754,14 @@ function initRobotChart() {
     options: {
       responsive:true, maintainAspectRatio:true,
       color:theme.foreground,
-      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+c.raw+' picks/hr'}})},
+      plugins:{legend:{display:false}, tooltip:Object.assign(themedChartOptions(theme), {callbacks:{label:c=>' '+i18nT('modules.robots.picksPerHourValue', '{{count}} picks/hr', {count:c.raw})}})},
       scales:{y:{beginAtZero:true, ticks:{color:theme.mutedForeground,font:{size:11}}, grid:{color:theme.muted}}, x:{ticks:{color:theme.mutedForeground,font:{size:10}, maxRotation:0, autoSkip:true, maxTicksLimit:8}, grid:{display:false}}}
     }
   });
 }
 
 window.addEventListener('item-theme-change', refreshChartTheme);
+window.addEventListener('item-language-change', refreshChartLanguage);
 
 function updateLineChart(days) {
   // Keep the dashboard live: if WMS inventory has loaded, the chart shows live
@@ -703,7 +771,8 @@ function updateLineChart(days) {
     return;
   }
   const d = days==='7' ? DATA_7 : DATA_30;
-  lineChart.data.labels = d.labels;
+  lineChart.$itemPeriod = String(days);
+  lineChart.data.labels = dashboardDateLabels(days);
   lineChart.data.datasets[0].data = d.values;
   lineChart.update();
 }
@@ -736,12 +805,14 @@ function startSyncClock() {
   const el = document.getElementById('sync-lbl');
   setInterval(()=>{
     s++;
-    el.textContent = s < 60 ? s+'s ago' : s < 3600 ? Math.floor(s/60)+'m ago' : Math.floor(s/3600)+'h ago';
+    const locale = window.ItemI18n ? window.ItemI18n.currentLocale() : 'en';
+    const relative = new Intl.RelativeTimeFormat(locale, {numeric:'always', style:'narrow'});
+    el.textContent = s < 60 ? relative.format(-s, 'second') : s < 3600 ? relative.format(-Math.floor(s/60), 'minute') : relative.format(-Math.floor(s/3600), 'hour');
   },1000);
 }
 
 async function refreshAll() {
-  document.getElementById('sync-lbl').textContent = 'just now';
+  document.getElementById('sync-lbl').textContent = i18nT('chrome.justNow', 'just now');
   await tickTokenRefresh();
   loadInsight();
   updateTokenStatus();
@@ -784,9 +855,10 @@ function doLogout() {
   const pw = document.getElementById('inp-pass');
   if (pw) pw.value = '';
   const btn = document.getElementById('login-btn');
-  if (btn) { btn.disabled = false; btn.textContent = 'Sign In to WMS'; }
+  if (btn) { btn.disabled = false; btn.textContent = i18nT('login.signIn', 'Sign In to WMS'); }
   const err = document.getElementById('login-err');
   if (err) err.style.display = 'none';
+  if (window.ItemI18n) window.ItemI18n.setUserNamespace('guest');
 }
 
 // Decode a JWT's payload (no signature verification — display only).

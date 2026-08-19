@@ -97,6 +97,16 @@ async function main() {
   }
   if (fs.existsSync(vendorDir)) copyVendor('.');
 
+  // Locale catalogs keep stable URLs so the browser can load the active
+  // language on demand. They are still precompressed with the rest of dist.
+  const localesDir = path.join(PUBLIC, 'assets/locales');
+  if (fs.existsSync(localesDir)) {
+    for (const filename of fs.readdirSync(localesDir).filter(name => name.endsWith('.json')).sort()) {
+      const relativePath = 'assets/locales/' + filename;
+      write(relativePath, fs.readFileSync(path.join(localesDir, filename)), manifest, '/' + relativePath);
+    }
+  }
+
 
   const jsDir = path.join(PUBLIC, 'assets/js');
   const jsFiles = fs.readdirSync(jsDir).filter(name => name.endsWith('.js') && name !== 'facility-customer-locations.js').sort();

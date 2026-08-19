@@ -11,6 +11,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>UNIS WMS — Inventory & Task Controller</title>
 <link rel="icon" href="/assets/brand/item-logo-light.svg" type="image/svg+xml"/>
+<script src="/assets/vendor/i18next/i18next.min.js"></script>
+<script src="/assets/js/i18n.js"></script>
+<script>ItemI18n.init();</script>
 <script src="/assets/js/theme.js"></script>
 <script>ItemTheme.initializeTheme();</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
@@ -31,25 +34,25 @@
       <img class="item-brand-logo login-brand-logo" data-item-logo src="/assets/brand/item-logo-light.svg" alt="Item"/>
       <div>
         <div class="login-brand-name">UNIS WMS</div>
-        <div class="login-brand-sub">Inventory &amp; Task Controller</div>
+        <div class="login-brand-sub" data-i18n="brand.controller">Inventory &amp; Task Controller</div>
       </div>
     </div>
-    <div class="login-h">Sign in to UNIS WMS</div>
-    <div class="login-sub">Sign in to your warehouse dashboard at unis.item.com</div>
+    <div class="login-h" data-i18n="login.title">Sign in to UNIS WMS</div>
+    <div class="login-sub" data-i18n="login.subtitle">Sign in to your warehouse dashboard at unis.item.com</div>
     <div class="fg">
-      <label>Username</label>
-      <input type="text" id="inp-user" placeholder="username" autocomplete="username"/>
+      <label data-i18n="login.username">Username</label>
+      <input type="text" id="inp-user" placeholder="username" data-i18n-placeholder="login.userPlaceholder" autocomplete="username"/>
     </div>
     <div class="fg">
-      <label>Password</label>
-      <input type="password" id="inp-pass" placeholder="Enter your password" onkeyup="if(event.key==='Enter')doLogin()"/>
-      <div class="hint">Use your UNIS IAM (id.item.com) credentials</div>
+      <label data-i18n="login.password">Password</label>
+      <input type="password" id="inp-pass" placeholder="Enter your password" data-i18n-placeholder="login.passwordPlaceholder" onkeyup="if(event.key==='Enter')doLogin()"/>
+      <div class="hint" data-i18n="login.hint">Use your UNIS IAM (id.item.com) credentials</div>
     </div>
     <button class="login-cta" id="login-btn" onclick="doLogin()">
-      Sign In to WMS
+      <span data-i18n="login.signIn">Sign In to WMS</span>
     </button>
     <div class="login-err" id="login-err"></div>
-    <div class="login-footer">Connecting to <strong>unis.item.com</strong> via id.item.com IAM</div>
+    <div class="login-footer" data-i18n="login.footer">Connecting securely through Item IAM</div>
   </div>
 </div>
 
@@ -62,123 +65,123 @@
       <div class="sb-logo-inner">
         <img class="item-brand-logo sidebar-brand-logo" data-item-logo src="/assets/brand/item-logo-light.svg" alt="Item"/>
         <div class="sb-logo-text">
-          Inventory &amp; Task
-          <span>Controller · UNIS WMS</span>
+          <span data-i18n="brand.sidebarTitle">Inventory &amp; Task</span>
+          <span data-i18n="brand.sidebarSubtitle">Controller · UNIS WMS</span>
         </div>
       </div>
     </div>
     <nav class="sb-nav">
-      <div class="sb-sect">Main</div>
+      <div class="sb-sect" data-i18n="nav.main">Main</div>
       <div class="sb-item active" data-view="dashboard" onclick="showView('dashboard')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Dashboard
+        <span data-i18n="nav.dashboard">Dashboard</span>
       </div>
       <div class="sb-item" data-view="inventory" onclick="toggleInv(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-        Inventory
+        <span data-i18n="nav.inventory">Inventory</span>
         <svg class="caret" id="inv-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="sb-sub" id="inv-sub">
-        <div class="sb-item" onclick="showView('inventory','all')">All Items</div>
-        <div class="sb-item" onclick="showView('inventory','categories')">Categories</div>
-        <div class="sb-item" onclick="showView('inventory','suppliers')">Suppliers</div>
-        <div class="sb-item" onclick="showView('inventory','po')">Purchase Orders</div>
-        <div class="sb-item" onclick="showView('alerts')">Low Stock Alerts <span class="sb-badge amber">5</span></div>
+        <div class="sb-item" onclick="showView('inventory','all')" data-i18n="nav.allItems">All Items</div>
+        <div class="sb-item" onclick="showView('inventory','categories')" data-i18n="nav.categories">Categories</div>
+        <div class="sb-item" onclick="showView('inventory','suppliers')" data-i18n="nav.suppliers">Suppliers</div>
+        <div class="sb-item" onclick="showView('inventory','po')" data-i18n="nav.purchaseOrders">Purchase Orders</div>
+        <div class="sb-item" onclick="showView('alerts')"><span data-i18n="nav.lowStockAlerts">Low Stock Alerts</span> <span class="sb-badge amber">5</span></div>
       </div>
       <div class="sb-item" data-view="tasks" onclick="showView('tasks')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Tasks <span class="sb-badge">6</span>
+        <span data-i18n="nav.tasks">Tasks</span> <span class="sb-badge">6</span>
       </div>
       <div class="sb-item" data-view="calendar" onclick="showView('calendar')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Calendar PI
+        <span data-i18n="nav.calendar">Calendar PI</span>
       </div>
 
-      <div class="sb-sect" style="margin-top:6px">Operations</div>
+      <div class="sb-sect" style="margin-top:6px" data-i18n="nav.operations">Operations</div>
       <div class="sb-item" data-view="scheduler" onclick="showView('scheduler')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Scheduler <span class="sb-badge blue">12</span>
+        <span data-i18n="nav.scheduler">Scheduler</span> <span class="sb-badge blue">12</span>
       </div>
       <div class="sb-item" data-view="cycle" onclick="toggleCycle(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.5-7.1"/><polyline points="21 4 21 10 15 10"/></svg>
-        Cycle Count <span class="sb-badge amber">3</span>
+        <span data-i18n="nav.cycleCount">Cycle Count</span> <span class="sb-badge amber">3</span>
         <svg class="caret" id="cycle-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="sb-sub" id="cycle-sub">
-        <div class="sb-item" onclick="showView('cycle')">Cycle Count Dashboard</div>
-        <div class="sb-item" onclick="showView('countApproval')">Count Result Approval</div>
-        <div class="sb-item" data-view="countCalendar" onclick="showView('countCalendar')">Count Calendar</div>
+        <div class="sb-item" onclick="showView('cycle')" data-i18n="nav.cycleDashboard">Cycle Count Dashboard</div>
+        <div class="sb-item" onclick="showView('countApproval')" data-i18n="nav.countApproval">Count Result Approval</div>
+        <div class="sb-item" data-view="countCalendar" onclick="showView('countCalendar')" data-i18n="nav.countCalendar">Count Calendar</div>
       </div>
       <div class="sb-item" id="robot-menu-trigger" data-view-group="robot" role="button" tabindex="0" aria-expanded="true" aria-controls="robot-sub" onclick="toggleRobotGroup(event)" onkeydown="handleRobotGroupKeydown(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
-        <span class="robot-nav-label">Robot Count</span>
+        <span class="robot-nav-label" data-i18n="nav.robotCount">Robot Count</span>
         <span class="robot-nav-actions"><span class="sb-badge green">8</span><svg class="caret open" id="robot-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
       </div>
-      <div class="sb-sub robot-sub open" id="robot-sub" aria-label="Robot Count views">
-        <div class="sb-item" data-view="robots" role="link" tabindex="0" onclick="showView('robots')" onkeydown="handleRobotChildKeydown(event,'robots')">Overview</div>
-        <div class="sb-item" data-view="gis" role="link" tabindex="0" onclick="showView('gis')" onkeydown="handleRobotChildKeydown(event,'gis')">GIS</div>
+      <div class="sb-sub robot-sub open" id="robot-sub" aria-label="Robot Count views" data-i18n-aria-label="nav.robotViews">
+        <div class="sb-item" data-view="robots" role="link" tabindex="0" onclick="showView('robots')" onkeydown="handleRobotChildKeydown(event,'robots')" data-i18n="nav.overview">Overview</div>
+        <div class="sb-item" data-view="gis" role="link" tabindex="0" onclick="showView('gis')" onkeydown="handleRobotChildKeydown(event,'gis')" data-i18n="nav.gis">GIS</div>
       </div>
       <div class="sb-item" data-view="consolidation" onclick="showView('consolidation')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M8 3H3v5"/><path d="M12 22v-6"/><path d="M12 8V2"/><path d="M21 3l-9 9"/><path d="M3 3l9 9"/><rect x="8" y="16" width="8" height="5" rx="1"/></svg>
-        Consolidation
+        <span data-i18n="nav.consolidation">Consolidation</span>
       </div>
       <div class="sb-item" onclick="toggleReplenGroup(event)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
-        Replenishment
+        <span data-i18n="nav.replenishment">Replenishment</span>
         <svg class="caret" id="replen-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
       <div class="sb-sub" id="replen-sub">
-        <div class="sb-item" data-view="replenish" onclick="showView('replenish')">Replenish</div>
-        <div class="sb-item" data-view="replenSuggest" onclick="showView('replenSuggest')">Suggestions</div>
+        <div class="sb-item" data-view="replenish" onclick="showView('replenish')" data-i18n="nav.replenish">Replenish</div>
+        <div class="sb-item" data-view="replenSuggest" onclick="showView('replenSuggest')" data-i18n="nav.suggestions">Suggestions</div>
       </div>
       <div class="sb-item" data-view="vlg" onclick="showView('vlg')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7v10"/><path d="M16 7v10"/><path d="M2 12h20"/></svg>
-        VLG Management
+        <span data-i18n="nav.vlg">VLG Management</span>
       </div>
       <div class="sb-item" data-view="locationTag" onclick="showView('locationTag')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-        Location Tag
+        <span data-i18n="nav.locationTag">Location Tag</span>
       </div>
       <div class="sb-item" data-view="locTagReq" onclick="showView('locTagReq')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        Location Tag Requests <span class="sb-badge blue">New</span>
+        <span data-i18n="nav.locationTagRequests">Location Tag Requests</span> <span class="sb-badge blue" data-i18n="common.new">New</span>
       </div>
 
-      <div class="sb-sect" style="margin-top:6px">Analytics</div>
+      <div class="sb-sect" style="margin-top:6px" data-i18n="nav.analytics">Analytics</div>
       <div class="sb-item" data-view="abcSlotting" onclick="showView('abcSlotting')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l3-3 3 2 5-7"/><path d="M7 8h2"/><path d="M7 12h2"/></svg>
-        ABC Slotting <span class="sb-badge blue">New</span>
+        <span data-i18n="nav.abcSlotting">ABC Slotting</span> <span class="sb-badge blue" data-i18n="common.new">New</span>
       </div>
       <div class="sb-item" data-view="reports" onclick="showView('reports')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        Reports
+        <span data-i18n="nav.reports">Reports</span>
       </div>
       <div class="sb-item" data-view="reports" onclick="showView('reports'); setTimeout(()=>{const el=document.getElementById('eom-subtitle');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},200)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
-        Month-End Compare
+        <span data-i18n="nav.monthEndCompare">Month-End Compare</span>
       </div>
       <div class="sb-item" data-view="alerts" onclick="showView('alerts')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        Alerts <span class="sb-badge blue">3</span>
+        <span data-i18n="nav.alerts">Alerts</span> <span class="sb-badge blue">3</span>
       </div>
       <div class="sb-item" data-view="settings" onclick="showView('settings')" id="sb-admin-settings" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9c0-.3-.1-.6-.33-.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06c.22.23.52.33.82.33h.09a2 2 0 0 1 0-4"/></svg>
-        Admin Settings
+        <span data-i18n="nav.adminSettings">Admin Settings</span>
       </div>
     </nav>
     <div class="sb-footer">
-      <div class="sb-qa-title">Quick Actions</div>
+      <div class="sb-qa-title" data-i18n="quick.title">Quick Actions</div>
       <button class="qa-btn" onclick="showView('inventory','all')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Product
+        <span data-i18n="quick.addProduct">Add Product</span>
       </button>
       <button class="qa-btn" onclick="showView('tasks')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Create Task
+        <span data-i18n="quick.createTask">Create Task</span>
       </button>
       <button class="qa-btn" onclick="showView('inventory','po')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Purchase Order
+        <span data-i18n="quick.purchaseOrder">Purchase Order</span>
       </button>
     </div>
   </aside>
@@ -189,26 +192,39 @@
     <!-- WMS STATUS BAR -->
     <div class="wms-bar">
       <div class="wms-dot"></div>
-      <span>Connected to <strong>UNIS WMS</strong> · unis.item.com · Facility:
+      <span><span data-i18n="chrome.connectedTo">Connected to</span> <strong>UNIS WMS</strong> · unis.item.com · <span data-i18n="chrome.facility">Facility</span>:
         <select id="facility-switcher" onchange="switchFacility(this.value)" style="background:color-mix(in srgb,var(--chart-3) 16%,var(--card));border:1px solid color-mix(in srgb,var(--chart-3) 38%,var(--border));color:var(--chart-3);font-weight:700;font-size:12px;padding:2px 6px;border-radius:5px;margin:0 4px;cursor:pointer"></select>
-        · User: <strong id="wms-user">—</strong></span>
-      <span style="margin-left:4px;color:var(--muted-foreground)">· Last sync: <span id="sync-lbl">just now</span></span>
+        · <span data-i18n="chrome.user">User</span>: <strong id="wms-user">—</strong></span>
+      <span style="margin-left:4px;color:var(--muted-foreground)">· <span data-i18n="chrome.lastSync">Last sync</span>: <span id="sync-lbl" data-i18n="chrome.justNow">just now</span></span>
       <span id="token-status" style="margin-left:8px"></span>
-      <a onclick="showReconnect()" style="margin-left:8px;cursor:pointer">⚿ Reconnect</a>
-      <a onclick="refreshAll()">↻ Refresh</a>
+      <a onclick="showReconnect()" style="margin-left:8px;cursor:pointer">⚿ <span data-i18n="chrome.reconnect">Reconnect</span></a>
+      <a onclick="refreshAll()">↻ <span data-i18n="chrome.refresh">Refresh</span></a>
     </div>
 
     <!-- TOPBAR -->
     <div class="topbar">
       <div class="topbar-title">
-        <h1 id="tb-title">Dashboard</h1>
-        <p id="tb-sub">Overview of inventory status and task progress</p>
+        <h1 id="tb-title" data-i18n="views.dashboard.title">Dashboard</h1>
+        <p id="tb-sub" data-i18n="views.dashboard.subtitle">Overview of inventory status and task progress</p>
       </div>
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input placeholder="Search products, tasks, etc…" type="text"/>
+        <input placeholder="Search products, tasks, etc…" data-i18n-placeholder="chrome.search" type="text"/>
       </div>
       <div class="topbar-right">
+        <div class="language-selector" id="language-selector">
+          <button class="language-trigger" id="language-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="language-options" aria-label="Language: English">
+            <span aria-hidden="true">🌐</span>
+            <span class="language-label" data-i18n="language.label">Language</span>
+            <span class="language-current" id="language-current">English</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="language-popover" id="language-popover" hidden>
+            <label class="sr-only" for="language-search" data-i18n="language.search">Search languages</label>
+            <input id="language-search" type="search" autocomplete="off" placeholder="Search languages" data-i18n-placeholder="language.search"/>
+            <div class="language-options" id="language-options" role="listbox" aria-label="Language"></div>
+          </div>
+        </div>
         <button class="theme-toggle topbar-theme-toggle" type="button" data-theme-toggle aria-label="Switch theme" aria-pressed="false">
           <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></svg>
           <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -218,7 +234,7 @@
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
           <span id="topbar-date-text"></span>
         </div>
-        <div class="notif">
+        <div class="notif" role="button" tabindex="0" aria-label="Notifications" data-i18n-aria-label="chrome.notifications">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <div class="notif-dot"></div>
         </div>
@@ -226,7 +242,7 @@
           <div class="avatar">BE</div>
           <div class="user-info">
             <div class="name">Admin</div>
-            <div class="role">Administrator</div>
+            <div class="role" data-i18n="chrome.administrator">Administrator</div>
           </div>
           <svg style="width:12px;height:12px;color:var(--muted-foreground);margin-left:2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
           <div class="user-menu" id="user-menu" onclick="event.stopPropagation()">
@@ -236,11 +252,11 @@
             </div>
             <div class="user-menu-item" onclick="showReconnect()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="16" r="1"/><rect x="3" y="10" width="18" height="12" rx="2"/><path d="M7 10V7a5 5 0 0 1 10 0v3"/></svg>
-              Refresh session
+              <span data-i18n="chrome.refreshSession">Refresh session</span>
             </div>
             <div class="user-menu-item danger" onclick="doLogout()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-              Log out
+              <span data-i18n="chrome.logout">Log out</span>
             </div>
           </div>
         </div>
@@ -256,12 +272,12 @@
         <div class="card" id="dashboard-employee-ownership-card" style="margin-bottom:18px;border:1.5px solid color-mix(in srgb,var(--primary) 35%,var(--border));background:linear-gradient(135deg,var(--card) 0%,color-mix(in srgb,var(--primary) 10%,var(--card)) 100%)">
           <div class="card-hdr" style="align-items:center">
             <div>
-              <div class="card-ttl">Employee Ownership</div>
-              <div class="scheduler-help">Live HRM ownership-card employees. Click an employee circle to view the full ownership card.</div>
+              <div class="card-ttl" data-i18n="modules.dashboard.employeeOwnership">Employee Ownership</div>
+              <div class="scheduler-help" data-i18n="modules.dashboard.ownershipHelp">Live HRM ownership-card employees. Click an employee circle to view the full ownership card.</div>
             </div>
           </div>
           <div id="dash-ownership-strip" style="display:flex;gap:18px;overflow-x:auto;padding:14px 4px 4px;min-height:132px">
-            <div style="font-size:12px;color:var(--muted-foreground);padding:24px">Loading HRM ownership employees…</div>
+            <div style="font-size:12px;color:var(--muted-foreground);padding:24px" data-i18n="modules.dashboard.loadingOwnership">Loading HRM ownership employees…</div>
           </div>
         </div>
 
@@ -269,43 +285,43 @@
         <div class="card" style="margin-top:18px">
           <div class="card-hdr">
             <div>
-              <div class="card-ttl">Cycle Count by Customer</div>
-              <div class="scheduler-help">Count ticket metrics grouped by customer/account for the current facility.</div>
+              <div class="card-ttl" data-i18n="modules.dashboard.cycleByCustomer">Cycle Count by Customer</div>
+              <div class="scheduler-help" data-i18n="modules.dashboard.cycleHelp">Count ticket metrics grouped by customer/account for the current facility.</div>
             </div>
-            <button class="btn btn-secondary" onclick="loadDashCycleCountKpi()" style="font-size:12px;padding:5px 12px">Refresh</button>
+            <button class="btn btn-secondary" onclick="loadDashCycleCountKpi()" style="font-size:12px;padding:5px 12px" data-i18n="common.refresh" data-i18n-aria-label="modules.dashboard.refreshCycleKpis" aria-label="Refresh cycle count KPIs">Refresh</button>
           </div>
-          <div id="dash-cc-kpi" style="padding:12px;font-size:12px;color:var(--muted-foreground)">Click Refresh or sign in to load cycle count KPIs.</div>
+          <div id="dash-cc-kpi" style="padding:12px;font-size:12px;color:var(--muted-foreground)" data-i18n="modules.dashboard.loadCycleKpis">Click Refresh or sign in to load cycle count KPIs.</div>
         </div>
 
         <!-- CHARTS -->
         <div class="charts-row">
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Inventory Summary</div>
-              <select class="sel" onchange="updateLineChart(this.value)">
-                <option value="7">Last 7 Days</option>
-                <option value="30">Last 30 Days</option>
+              <div class="card-ttl" data-i18n="modules.dashboard.inventorySummary">Inventory Summary</div>
+              <select class="sel" onchange="updateLineChart(this.value)" aria-label="Inventory summary period" data-i18n-aria-label="modules.dashboard.inventoryPeriod">
+                <option value="7" data-i18n="modules.dashboard.last7Days">Last 7 Days</option>
+                <option value="30" data-i18n="modules.dashboard.last30Days">Last 30 Days</option>
               </select>
             </div>
             <canvas id="lineChart" height="155"></canvas>
           </div>
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Inventory Status</div>
-              <span class="card-link" onclick="showView('inventory','all')">View Inventory ›</span>
+              <div class="card-ttl" data-i18n="modules.dashboard.inventoryStatus">Inventory Status</div>
+              <span class="card-link" onclick="showView('inventory','all')" role="link" tabindex="0" data-i18n="modules.dashboard.viewInventory">View Inventory ›</span>
             </div>
             <div class="donut-wrap">
               <canvas id="donutChart" width="200" height="200"></canvas>
               <div class="donut-center">
                 <div class="big" id="dash-donut-total">—</div>
-                <div class="sm">Live Items</div>
+                <div class="sm" data-i18n="modules.dashboard.liveItems">Live Items</div>
               </div>
             </div>
             <div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--primary)"></span>In Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-in">—</span><span class="legend-p" id="dash-legend-in-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span>Low Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-low">—</span><span class="legend-p" id="dash-legend-low-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span>Out of Stock</span><div class="legend-right"><span class="legend-n" id="dash-legend-out">—</span><span class="legend-p" id="dash-legend-out-pct"></span></div></div>
-              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span>Locations Used</span><div class="legend-right"><span class="legend-n" id="dash-legend-locs">—</span><span class="legend-p"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--primary)"></span><span data-i18n="modules.dashboard.inStock">In Stock</span></span><div class="legend-right"><span class="legend-n" id="dash-legend-in">—</span><span class="legend-p" id="dash-legend-in-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span><span data-i18n="modules.dashboard.lowStock">Low Stock</span></span><div class="legend-right"><span class="legend-n" id="dash-legend-low">—</span><span class="legend-p" id="dash-legend-low-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span><span data-i18n="modules.dashboard.outOfStock">Out of Stock</span></span><div class="legend-right"><span class="legend-n" id="dash-legend-out">—</span><span class="legend-p" id="dash-legend-out-pct"></span></div></div>
+              <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span><span data-i18n="modules.dashboard.locationsUsed">Locations Used</span></span><div class="legend-right"><span class="legend-n" id="dash-legend-locs">—</span><span class="legend-p"></span></div></div>
             </div>
           </div>
         </div>
@@ -314,29 +330,29 @@
         <div class="bottom-row">
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Low Stock Alerts</div>
-              <span class="card-link" onclick="showView('alerts')">View All Alerts ›</span>
+              <div class="card-ttl" data-i18n="modules.dashboard.lowStockAlerts">Low Stock Alerts</div>
+              <span class="card-link" onclick="showView('alerts')" role="link" tabindex="0" data-i18n="modules.dashboard.viewAllAlerts">View All Alerts ›</span>
             </div>
             <table class="tbl">
-              <thead><tr><th>Product</th><th>SKU</th><th>Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
+              <thead><tr><th data-i18n="modules.dashboard.product">Product</th><th data-i18n="modules.dashboard.sku">SKU</th><th data-i18n="modules.dashboard.stock">Stock</th><th data-i18n="modules.dashboard.reorderLevel">Reorder Level</th><th data-i18n="common.status">Status</th></tr></thead>
               <tbody id="dash-low-stock-body">
-                <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)">Loading live low-stock rows…</td></tr>
+                <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted-foreground)" data-i18n="modules.dashboard.loadingLowStock">Loading live low-stock rows…</td></tr>
               </tbody>
             </table>
-            <div class="view-all-row" onclick="showView('alerts')">View All Alerts ›</div>
+            <div class="view-all-row" onclick="showView('alerts')" role="link" tabindex="0" data-i18n="modules.dashboard.viewAllAlerts">View All Alerts ›</div>
           </div>
 
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Task Overview</div>
-              <span class="card-link" onclick="showView('tasks')">View All Tasks ›</span>
+              <div class="card-ttl" data-i18n="modules.dashboard.taskOverview">Task Overview</div>
+              <span class="card-link" onclick="showView('tasks')" role="link" tabindex="0" data-i18n="modules.dashboard.viewAllTasks">View All Tasks ›</span>
             </div>
             <div class="task-kpis">
-              <div class="task-kpi"><div class="n" id="dash-task-total">—</div><div class="l">Total Tasks</div></div>
-              <div class="task-kpi"><div class="n g" id="dash-task-completed">—</div><div class="l">Completed</div></div>
-              <div class="task-kpi"><div class="n b" id="dash-task-progress">—</div><div class="l">In Progress</div></div>
-              <div class="task-kpi"><div class="n a" id="dash-task-pending">—</div><div class="l">Pending</div></div>
-              <div class="task-kpi"><div class="n r" id="dash-task-overdue">—</div><div class="l">Overdue</div></div>
+              <div class="task-kpi"><div class="n" id="dash-task-total">—</div><div class="l" data-i18n="modules.dashboard.totalTasks">Total Tasks</div></div>
+              <div class="task-kpi"><div class="n g" id="dash-task-completed">—</div><div class="l" data-i18n="modules.dashboard.completed">Completed</div></div>
+              <div class="task-kpi"><div class="n b" id="dash-task-progress">—</div><div class="l" data-i18n="modules.dashboard.inProgress">In Progress</div></div>
+              <div class="task-kpi"><div class="n a" id="dash-task-pending">—</div><div class="l" data-i18n="modules.dashboard.pending">Pending</div></div>
+              <div class="task-kpi"><div class="n r" id="dash-task-overdue">—</div><div class="l" data-i18n="modules.dashboard.overdue">Overdue</div></div>
             </div>
             <div class="prog-bar">
               <div class="prog-seg" style="width:64%;background:var(--chart-3)"></div>
@@ -344,11 +360,11 @@
               <div class="prog-seg" style="width:36%;background:var(--chart-2)"></div>
               <div class="prog-seg" style="width:12%;background:var(--destructive)"></div>
             </div>
-            <div style="font-size:11.5px;font-weight:700;color:var(--muted-foreground);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Recent Tasks</div>
+            <div style="font-size:11.5px;font-weight:700;color:var(--muted-foreground);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em" data-i18n="modules.dashboard.recentTasks">Recent Tasks</div>
             <div class="task-rows" id="dash-task-rows">
-              <div class="tasks-empty">Loading live cycle count tasks…</div>
+              <div class="tasks-empty" data-i18n="modules.dashboard.loadingTasks">Loading live cycle count tasks…</div>
             </div>
-            <div class="view-all-row" onclick="showView('tasks')">View All Tasks ›</div>
+            <div class="view-all-row" onclick="showView('tasks')" role="link" tabindex="0" data-i18n="modules.dashboard.viewAllTasks">View All Tasks ›</div>
           </div>
         </div>
       </div>
@@ -504,7 +520,7 @@
               <label class="cc-label" style="display:block;margin-bottom:8px">Name</label>
               <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
                 <input type="text" class="cc-input" id="sched-wise-search-name" placeholder="Name" style="width:260px"/>
-                <button type="button" class="btn btn-primary" onclick="filterWiseScheduleTable()" style="min-width:100px">Search</button>
+                <button type="button" class="btn btn-primary" onclick="filterWiseScheduleTable()" style="min-width:100px" data-i18n="common.search">Search</button>
                 <button type="button" class="btn btn-secondary" onclick="resetWiseScheduleSearch()" style="min-width:100px">Reset</button>
               </div>
             </div>
@@ -535,7 +551,7 @@
                 </div>
               </div>
               <div class="form-actions" style="margin-top:18px;justify-content:flex-end">
-                <button type="button" class="btn btn-secondary" onclick="showWiseAddScheduleForm()">Cancel</button>
+                <button type="button" class="btn btn-secondary" onclick="showWiseAddScheduleForm()" data-i18n="common.cancel">Cancel</button>
                 <button type="button" class="btn btn-primary" id="sched-save-btn" onclick="saveWiseSchedule()">Save Schedule</button>
               </div>
             </div>
@@ -552,7 +568,7 @@
                   </tr>
                 </thead>
                 <tbody id="sched-wise-table-body">
-                  <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted-foreground);font-weight:600">No Data</td></tr>
+                  <tr><td colspan="5" style="padding:26px;text-align:center;color:var(--muted-foreground);font-weight:600" data-i18n="common.noData">No Data</td></tr>
                 </tbody>
               </table>
               <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-top:1px solid var(--input);color:var(--foreground);font-weight:600">
@@ -587,7 +603,7 @@
             <div class="cc-field">
               <label class="cc-label"><span class="req">*</span>Customer</label>
               <select class="cc-input" id="cc-customer">
-                <option value="">Select</option>
+                <option value="" data-i18n="common.select">Select</option>
               </select>
               <div class="cc-cust-meta" id="cc-cust-meta"></div>
               <div class="scheduler-help" style="margin-top:4px">Pick one customer, add their locations, then switch customer to add more. The schedule can cover multiple customers.</div>
@@ -595,7 +611,7 @@
             <div class="cc-field">
               <label class="cc-label"><span class="req">*</span>Type</label>
               <select class="cc-input" id="cc-type">
-                <option value="">Select</option>
+                <option value="" data-i18n="common.select">Select</option>
               </select>
             </div>
             <div class="cc-field">
@@ -791,7 +807,7 @@
             <button class="btn btn-primary" onclick="alert('Select rejected result rows to create recount tasks.')">Create Recount Task</button>
             <button class="btn" style="background:var(--chart-3);color:var(--primary-foreground)" onclick="batchApproveCountResults()">Batch Approve</button>
             <button class="btn" style="background:var(--destructive);color:var(--destructive-foreground)" onclick="batchRejectCountResults()">Batch Reject</button>
-            <button class="btn btn-primary" onclick="loadCountApprovalView()">Search</button>
+            <button class="btn btn-primary" onclick="loadCountApprovalView()" data-i18n="common.search">Search</button>
           </div>
         </div>
         <div class="card">
@@ -811,11 +827,11 @@
         <div class="card" id="onto-config" style="padding:14px 18px;margin-bottom:0">
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
             <div style="flex:1;min-width:260px">
-              <div style="font-size:13px;font-weight:700;color:var(--foreground)">Ontology AI · live KPI source</div>
-              <div class="scheduler-help" style="margin-top:2px">POSTs <code style="background:var(--muted);padding:1px 5px;border-radius:3px">{ontology_base_id, version_id, query}</code> with Bearer auth. Status: <span id="onto-status" style="font-weight:700;color:var(--muted-foreground)">not configured</span></div>
+              <div style="font-size:13px;font-weight:700;color:var(--foreground)" data-i18n="modules.robots.ontologySource">Ontology AI · live KPI source</div>
+              <div class="scheduler-help" style="margin-top:2px"><span data-i18n="modules.robots.ontologyRequestPrefix">POST request fields</span> <code style="background:var(--muted);padding:1px 5px;border-radius:3px">{ontology_base_id, version_id, query}</code> <span data-i18n="modules.robots.ontologyRequestSuffix">with Bearer authentication. Status:</span> <span id="onto-status" style="font-weight:700;color:var(--muted-foreground)" data-i18n="modules.robots.notConfigured">not configured</span></div>
             </div>
-            <button class="btn btn-secondary" onclick="configureOntology()" style="font-size:12.5px">⚙ Configure URL + token</button>
-            <button class="btn btn-primary" onclick="loadRobotKpisFromOntology()" id="onto-refresh-btn" style="font-size:12.5px">↻ Refresh KPIs</button>
+            <button class="btn btn-secondary" onclick="configureOntology()" style="font-size:12.5px" data-i18n="modules.robots.configure" data-i18n-aria-label="modules.robots.configureAria" aria-label="Configure ontology URL and token">⚙ Configure URL + token</button>
+            <button class="btn btn-primary" onclick="loadRobotKpisFromOntology()" id="onto-refresh-btn" style="font-size:12.5px" data-i18n="modules.robots.refreshKpis" data-i18n-aria-label="modules.robots.refreshKpisAria" aria-label="Refresh robot KPIs">↻ Refresh KPIs</button>
           </div>
         </div>
 
@@ -823,109 +839,109 @@
         <div class="card" id="robot-inventory-card" style="padding:14px 18px;margin-top:15px">
           <div class="card-hdr">
             <div>
-              <div class="card-ttl">Robot Count · Warehouse Inventory Scan</div>
-              <div class="scheduler-help">Live yard-25 warehouse inventory scan results by date and zone.</div>
+              <div class="card-ttl" data-i18n="modules.robots.scanTitle">Robot Count · Warehouse Inventory Scan</div>
+              <div class="scheduler-help" data-i18n="modules.robots.scanHelp">Live yard-25 warehouse inventory scan results by date and zone.</div>
             </div>
-            <button class="btn btn-primary" onclick="loadRobotWarehouseInventory()" id="robot-inventory-refresh" style="font-size:12.5px">↻ Load Scan</button>
+            <button class="btn btn-primary" onclick="loadRobotWarehouseInventory()" id="robot-inventory-refresh" style="font-size:12.5px" data-i18n="modules.robots.loadScan" data-i18n-aria-label="modules.robots.loadScanAria" aria-label="Load warehouse inventory scan">↻ Load Scan</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 12px">
-            <div class="cc-field" style="margin:0"><label class="cc-label">Date</label><input class="cc-input" id="robot-scan-date" type="date" value="2026-07-09"/></div>
-            <div class="cc-field" style="margin:0"><label class="cc-label">Yard</label><input class="cc-input" id="robot-scan-yard" value="yard-25"/></div>
-            <div class="cc-field" style="margin:0"><label class="cc-label">Zone</label><input class="cc-input" id="robot-scan-zone" value="Bay1"/></div>
+            <div class="cc-field" style="margin:0"><label class="cc-label" for="robot-scan-date" data-i18n="modules.robots.date">Date</label><input class="cc-input" id="robot-scan-date" type="date" value="2026-07-09" aria-label="Scan date" data-i18n-aria-label="modules.robots.dateAria"/></div>
+            <div class="cc-field" style="margin:0"><label class="cc-label" for="robot-scan-yard" data-i18n="modules.robots.yard">Yard</label><input class="cc-input" id="robot-scan-yard" value="yard-25" placeholder="yard-25" data-i18n-aria-label="modules.robots.yardAria" aria-label="Yard code" data-i18n-placeholder="modules.robots.yardPlaceholder"/></div>
+            <div class="cc-field" style="margin:0"><label class="cc-label" for="robot-scan-zone" data-i18n="modules.robots.zone">Zone</label><input class="cc-input" id="robot-scan-zone" value="Bay1" placeholder="Bay1" data-i18n-aria-label="modules.robots.zoneAria" aria-label="Zone code" data-i18n-placeholder="modules.robots.zonePlaceholder"/></div>
           </div>
-          <div id="robot-inventory-status" style="font-size:12px;color:var(--muted-foreground);margin-bottom:10px">Click Load Scan to fetch robot count inventory.</div>
+          <div id="robot-inventory-status" role="status" aria-live="polite" style="font-size:12px;color:var(--muted-foreground);margin-bottom:10px" data-i18n="modules.robots.scanPrompt">Click Load Scan to fetch robot count inventory.</div>
           <div id="robot-inventory-summary" class="kpi-grid" style="display:none;margin-top:10px"></div>
           <div id="robot-inventory-table" style="margin-top:12px;max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:8px;display:none"></div>
         </div>
 
         <div class="kpi-grid" style="margin-top:15px">
-          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div><div><div class="kpi-lbl">Fleet Size</div><div class="kpi-val" id="rk-fleet">12</div><div class="kpi-chg neutral" id="rk-fleet-sub">2 retired, 1 inbound</div></div></div>
-          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl">Active Now</div><div class="kpi-val" id="rk-active">8</div><div class="kpi-chg up" id="rk-active-sub">66.7% utilization</div></div></div>
-          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="kpi-lbl">Charging / Idle</div><div class="kpi-val" id="rk-charging">3</div><div class="kpi-chg neutral" id="rk-charging-sub">Avg 78% battery</div></div></div>
-          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg></div><div><div class="kpi-lbl">Out of Service</div><div class="kpi-val" id="rk-down">1</div><div class="kpi-chg down" id="rk-down-sub">R-04 · drive fault</div></div></div>
+          <div class="kpi"><div class="kpi-ico blue"><svg viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg></div><div><div class="kpi-lbl" data-i18n="modules.robots.fleetSize">Fleet Size</div><div class="kpi-val" id="rk-fleet">12</div><div class="kpi-chg neutral" id="rk-fleet-sub" data-i18n="modules.robots.retiredInbound">2 retired, 1 inbound</div></div></div>
+          <div class="kpi"><div class="kpi-ico green"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-3)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div><div class="kpi-lbl" data-i18n="modules.robots.activeNow">Active Now</div><div class="kpi-val" id="rk-active">8</div><div class="kpi-chg up" id="rk-active-sub" data-i18n="modules.robots.utilization">66.7% utilization</div></div></div>
+          <div class="kpi"><div class="kpi-ico amber"><svg viewBox="0 0 24 24" fill="none" stroke="var(--chart-2)" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="kpi-lbl" data-i18n="modules.robots.chargingIdle">Charging / Idle</div><div class="kpi-val" id="rk-charging">3</div><div class="kpi-chg neutral" id="rk-charging-sub" data-i18n="modules.robots.avgBattery">Avg 78% battery</div></div></div>
+          <div class="kpi"><div class="kpi-ico red"><svg viewBox="0 0 24 24" fill="none" stroke="var(--destructive)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12" y2="16"/></svg></div><div><div class="kpi-lbl" data-i18n="modules.robots.outOfService">Out of Service</div><div class="kpi-val" id="rk-down">1</div><div class="kpi-chg down" id="rk-down-sub" data-i18n="modules.robots.driveFaultSummary">R-04 · drive fault</div></div></div>
         </div>
 
         <div class="charts-row">
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Fleet Picks/Hour — Last 24h</div>
-              <select class="sel"><option>24h</option><option>7d</option></select>
+              <div class="card-ttl" data-i18n="modules.robots.picksHour">Fleet Picks/Hour — Last 24h</div>
+              <select class="sel" aria-label="Fleet chart period" data-i18n-aria-label="modules.robots.fleetPeriodAria"><option value="24h" data-i18n="modules.robots.last24HoursShort">24h</option><option value="7d" data-i18n="modules.robots.last7DaysShort">7d</option></select>
             </div>
             <canvas id="robotPickChart" height="155"></canvas>
           </div>
           <div class="card">
             <div class="card-hdr">
-              <div class="card-ttl">Fleet Status</div>
+              <div class="card-ttl" data-i18n="modules.robots.fleetStatus">Fleet Status</div>
             </div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span>Active</span><div class="legend-right"><span class="legend-n">8</span><span class="legend-p">(66.7%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span>Charging</span><div class="legend-right"><span class="legend-n">2</span><span class="legend-p">(16.7%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--muted-foreground)"></span>Idle</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
-            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span>Out of Service</span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
-            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--muted);font-size:12px;color:var(--muted-foreground)">Total picks today: <strong style="color:var(--foreground)">14,820</strong> · Avg uptime: <strong style="color:var(--chart-3)">94.2%</strong></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-3)"></span><span data-i18n="modules.robots.active">Active</span></span><div class="legend-right"><span class="legend-n">8</span><span class="legend-p">(66.7%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--chart-2)"></span><span data-i18n="modules.robots.charging">Charging</span></span><div class="legend-right"><span class="legend-n">2</span><span class="legend-p">(16.7%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--muted-foreground)"></span><span data-i18n="modules.robots.idle">Idle</span></span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
+            <div class="legend-row"><span class="legend-lbl"><span class="legend-dot" style="background:var(--destructive)"></span><span data-i18n="modules.robots.outOfService">Out of Service</span></span><div class="legend-right"><span class="legend-n">1</span><span class="legend-p">(8.3%)</span></div></div>
+            <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--muted);font-size:12px;color:var(--muted-foreground)"><span data-i18n="modules.robots.totalPicks">Total picks today:</span> <strong style="color:var(--foreground)">14,820</strong> · <span data-i18n="modules.robots.avgUptime">Avg uptime:</span> <strong style="color:var(--chart-3)">94.2%</strong></div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-hdr">
-            <div class="card-ttl">Robot Fleet Detail</div>
-            <span class="card-link">+ Add Robot</span>
+            <div class="card-ttl" data-i18n="modules.robots.fleetDetail">Robot Fleet Detail</div>
+            <span class="card-link" role="button" tabindex="0" data-i18n="modules.robots.addRobot">+ Add Robot</span>
           </div>
           <div class="robot-grid">
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-01</div><div class="robot-id">Locus · Aisle A</div></div><span class="robot-stat-dot ok"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge ok">Active</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">92%<span class="batt-bar"><i class="hi" style="width:92%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">142</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">98.4%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge ok" data-i18n="modules.robots.active">Active</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">92%<span class="batt-bar"><i class="hi" style="width:92%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">142</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">98.4%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-02</div><div class="robot-id">Locus · Aisle A</div></div><span class="robot-stat-dot ok"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge ok">Active</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">68%<span class="batt-bar"><i class="hi" style="width:68%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">138</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">96.1%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge ok" data-i18n="modules.robots.active">Active</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">68%<span class="batt-bar"><i class="hi" style="width:68%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">138</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">96.1%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-03</div><div class="robot-id">Locus · Aisle B</div></div><span class="robot-stat-dot ok"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge ok">Active</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">81%<span class="batt-bar"><i class="hi" style="width:81%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">155</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">97.8%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge ok" data-i18n="modules.robots.active">Active</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">81%<span class="batt-bar"><i class="hi" style="width:81%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">155</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">97.8%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-04</div><div class="robot-id">Locus · Bay 2</div></div><span class="robot-stat-dot err"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge err">Drive fault</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">12%<span class="batt-bar"><i class="lo" style="width:12%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">—</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">61.2%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge err" data-i18n="modules.robots.driveFault">Drive fault</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">12%<span class="batt-bar"><i class="lo" style="width:12%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">—</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">61.2%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-05</div><div class="robot-id">Locus · Aisle B</div></div><span class="robot-stat-dot ok"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge ok">Active</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">74%<span class="batt-bar"><i class="hi" style="width:74%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">147</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">95.7%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge ok" data-i18n="modules.robots.active">Active</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">74%<span class="batt-bar"><i class="hi" style="width:74%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">147</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">95.7%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-06</div><div class="robot-id">Locus · Aisle C</div></div><span class="robot-stat-dot warn"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge warn">Charging</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">34%<span class="batt-bar"><i class="md" style="width:34%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">128</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">93.4%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge warn" data-i18n="modules.robots.charging">Charging</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">34%<span class="batt-bar"><i class="md" style="width:34%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">128</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">93.4%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-07</div><div class="robot-id">Locus · Aisle C</div></div><span class="robot-stat-dot ok"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge ok">Active</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">88%<span class="batt-bar"><i class="hi" style="width:88%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">151</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">97.1%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge ok" data-i18n="modules.robots.active">Active</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">88%<span class="batt-bar"><i class="hi" style="width:88%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">151</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">97.1%</span></div>
             </div>
             <div class="robot">
               <div class="robot-hdr"><div><div class="robot-name">R-08</div><div class="robot-id">Locus · Aisle D</div></div><span class="robot-stat-dot idle"></span></div>
-              <div class="robot-row"><span class="l">Status</span><span class="v"><span class="badge idle">Idle</span></span></div>
-              <div class="robot-row"><span class="l">Battery</span><span class="v batt">100%<span class="batt-bar"><i class="hi" style="width:100%"></i></span></span></div>
-              <div class="robot-row"><span class="l">Picks/hr</span><span class="v">—</span></div>
-              <div class="robot-row"><span class="l">Uptime</span><span class="v">99.0%</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.status">Status</span><span class="v"><span class="badge idle" data-i18n="modules.robots.idle">Idle</span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.battery">Battery</span><span class="v batt">100%<span class="batt-bar"><i class="hi" style="width:100%"></i></span></span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.picksPerHour">Picks/hr</span><span class="v">—</span></div>
+              <div class="robot-row"><span class="l" data-i18n="modules.robots.uptime">Uptime</span><span class="v">99.0%</span></div>
             </div>
           </div>
         </div>
@@ -1498,7 +1514,7 @@
               <div class="scheduler-help" id="consol-wf-sub">Review selected candidates and configure the consolidation task</div>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-secondary" onclick="consolWfCancel()" style="font-size:12px;padding:6px 14px">Cancel</button>
+              <button class="btn btn-secondary" onclick="consolWfCancel()" style="font-size:12px;padding:6px 14px" data-i18n="common.cancel">Cancel</button>
               <button class="btn btn-primary" id="consol-wf-submit-btn" onclick="consolWfSubmit()" style="font-size:12px;padding:6px 14px">Create Consolidation Task</button>
             </div>
           </div>
@@ -1666,7 +1682,7 @@
               <div class="cc-field" style="min-width:150px;margin:0"><label class="cc-label">Group Type</label><input class="cc-input" type="text" id="vlg-filter-type" placeholder="Group type"/></div>
               <div class="cc-field" style="min-width:140px;margin:0"><label class="cc-label">Tags</label><input class="cc-input" type="text" id="vlg-filter-tag" placeholder="Tag"/></div>
               <div class="cc-field" style="min-width:160px;margin:0"><label class="cc-label">Customer</label><select class="cc-input" id="vlg-filter-customer"><option value="">All Customers</option></select></div>
-              <button class="btn btn-primary" onclick="loadVlgData()" style="height:38px">Search</button>
+              <button class="btn btn-primary" onclick="loadVlgData()" style="height:38px" data-i18n="common.search">Search</button>
               <button class="btn btn-secondary" onclick="resetVlgFilters()" style="height:38px">Reset</button>
             </div>
             <div style="overflow-x:auto">
@@ -1777,7 +1793,7 @@
 
             <!-- Action buttons -->
             <div style="display:flex;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--border)">
-              <button class="btn btn-secondary" onclick="vlgCloseEdit()">Cancel</button>
+              <button class="btn btn-secondary" onclick="vlgCloseEdit()" data-i18n="common.cancel">Cancel</button>
               <button class="btn btn-primary" id="vlg-save-btn" onclick="vlgSave()">Update</button>
             </div>
           </div>
@@ -1893,7 +1909,7 @@
             <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:14px 0 18px">
               <div class="cc-field" style="min-width:200px;margin:0"><label class="cc-label">Location Tag</label><input class="cc-input" type="text" id="ltag-filter-tag" placeholder="Search by tag"/></div>
               <div class="cc-field" style="min-width:200px;margin:0"><label class="cc-label">Location</label><input class="cc-input" type="text" id="ltag-filter-location" placeholder="Location name"/></div>
-              <button class="btn btn-primary" onclick="loadLocationTagData()" style="height:38px">Search</button>
+              <button class="btn btn-primary" onclick="loadLocationTagData()" style="height:38px" data-i18n="common.search">Search</button>
               <button class="btn btn-secondary" onclick="resetLocationTagFilters()" style="height:38px">Reset</button>
             </div>
             <div style="overflow-x:auto">
@@ -1929,7 +1945,7 @@
               </div>
             </div>
             <div style="display:flex;gap:10px;margin-bottom:18px">
-              <button class="btn btn-primary" id="ltag-save-btn" onclick="ltagSave()">Save</button>
+              <button class="btn btn-primary" id="ltag-save-btn" onclick="ltagSave()" data-i18n="common.save">Save</button>
             </div>
           </div>
 
@@ -1938,7 +1954,7 @@
               <div class="card-ttl">Assigned Locations</div>
               <div style="display:flex;gap:8px;align-items:center">
                 <input class="cc-input" type="text" id="ltag-edit-loc-search" placeholder="Search For Location Name" style="width:220px;height:34px;font-size:13px"/>
-                <button class="btn btn-secondary" onclick="ltagFilterEditLocs()" style="height:34px;font-size:12px">Search</button>
+                <button class="btn btn-secondary" onclick="ltagFilterEditLocs()" style="height:34px;font-size:12px" data-i18n="common.search">Search</button>
                 <button class="btn btn-primary" id="ltag-add-loc-btn" onclick="ltagAddLocationPrompt()" style="height:34px;font-size:12px">Add Location</button>
                 <button class="btn btn-secondary" id="ltag-batch-del-btn" onclick="ltagBatchDeleteLocs()" style="height:34px;font-size:12px;color:var(--destructive);border-color:color-mix(in srgb,var(--destructive) 38%,var(--border))">Batch Delete</button>
               </div>
@@ -1995,14 +2011,14 @@
       </div>
       <div class="modal-body">
         <div class="modal-filters">
-          <div class="cc-field"><label class="cc-label">Customer</label><select class="cc-input" id="loc-customer"><option value="">Select</option></select></div>
+          <div class="cc-field"><label class="cc-label">Customer</label><select class="cc-input" id="loc-customer"><option value="" data-i18n="common.select">Select</option></select></div>
           <div class="cc-field"><label class="cc-label">Item</label><input class="cc-input" id="loc-item" placeholder="SKU, item name, or item ID" autocomplete="off"/></div>
           <div class="cc-field"><label class="cc-label">Location</label><input class="cc-input" id="loc-name" placeholder="e.g. 100.001.1.1" autocomplete="off"/></div>
-          <div class="cc-field"><label class="cc-label">Location Type</label><select class="cc-input" id="loc-type"><option value="">Select</option></select></div>
+          <div class="cc-field"><label class="cc-label">Location Type</label><select class="cc-input" id="loc-type"><option value="" data-i18n="common.select">Select</option></select></div>
           <div class="cc-field"><label class="cc-label">Storage Zone</label><select class="cc-input" id="loc-storage-zone"><option value="">Rack + Bulk</option><option value="RACK">RACK only</option><option value="BULK">BULK only</option></select></div>
-          <div class="cc-field"><label class="cc-label">Support Pick Type</label><select class="cc-input" id="loc-pick-type"><option value="">Select</option></select></div>
-          <div class="cc-field"><label class="cc-label">Status</label><select class="cc-input" id="loc-status"><option value="">Select</option></select></div>
-          <div class="cc-field"><label class="cc-label">Occupancy Status</label><select class="cc-input" id="loc-occ"><option value="">Select</option></select></div>
+          <div class="cc-field"><label class="cc-label">Support Pick Type</label><select class="cc-input" id="loc-pick-type"><option value="" data-i18n="common.select">Select</option></select></div>
+          <div class="cc-field"><label class="cc-label">Status</label><select class="cc-input" id="loc-status"><option value="" data-i18n="common.select">Select</option></select></div>
+          <div class="cc-field"><label class="cc-label">Occupancy Status</label><select class="cc-input" id="loc-occ"><option value="" data-i18n="common.select">Select</option></select></div>
           <div class="cc-field"><label class="cc-label">Aisle</label><input class="cc-input" id="loc-aisle" list="loc-aisle-list" placeholder="Pick or type…" autocomplete="off"/><datalist id="loc-aisle-list"></datalist></div>
           <div class="cc-field"><label class="cc-label">Bay / Section</label><input class="cc-input" id="loc-bay" list="loc-bay-list" placeholder="Pick or type…" autocomplete="off"/><datalist id="loc-bay-list"></datalist></div>
           <div class="cc-field"><label class="cc-label">Level</label><input class="cc-input" id="loc-level" type="number" min="0" placeholder="1, 2, 3…" autocomplete="off"/></div>
@@ -2041,7 +2057,7 @@
               </tr>
             </thead>
             <tbody id="loc-results-body">
-              <tr class="empty-row"><td colspan="10">No Data</td></tr>
+              <tr class="empty-row"><td colspan="10" data-i18n="common.noData">No Data</td></tr>
             </tbody>
           </table>
         </div>
@@ -2068,8 +2084,8 @@
       </div>
       <div class="modal-footer">
         <span class="results-count" id="loc-selected-count" style="margin-right:auto">0 selected</span>
-        <button class="btn btn-secondary" onclick="closeLocationModal()">Close</button>
-        <button class="btn btn-primary" onclick="confirmLocationSelect()">Select</button>
+        <button class="btn btn-secondary" onclick="closeLocationModal()" data-i18n="common.close">Close</button>
+        <button class="btn btn-primary" onclick="confirmLocationSelect()" data-i18n="common.select">Select</button>
       </div>
     </div>
   </div>
@@ -2085,23 +2101,23 @@
 </div>
 <div id="ai-assist-panel" style="display:none;position:fixed;bottom:90px;right:24px;width:380px;max-height:520px;border-radius:16px;background:var(--card);box-shadow:0 12px 48px color-mix(in srgb,var(--foreground) 15%,transparent);z-index:9999;display:none;flex-direction:column;overflow:hidden;border:1px solid var(--border)">
   <div style="padding:14px 18px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:700;font-size:14px">AI Assistant</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary-foreground)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span style="font-weight:700;font-size:14px" data-i18n="assistant.title">AI Assistant</span></div>
     <div style="display:flex;gap:8px">
-      <span onclick="aiClear()" style="cursor:pointer;font-size:11px;opacity:.8" title="Clear chat">Clear</span>
-      <span onclick="aiToggle()" style="cursor:pointer;font-size:16px;line-height:1" title="Close">×</span>
+      <span onclick="aiClear()" style="cursor:pointer;font-size:11px;opacity:.8" title="Clear chat" data-i18n="assistant.clear" data-i18n-title="assistant.clearTitle">Clear</span>
+      <span onclick="aiToggle()" style="cursor:pointer;font-size:16px;line-height:1" title="Close" data-i18n-title="assistant.closeTitle">×</span>
     </div>
   </div>
   <div id="ai-messages" style="flex:1;overflow-y:auto;padding:14px;min-height:280px;max-height:360px"></div>
   <div style="padding:10px 14px;border-top:1px solid var(--muted)">
     <div id="ai-suggestions" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px"></div>
     <div style="display:flex;gap:6px">
-      <input id="ai-input" class="cc-input" placeholder="Ask about this dashboard…" style="flex:1;font-size:13px;padding:8px 12px" onkeyup="if(event.key==='Enter')aiSend()"/>
-      <button onclick="aiSend()" class="btn btn-primary" style="padding:8px 14px;font-size:12px">Send</button>
+      <input id="ai-input" class="cc-input" placeholder="Ask about this dashboard…" data-i18n-placeholder="assistant.placeholder" style="flex:1;font-size:13px;padding:8px 12px" onkeyup="if(event.key==='Enter')aiSend()"/>
+      <button onclick="aiSend()" class="btn btn-primary" style="padding:8px 14px;font-size:12px" data-i18n="assistant.send">Send</button>
     </div>
   </div>
 </div>
 
 <script src="/assets/js/assistant.js"></script>
-<script>syncInitialNavigation();ItemTheme.bind();</script>
+<script>syncInitialNavigation();ItemTheme.bind();ItemI18n.bindSelector();</script>
 </body>
 </html>
