@@ -60,6 +60,12 @@ async function doLogin() {
   const pass = document.getElementById('inp-pass').value;
   const errEl = document.getElementById('login-err');
   errEl.style.display = 'none';
+  if (!user || !pass) {
+    errEl.textContent = i18nT('login.required', 'Enter your username and password.');
+    errEl.style.display = 'block';
+    (document.getElementById(!user ? 'inp-user' : 'inp-pass') || {}).focus?.();
+    return false;
+  }
   btn.disabled = true; btn.textContent = i18nT('login.connecting', 'Connecting to WMS…');
   try {
     // Use IAM exchange-token via proxy — issues a JWT that Wise REST also accepts.

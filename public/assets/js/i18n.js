@@ -152,18 +152,28 @@
     return values;
   }
 
+  function setElementText(element, value) {
+    const next = String(value == null ? '' : value);
+    if (element.textContent !== next) element.textContent = next;
+  }
+
+  function setElementAttribute(element, attribute, value) {
+    const next = String(value == null ? '' : value);
+    if (element.getAttribute(attribute) !== next) element.setAttribute(attribute, next);
+  }
+
   function translateDom(rootNode) {
     const doc = root.document;
     const scope = rootNode || doc;
     if (!scope) return;
-    translatableNodes(scope, '[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
+    translatableNodes(scope, '[data-i18n]').forEach(element => setElementText(element, t(element.dataset.i18n)));
     const attributes = [
       ['data-i18n-placeholder', 'placeholder'],
       ['data-i18n-aria-label', 'aria-label'],
       ['data-i18n-title', 'title']
     ];
     attributes.forEach(([selector, attribute]) => {
-      translatableNodes(scope, '[' + selector + ']').forEach(element => element.setAttribute(attribute, t(element.getAttribute(selector))));
+      translatableNodes(scope, '[' + selector + ']').forEach(element => setElementAttribute(element, attribute, t(element.getAttribute(selector))));
     });
     translateModuleDom(scope);
   }
@@ -284,7 +294,8 @@
     if (!translated) return;
     const start = raw.match(/^\s*/)[0];
     const end = raw.match(/\s*$/)[0];
-    node.nodeValue = start + translated + end;
+    const next = start + translated + end;
+    if (node.nodeValue !== next) node.nodeValue = next;
   }
 
   function translateModuleAttributes(element) {
@@ -298,7 +309,7 @@
       const descriptor = keys[attribute] || moduleDescriptorForText(value);
       if (!descriptor) return;
       keys[attribute] = descriptor;
-      element.setAttribute(attribute, t(descriptor.key, descriptor.options));
+      setElementAttribute(element, attribute, t(descriptor.key, descriptor.options));
     });
     moduleAttributeKeys.set(element, keys);
   }
@@ -316,13 +327,13 @@
       if (rootNode.matches && rootNode.matches(GENERATED_UI_SELECTOR)) scopes.push(rootNode);
       rootNode.querySelectorAll(GENERATED_UI_SELECTOR).forEach(found => scopes.push(found));
     }
-    scopes.forEach(scope => {
-      translatableNodes(scope, '[data-i18n]').forEach(element => { element.textContent = t(element.dataset.i18n); });
+    [...new Set(scopes)].forEach(scope => {
+      translatableNodes(scope, '[data-i18n]').forEach(element => setElementText(element, t(element.dataset.i18n)));
       translatableNodes(scope, '[data-i18n-enum]').forEach(element => {
-        element.textContent = enumLabel(element.dataset.i18nEnum, element.dataset.i18nValue);
+        setElementText(element, enumLabel(element.dataset.i18nEnum, element.dataset.i18nValue));
       });
-      translatableNodes(scope, '[data-i18n-placeholder]').forEach(element => element.setAttribute('placeholder', t(element.dataset.i18nPlaceholder)));
-      translatableNodes(scope, '[data-i18n-aria-label]').forEach(element => element.setAttribute('aria-label', t(element.dataset.i18nAriaLabel)));
+      translatableNodes(scope, '[data-i18n-placeholder]').forEach(element => setElementAttribute(element, 'placeholder', t(element.dataset.i18nPlaceholder)));
+      translatableNodes(scope, '[data-i18n-aria-label]').forEach(element => setElementAttribute(element, 'aria-label', t(element.dataset.i18nAriaLabel)));
       translateModuleAttributes(scope);
       scope.querySelectorAll('*').forEach(translateModuleAttributes);
       const walker = doc.createTreeWalker(scope, root.NodeFilter.SHOW_TEXT);
@@ -337,12 +348,14 @@
     const target = doc.body;
     if (!target) return;
     moduleObserver = new root.MutationObserver(mutations => {
+      const affectedViews = new Set();
       mutations.forEach(mutation => mutation.addedNodes.forEach(node => {
         const scope = node.nodeType === 1 ? node : node.parentElement;
         if (!scope) return;
         const view = scope.closest ? scope.closest('#' + MODULE_VIEW_IDS.join(',#') + ',' + GENERATED_UI_SELECTOR) : null;
-        if (view) translateModuleDom(view);
+        if (view) affectedViews.add(view);
       }));
+      affectedViews.forEach(view => translateModuleDom(view));
     });
     moduleObserver.observe(target, {subtree:true,childList:true});
     translateModuleDom(doc);

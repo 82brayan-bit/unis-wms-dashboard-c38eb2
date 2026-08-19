@@ -20,6 +20,7 @@
     "hint": "Gamitin ang UNIS IAM (id.item.com) credentials",
     "signIn": "Mag-sign in sa WMS",
     "connecting": "Kumokonekta sa WMS…",
+    "required": "Ilagay ang username at password.",
     "failure": "Hindi nakapag-login. Suriin ang username at password.",
     "unavailable": "Hindi masimulan ang WMS session. Suriin ang sign-in at subukan muli.",
     "footer": "Ligtas na koneksyon sa Item IAM"

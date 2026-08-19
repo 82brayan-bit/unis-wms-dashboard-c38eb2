@@ -20,6 +20,7 @@
     "hint": "Sử dụng thông tin UNIS IAM (id.item.com)",
     "signIn": "Đăng nhập WMS",
     "connecting": "Đang kết nối WMS…",
+    "required": "Nhập tên người dùng và mật khẩu.",
     "failure": "Đăng nhập thất bại. Hãy kiểm tra tên người dùng và mật khẩu.",
     "unavailable": "Không thể bắt đầu phiên WMS. Hãy kiểm tra thông tin đăng nhập và thử lại.",
     "footer": "Kết nối an toàn qua Item IAM"

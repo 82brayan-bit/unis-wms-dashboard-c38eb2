@@ -20,6 +20,7 @@
     "hint": "使用 UNIS IAM (id.item.com) 凭据",
     "signIn": "登录 WMS",
     "connecting": "正在连接 WMS…",
+    "required": "请输入用户名和密码。",
     "failure": "登录失败，请检查用户名和密码。",
     "unavailable": "无法启动 WMS 会话，请检查登录信息后重试。",
     "footer": "通过 Item IAM 安全连接"

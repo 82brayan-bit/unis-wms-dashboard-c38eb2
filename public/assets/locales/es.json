@@ -20,6 +20,7 @@
     "hint": "Use sus credenciales de UNIS IAM (id.item.com)",
     "signIn": "Iniciar sesión en WMS",
     "connecting": "Conectando con WMS…",
+    "required": "Ingrese su usuario y contraseña.",
     "failure": "Error de inicio de sesión. Verifique su usuario y contraseña.",
     "unavailable": "No se pudo iniciar la sesión de WMS. Verifique sus datos e inténtelo de nuevo.",
     "footer": "Conexión segura mediante Item IAM"

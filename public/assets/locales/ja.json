@@ -20,6 +20,7 @@
     "hint": "UNIS IAM (id.item.com) の認証情報を使用してください",
     "signIn": "WMS にサインイン",
     "connecting": "WMS に接続中…",
+    "required": "ユーザー名とパスワードを入力してください。",
     "failure": "ログインに失敗しました。ユーザー名とパスワードを確認してください。",
     "unavailable": "WMS セッションを開始できません。サインイン情報を確認して再試行してください。",
     "footer": "Item IAM による安全な接続"

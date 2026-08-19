@@ -20,6 +20,7 @@
     "hint": "UNIS IAM (id.item.com) 자격 증명을 사용하세요",
     "signIn": "WMS 로그인",
     "connecting": "WMS 연결 중…",
+    "required": "사용자 이름과 비밀번호를 입력하세요.",
     "failure": "로그인에 실패했습니다. 사용자 이름과 비밀번호를 확인하세요.",
     "unavailable": "WMS 세션을 시작할 수 없습니다. 로그인 정보를 확인하고 다시 시도하세요.",
     "footer": "Item IAM을 통한 안전한 연결"

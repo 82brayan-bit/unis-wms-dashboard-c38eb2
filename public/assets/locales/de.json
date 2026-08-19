@@ -20,6 +20,7 @@
     "hint": "Verwenden Sie Ihre UNIS-IAM-Zugangsdaten (id.item.com)",
     "signIn": "Bei WMS anmelden",
     "connecting": "Verbindung mit WMS…",
+    "required": "Geben Sie Benutzername und Passwort ein.",
     "failure": "Anmeldung fehlgeschlagen. Prüfen Sie Benutzername und Passwort.",
     "unavailable": "Ihre WMS-Sitzung konnte nicht gestartet werden. Prüfen Sie die Anmeldung und versuchen Sie es erneut.",
     "footer": "Sichere Verbindung über Item IAM"
