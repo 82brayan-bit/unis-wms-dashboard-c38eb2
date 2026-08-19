@@ -24,6 +24,9 @@ test('production build emits hashed, compressed, lazy assets with intact legacy 
     assert.equal(fs.existsSync(path.join(dist, 'assets/locales', locale + '.json.gz')), true);
     assert.equal(fs.existsSync(path.join(dist, 'assets/locales', locale + '.json.br')), true);
   }
+  assert.match(manifest['/assets/js/presence-collector.js'], /presence-collector\.[0-9a-f]{10}\.js$/);
+  assert.ok(html.indexOf(manifest['/assets/js/presence-collector.js']) < html.indexOf(manifest['/assets/js/dashboard-runtime.js']),
+    'the hashed presence collector must be referenced before the hashed dashboard runtime');
   assert.match(manifest['/assets/data/facilities/lt-f1.js'], /lt-f1\.[0-9a-f]{10}\.js$/);
   // The official GIS renderer ships as its own lazy chunk: hashed in the
   // manifest, compressed, and never referenced statically by the page.
