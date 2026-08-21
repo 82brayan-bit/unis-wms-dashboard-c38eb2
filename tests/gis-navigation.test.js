@@ -48,7 +48,7 @@ test('GIS route is facility-scoped and wired to lazy real location data', () => 
   assert.match(runtime, /activeName === 'gis'[\s\S]*initGisView\(\{facilityChanged:true\}\)/);
   assert.match(modules, /function gisDashboardFacilityContext\(\)[\s\S]*facility-switcher[\s\S]*selector && selector\.value/);
   assert.match(modules, /const facilityId = context\.facilityId/);
-  assert.match(modules, /await FacilityData\.load\(facilityId\)/);
+  assert.match(modules, /gisAwaitWithin\(\s*FacilityData\.load\(facilityId\)/);
   assert.match(modules, /token !== GIS\.requestToken \|\| facilityId !== gisDashboardFacilityContext\(\)\.facilityId/);
   assert.match(modules, /Object\.entries\(locations \|\| \{\}\)/);
   assert.match(modules, /presentCustomerIds\.has\(String\(customer\.id\)\)/);

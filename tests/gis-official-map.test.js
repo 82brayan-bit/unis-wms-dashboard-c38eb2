@@ -149,11 +149,13 @@ function loadOfficial(fetchStub) {
     fetch: fetchStub,
     requestAnimationFrame: () => 0,
     cancelAnimationFrame: () => {},
+    setTimeout, clearTimeout, AbortController,
     Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console,
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(officialSource, sandbox);
+  sandbox.window.GISOfficial.configureRequestContext({ accessToken: 'fixture-token', tenantId: 'LT', timezone: 'America/Los_Angeles' });
   return sandbox.window.GISOfficial;
 }
 
@@ -323,8 +325,11 @@ test('the official GIS module is lazy-loaded only when the GIS view initializes'
   assert.doesNotMatch(html, /gis-official-map/);
 });
 
-test('initGisView tries official geometry first and keeps the schematic as the fallback', () => {
-  assert.match(gisSource, /const official = await officialModule\.loadForFacility\(facilityId, facilityName\)/);
+test('initGisView authenticates official geometry first and keeps recorded topology as the fallback', () => {
+  assert.match(gisSource, /officialModule\.configureRequestContext\(gisDashboardRequestContext\(\)\)/);
+  assert.match(gisSource, /gisAwaitWithin\(\s*officialModule\.loadForFacility/);
+  assert.match(gisSource, /gisAwaitWithin\(\s*FacilityData\.load/);
+  assert.match(gisSource, /const official = await gisAwaitWithin\(\s*officialModule\.loadForFacility\(facilityId, facilityName\)/);
   assert.match(gisSource, /if \(official\.status === 'official'\)[\s\S]*gisRenderOfficialMode\(official, context\)[\s\S]*return \{facilityId, official:true/);
   assert.match(gisSource, /gisExitOfficialMode\(official\.message\)/);
   const officialIndex = gisSource.indexOf('loadForFacility');
@@ -430,12 +435,14 @@ test('map engine failure falls back truthfully without geometry loss', async () 
     fetch: buildFetchStub(),
     requestAnimationFrame: () => 0,
     cancelAnimationFrame: () => {},
+    setTimeout, clearTimeout, AbortController,
     Map, Set, Object, Array, Number, String, Math, JSON, Promise, Date, Infinity, isFinite, console,
   };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(officialSource, sandbox);
   const G = sandbox.window.GISOfficial;
+  G.configureRequestContext({ accessToken: 'fixture-token', tenantId: 'LT', timezone: 'America/Los_Angeles' });
   G.state.leafletLoading = Promise.resolve(null); // script load failed
   const result = await G.loadForFacility('LT_F1', 'Valley View');
   assert.equal(result.status, 'unavailable');
@@ -554,14 +561,28 @@ test('every GIS proxy request is scoped to tenant LT and the selected facility',
   const first = calls[0];
   assert.equal(first.headers['x-tenant-id'], 'LT', 'tenant on facility-search');
   assert.equal(first.headers['x-facility-id'], 'LT_F1', 'facility scope set synchronously before facility-search');
+  assert.equal(first.headers.Authorization, 'Bearer fixture-token', 'signed-in bearer token on facility-search');
   assert.equal(first.headers['Item-Time-Zone'], 'America/Los_Angeles', 'default timezone on facility-search');
   assert.equal(first.headers['x-channel'], 'WEB', 'channel convention on every request');
   // Every request in the load is scoped.
   for (const call of calls) {
     assert.equal(call.headers['x-tenant-id'], 'LT', 'tenant on ' + call.url);
     assert.equal(call.headers['x-facility-id'], 'LT_F1', 'facility on ' + call.url);
+    assert.equal(call.headers.Authorization, 'Bearer fixture-token', 'bearer token on ' + call.url);
   }
   G.reset();
+});
+
+test('a stalled GIS read resolves to an actionable unavailable state within its deadline', async () => {
+  const G = loadOfficial(() => new Promise(() => {}));
+  G.configureRequestContext({ accessToken: 'fixture-token', tenantId: 'LT', timezone: 'America/Los_Angeles', requestTimeoutMs: 50 });
+  const started = Date.now();
+  const result = await G.loadForFacility('LT_F1', 'Valley View');
+  assert.equal(result.status, 'unavailable');
+  assert.equal(result.reason, 'timeout');
+  assert.match(result.message, /did not respond in time/i);
+  assert.ok(Date.now() - started < 1000, 'stalled read was bounded');
+  assert.equal(G.state.active, false);
 });
 
 test('the matched facility record replaces the timezone for later requests', async () => {

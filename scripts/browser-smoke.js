@@ -340,7 +340,7 @@ async function main() {
         if (predicate()) return;
         await new Promise(resolve => setTimeout(resolve, 25));
       }
-      throw new Error('Timed out waiting for ' + (label || 'the GIS view') + ' | state: ' + JSON.stringify({facility:GIS.facilityId, records:GIS.records.length, cells:document.getElementById('gis-map-canvas').dataset.cellCount, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), official:GIS.official.active, viewportHidden:document.getElementById('gis-map-viewport').hidden, state:document.getElementById('gis-map-state').textContent}));
+      throw new Error('Timed out waiting for ' + (label || 'the GIS view') + ' | state: ' + JSON.stringify({facility:GIS.facilityId, records:GIS.records.length, cells:document.getElementById('gis-map-canvas').dataset.cellCount, busy:document.getElementById('gis-topology').getAttribute('aria-busy'), requestToken:GIS.requestToken, officialRequestToken:window.GISOfficial ? GISOfficial.state.requestToken : null, official:GIS.official.active, viewportHidden:document.getElementById('gis-map-viewport').hidden, state:document.getElementById('gis-map-state').textContent}));
     }
     function themeState(theme, context) {
       ItemTheme.applyTheme(theme, {persist:true});
@@ -459,8 +459,11 @@ async function main() {
     initialRobotNavigation.reopened = initialTrigger.getAttribute('aria-expanded') === 'true' && initialSubmenu.classList.contains('open') && visible(initialSubmenu);
 
     const officialModuleNotLoaded = typeof window.GISOfficial === 'undefined';
+    WISE_TOKEN = ['e30', btoa(JSON.stringify({exp:Math.floor(Date.now()/1000)+3600,data:{tenant_id:'LT',user_id:'1'}})).replaceAll('+','-').replaceAll('/','_').replaceAll('=',''), 'fixture-signature'].join('.');
     await populateFacilitySwitcher();
-    await initGisView({facilityChanged:true});
+    showView('gis', null, {deferLoad:true});
+    const initialGisResult = await initGisView({facilityChanged:true});
+    console.log('[smoke] initial GIS result ' + JSON.stringify(initialGisResult));
     await waitFor(() => GIS.facilityId === 'LT_F1' && GIS.records.length > 0 && Number(document.getElementById('gis-map-canvas').dataset.cellCount) > 0 && document.getElementById('gis-topology').getAttribute('aria-busy') === 'false');
     console.log('[smoke] initial GIS fallback complete');
     const f1 = await FacilityData.load('LT_F1');

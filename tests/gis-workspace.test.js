@@ -112,6 +112,11 @@ test('workspace controls are wired in the glue', () => {
   assert.match(modules, /function gisShowMap\(\)[\s\S]*GIS\.official\.active && leaflet[\s\S]*viewport\) viewport\.hidden = true[\s\S]*leaflet\.hidden = false/);
 });
 
+test('GIS hidden states cannot be overridden by positioned workspace display rules', () => {
+  assert.match(css, /\.gis-state\[hidden\]\{display:none!important\}/);
+  assert.match(css, /\.gis-ws-map \.gis-state\{[^}]*z-index:1000/);
+});
+
 test('Leaflet vendor assets load lazily only on the GIS route', () => {
   assert.match(officialSource, /script\.src = '\/assets\/vendor\/leaflet\/leaflet\.js'/);
   assert.match(officialSource, /css\.href = '\/assets\/vendor\/leaflet\/leaflet\.css'/);

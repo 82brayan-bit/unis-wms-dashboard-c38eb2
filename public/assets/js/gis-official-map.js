@@ -23,6 +23,26 @@
   });
   var AISLE_STYLE = Object.freeze({ label: 'Aisles & roads', stroke: '#1E40AF', strokeWeight: 4, strokeOpacity: 0.8, zIndex: 1000 });
   var GRID_CELL_FEET = 3; // official cell grid step (turf squareGrid, "feet")
+  var GIS_REQUEST_TIMEOUT_MS = 8000;
+  var GIS_LOAD_TIMEOUT_MS = 15000;
+  var requestContext = { accessToken: '', tenantId: '', timezone: '', requestTimeoutMs: GIS_REQUEST_TIMEOUT_MS };
+  var pendingControllers = new Set();
+
+  function configureRequestContext(context) {
+    var value = context && typeof context === 'object' ? context : {};
+    var timeout = Number(value.requestTimeoutMs);
+    requestContext = {
+      accessToken: String(value.accessToken || '').replace(/^Bearer\s+/i, ''),
+      tenantId: String(value.tenantId || ''),
+      timezone: String(value.timezone || ''),
+      requestTimeoutMs: Number.isFinite(timeout) ? Math.max(50, Math.min(GIS_REQUEST_TIMEOUT_MS, timeout)) : GIS_REQUEST_TIMEOUT_MS,
+    };
+  }
+
+  function cancelPendingRequests() {
+    pendingControllers.forEach(function (controller) { controller.abort(); });
+    pendingControllers.clear();
+  }
 
   // Production-safe raster basemaps with required attribution (no API keys).
   // Map mode follows the Item theme (CARTO light/dark); satellite is Esri
@@ -260,22 +280,47 @@
 
   // ─────────────────────────── IO (read-only via proxy) ───────────────────────────
 
-  // Every GIS proxy request is scoped to the selected facility: tenant LT,
-  // the dashboard-selected facility id and the facility timezone (default
-  // America/Los_Angeles, replaced from the matched facility record after
-  // facility-search). The facility id is read live so facility switches
-  // replace the scope on the very next request.
+  // Every GIS proxy request inherits the signed-in tenant and bearer token,
+  // plus the dashboard-selected facility id and facility timezone. The
+  // timezone starts from the caller's context and is replaced by the exact
+  // facility-search match. Facility changes replace scope on the next request.
   function apiFetch(pathAndQuery, options) {
+    if (!requestContext.accessToken || !requestContext.tenantId) {
+      return Promise.reject(new Error('Your warehouse session is unavailable. Sign in again and retry.'));
+    }
     var headers = Object.assign({}, options && options.headers, {
       'Accept': 'application/json',
-      'x-tenant-id': 'LT',
+      'Authorization': 'Bearer ' + requestContext.accessToken,
+      'x-tenant-id': requestContext.tenantId,
       'x-facility-id': state.facilityId || '',
-      'Item-Time-Zone': state.timezone || 'America/Los_Angeles',
+      'Item-Time-Zone': state.timezone || requestContext.timezone || 'America/Los_Angeles',
       'x-channel': 'WEB',
     });
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    if (controller) pendingControllers.add(controller);
     var fetchOptions = Object.assign({}, options || {}, { headers: headers });
-    return fetch('/api/proxy/gis' + pathAndQuery, fetchOptions).then(function (response) {
-      return response.json().catch(function () { return null; });
+    if (controller) fetchOptions.signal = controller.signal;
+    var remaining = state.loadDeadline ? Math.max(1, state.loadDeadline - Date.now()) : requestContext.requestTimeoutMs;
+    var timeoutMs = Math.max(1, Math.min(requestContext.requestTimeoutMs, remaining));
+    var timer = null;
+    var timeoutPromise = new Promise(function (_, reject) {
+      timer = setTimeout(function () {
+        if (controller) controller.abort();
+        reject(new Error('The warehouse map service did not respond in time.'));
+      }, timeoutMs);
+    });
+    var request = fetch('/api/proxy/gis' + pathAndQuery, fetchOptions).then(function (response) {
+      if (response && response.ok === false) throw new Error(response.status === 401 ? 'Your warehouse session expired. Sign in again and retry.' : 'The warehouse map service is unavailable.');
+      return response.json().catch(function () { throw new Error('The warehouse map service returned an unreadable response.'); });
+    }).then(function (json) {
+      if (json && (json.success === false || (json.code != null && String(json.code) !== '0' && String(json.code) !== '200'))) {
+        throw new Error('The warehouse map service could not complete this read.');
+      }
+      return json;
+    });
+    return Promise.race([request, timeoutPromise]).finally(function () {
+      if (timer) clearTimeout(timer);
+      if (controller) pendingControllers.delete(controller);
     });
   }
 
@@ -427,8 +472,8 @@
       }, Promise.resolve()).then(function () {
         return { type: type, records: merged, totalCount: declaredTotal || merged.length, totalPage: totalPage };
       });
-    }).catch(function () {
-      return { type: type, records: [], totalCount: 0, totalPage: 1 };
+    }).catch(function (error) {
+      return { type: type, records: [], totalCount: 0, totalPage: 1, error: error };
     });
   }
 
@@ -1158,13 +1203,15 @@
   // ─────────────────────────── Public API ───────────────────────────
 
   function loadForFacility(facilityId, facilityName) {
+    cancelPendingRequests();
     state.requestToken++;
     var token = state.requestToken;
     // Scope the entire load to the selected facility synchronously, before
     // facility-search goes out, so no request can reuse a prior facility.
     state.facilityId = facilityId;
     state.facilityName = facilityName;
-    state.timezone = 'America/Los_Angeles';
+    state.timezone = requestContext.timezone || 'America/Los_Angeles';
+    state.loadDeadline = Date.now() + GIS_LOAD_TIMEOUT_MS;
     state.active = false;
     hideTooltip();
     setStatus('Loading official GIS layout for ' + facilityName + '…');
@@ -1193,12 +1240,14 @@
 
       var layers = { zone: [], rack: [], bulk: [], dock: [] };
       var counts = { zone: 0, rack: 0, bulk: 0, dock: 0, aisles: 0 };
+      var layerErrors = [];
       function loadOne(type) {
         return loadPlanarLayer(resolved.warehouseId, type, function (layerType, page, total) {
           if (token !== state.requestToken) return;
           setStatus('Loading official GIS ' + layerType + ' geometry… page ' + page + ' of ' + total);
         }).then(function (result) {
           if (token !== state.requestToken) return;
+          if (result.error) layerErrors.push(result.error);
           var features = gisToGeoJSON(result.records, type);
           layers[type] = features;
           counts[type] = features.length;
@@ -1215,6 +1264,9 @@
         state.counts = counts;
         if (!isOfficialGeometryPresent({ counts: counts })) {
           state.active = false;
+          if (layerErrors.some(function (error) { return /time|abort/i.test(error && error.message || ''); })) {
+            return { status: 'unavailable', reason: 'timeout', message: 'The warehouse map service did not respond in time. Try Refresh in a moment.' };
+          }
           return { status: 'unavailable', reason: 'no-geometry', message: 'No surveyed planar geometry is available for warehouse ' + resolved.warehouseId + '.' };
         }
         return gisLoadLeaflet().then(function (leaflet) {
@@ -1245,7 +1297,10 @@
     }).catch(function (error) {
       if (token !== state.requestToken) return { stale: true };
       state.active = false;
-      return { status: 'unavailable', reason: 'error', message: error && error.message ? error.message : 'Official GIS service could not be reached.' };
+      var timedOut = /time|abort/i.test(error && error.message || '');
+      return { status: 'unavailable', reason: timedOut ? 'timeout' : 'error', message: error && error.message ? error.message : 'Official GIS service could not be reached.' };
+    }).finally(function () {
+      if (token === state.requestToken) state.loadDeadline = 0;
     });
   }
 
@@ -1404,6 +1459,7 @@
   }
 
   function reset() {
+    cancelPendingRequests();
     state.requestToken++;
     state.active = false;
     state.mapReady = false;
@@ -1414,7 +1470,8 @@
     state.customers = new Map();
     state.customerNames = new Map();
     state.customerUnavailable = false;
-    state.timezone = 'America/Los_Angeles';
+    state.timezone = requestContext.timezone || 'America/Los_Angeles';
+    state.loadDeadline = 0;
     state.projected = [];
     state.aisleProjected = [];
     state.layerProjected = {};
@@ -1475,6 +1532,7 @@
       AISLE_STYLE: AISLE_STYLE,
       GRID_CELL_FEET: GRID_CELL_FEET,
     },
+    configureRequestContext: configureRequestContext,
     loadForFacility: loadForFacility,
     reset: reset,
     queueRender: queueRender,

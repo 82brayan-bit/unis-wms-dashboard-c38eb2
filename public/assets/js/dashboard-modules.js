@@ -4304,6 +4304,27 @@ function gisDashboardFacilityContext() {
   };
 }
 
+function gisDashboardRequestContext() {
+  const payload = decodeJwt(WISE_TOKEN);
+  const identity = payload && payload.data;
+  const facility = FACILITIES.find(candidate => String(candidate.id) === String(FACILITY_ID || ''));
+  return {
+    accessToken:String(WISE_TOKEN || ''),
+    tenantId:String((identity && (identity.tenant_id || identity.company_code)) || ''),
+    timezone:String((facility && (facility.timeZone || facility.timezone)) || ''),
+  };
+}
+
+function gisAwaitWithin(promise, timeoutMs, message) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 function gisResetFacilityContext() {
   const context = gisDashboardFacilityContext();
   GIS.requestToken++;
@@ -4358,13 +4379,25 @@ async function initGisView(options) {
   gisSetState('Loading facility topology', 'Preparing recorded warehouse locations.');
   gisResetDetail('Loading location detail…');
   gisResetMetrics();
+  gisPopulateBayPicker([]);
+  const summary = document.getElementById('gis-customer-summary');
+  if (summary) summary.textContent = 'Loading warehouse map for ' + facilityName + '.';
   try {
     // Official GIS geometry is the primary map source when the read-only GIS
     // service resolves this facility to a warehouse with surveyed planars.
     const officialModule = await gisLoadOfficialModule();
     if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     if (officialModule) {
-      const official = await officialModule.loadForFacility(facilityId, facilityName);
+      await gisAwaitWithin(ensureWiseToken(false), 8000, 'Your warehouse session could not be refreshed in time.').catch(() => false);
+      officialModule.configureRequestContext(gisDashboardRequestContext());
+      const official = await gisAwaitWithin(
+        officialModule.loadForFacility(facilityId, facilityName),
+        17000,
+        'The warehouse map service did not respond in time. Try Refresh in a moment.'
+      ).catch(error => {
+        officialModule.reset();
+        return {status:'unavailable', reason:'timeout', message:error.message};
+      });
       if (official.stale || token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
       if (official.status === 'official') {
         GIS.facilityId = facilityId;
@@ -4375,7 +4408,11 @@ async function initGisView(options) {
     } else {
       gisExitOfficialMode('The official GIS service could not be reached.');
     }
-    const result = await FacilityData.load(facilityId);
+    const result = await gisAwaitWithin(
+      FacilityData.load(facilityId),
+      10000,
+      'Recorded warehouse locations did not become available in time.'
+    );
     if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     const customers = Array.isArray(result.customers) ? result.customers : [];
     const flattened = gisFlattenLocations(result.locations, customers);
