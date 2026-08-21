@@ -2884,7 +2884,10 @@ function gisSetLoading(loading) {
   const topology = document.getElementById('gis-topology');
   const refresh = document.getElementById('gis-refresh');
   const label = document.getElementById('gis-refresh-label');
-  if (topology) topology.setAttribute('aria-busy', String(loading));
+  if (topology) {
+    topology.setAttribute('aria-busy', String(loading));
+    topology.dataset.loadState = loading ? 'loading' : 'settled';
+  }
   if (refresh) refresh.disabled = loading;
   if (label) label.textContent = loading ? 'Loading…' : 'Refresh';
   ['gis-zoom-out','gis-zoom-in','gis-fit-map'].forEach(id => {
@@ -2917,16 +2920,20 @@ function gisShowMap() {
   const state = document.getElementById('gis-map-state');
   const viewport = document.getElementById('gis-map-viewport');
   const leaflet = document.getElementById('gis-ws-leaflet');
+  const canvas = document.getElementById('gis-map-canvas');
   if (state) state.hidden = true;
   if (GIS.official.active && leaflet) {
     // Official mode renders on the basemap container; keep the schematic
     // viewport hidden so the two map surfaces never overlap.
     if (viewport) viewport.hidden = true;
+    if (canvas) canvas.hidden = true;
     leaflet.hidden = false;
     if (window.GISOfficial) window.GISOfficial.invalidateSize();
     return;
   }
+  if (leaflet) leaflet.hidden = true;
   if (viewport) viewport.hidden = false;
+  if (canvas) canvas.hidden = false;
 }
 
 function gisUpdateMetric(id, value) {
@@ -4024,7 +4031,7 @@ function gisRenderOfficialMode(result, context) {
   }
   const note = document.getElementById('gis-render-note');
   if (note) note.textContent = 'Official GIS layout: surveyed warehouse geometry from the official GIS service, shown as stored. Polygon colors and the aisle/road overlay follow the official warehouse map.';
-  const verifiedMapping = result.verified ? ' The warehouse mapping is verified against the audited facility registry.' : '';
+  const verifiedMapping = result.verified ? ' The warehouse was matched by its exact facility identifier.' : '';
   gisSetModeBanner('official', 'Official GIS layout', 'Surveyed warehouse geometry from the official GIS service. Rack, bulk, zone and dock planars are shown at their real stored coordinates with the official aisle and road overlay.' + verifiedMapping);
   gisShowMap();
   // The geometry loads while the viewport is still hidden for the loading
@@ -4325,6 +4332,58 @@ function gisAwaitWithin(promise, timeoutMs, message) {
   });
 }
 
+function gisSurfaceVisible(element) {
+  if (!element || element.hidden) return false;
+  const style = getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+}
+
+function gisWaitForSurface(kind, token, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let attempts = 0;
+  return new Promise(resolve => {
+    const inspect = () => {
+      attempts++;
+      if (token !== GIS.requestToken || !document.getElementById('view-gis').classList.contains('active')) {
+        resolve({stale:true});
+        return;
+      }
+      const state = document.getElementById('gis-map-state');
+      const stateHidden = !!state && state.hidden && getComputedStyle(state).display === 'none';
+      let ready = false;
+      if (kind === 'official') {
+        const leaflet = document.getElementById('gis-ws-leaflet');
+        const canvas = leaflet && leaflet.querySelector('canvas.gis-planar-canvas');
+        if (attempts <= 2 && window.GISOfficial) window.GISOfficial.refresh();
+        ready = GIS.official.active && gisSurfaceVisible(leaflet) && !!canvas && canvas.width > 1 && canvas.height > 1
+          && Number(leaflet.dataset.officialFeatureCount || 0) > 0 && stateHidden;
+      } else {
+        const viewport = document.getElementById('gis-map-viewport');
+        const canvas = document.getElementById('gis-map-canvas');
+        if (attempts <= 2) {
+          gisShowMap();
+          gisDrawMapCanvas();
+        }
+        ready = gisSurfaceVisible(viewport) && gisSurfaceVisible(canvas) && canvas.width > 1 && canvas.height > 1
+          && Number(canvas.dataset.cellCount || 0) > 0 && stateHidden;
+      }
+      if (ready) {
+        const topology = document.getElementById('gis-topology');
+        if (topology) topology.dataset.renderState = kind;
+        resolve({ready:true});
+        return;
+      }
+      if (Date.now() >= deadline) {
+        resolve({ready:false});
+        return;
+      }
+      setTimeout(inspect, 50);
+    };
+    setTimeout(inspect, 0);
+  });
+}
+
 function gisResetFacilityContext() {
   const context = gisDashboardFacilityContext();
   GIS.requestToken++;
@@ -4348,6 +4407,7 @@ function gisResetFacilityContext() {
   const name = document.getElementById('gis-facility-name');
   const id = document.getElementById('gis-facility-id');
   const canvas = document.getElementById('gis-map-canvas');
+  const topology = document.getElementById('gis-topology');
   if (summary) summary.textContent = 'Loading overall facility information for ' + context.facilityName + '.';
   if (legend) legend.innerHTML = '';
   if (name) name.textContent = context.facilityName;
@@ -4357,6 +4417,7 @@ function gisResetFacilityContext() {
     canvas.dataset.activeCellCount = '0';
     canvas.dataset.sharedCellCount = '0';
   }
+  if (topology) topology.dataset.renderState = 'pending';
   gisSetLoading(true);
   gisSetStatus('Loading locations for ' + context.facilityName + '...');
   gisSetState('Loading facility topology', 'Preparing recorded warehouse locations for ' + context.facilityName + '.');
@@ -4402,9 +4463,12 @@ async function initGisView(options) {
       if (official.status === 'official') {
         GIS.facilityId = facilityId;
         gisRenderOfficialMode(official, context);
-        return {facilityId, official:true, warehouseId:official.warehouseId, counts:official.counts};
+        const officialSurface = await gisWaitForSurface('official', token, 2500);
+        if (officialSurface.stale) return {stale:true};
+        if (officialSurface.ready) return {facilityId, official:true, warehouseId:official.warehouseId, counts:official.counts};
+        gisExitOfficialMode('The surveyed warehouse map could not be displayed. Showing the recorded WMS topology instead.');
       }
-      gisExitOfficialMode(official.message);
+      if (official.status !== 'official') gisExitOfficialMode(official.message);
     } else {
       gisExitOfficialMode('The official GIS service could not be reached.');
     }
@@ -4438,6 +4502,14 @@ async function initGisView(options) {
     }
     gisSetStatus(GIS.records.length.toLocaleString() + ' recorded locations loaded for ' + facilityName + '.');
     renderGisTopology();
+    const schematicSurface = await gisWaitForSurface('schematic', token, 2500);
+    if (schematicSurface.stale) return {stale:true};
+    if (!schematicSurface.ready) {
+      gisSetStatus('The warehouse topology could not be displayed for ' + facilityName + '.');
+      gisSetState('Warehouse map could not be displayed', 'Try Refresh. If the map remains unavailable, choose another facility or contact warehouse support.');
+      gisResetDetail('Location detail is unavailable until the warehouse map can be displayed.');
+      return {unavailable:true, facilityId, reason:'render'};
+    }
     return {facilityId, count:GIS.records.length};
   } catch (error) {
     if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};

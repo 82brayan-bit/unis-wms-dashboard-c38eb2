@@ -114,7 +114,14 @@ test('workspace controls are wired in the glue', () => {
 
 test('GIS hidden states cannot be overridden by positioned workspace display rules', () => {
   assert.match(css, /\.gis-state\[hidden\]\{display:none!important\}/);
+  assert.match(css, /\.gis-map-canvas\[hidden\],\.gis-ws-leaflet\[hidden\]\{display:none!important\}/);
+  assert.match(css, /\.gis-mode-banner\[hidden\],\.gis-layer-controls\[hidden\],\.gis-map-browser\[hidden\]\{display:none!important\}/);
   assert.match(css, /\.gis-ws-map \.gis-state\{[^}]*z-index:1000/);
+  assert.match(modules, /function gisShowMap\(\)[\s\S]*if \(canvas\) canvas\.hidden = true[\s\S]*if \(canvas\) canvas\.hidden = false/);
+  assert.match(modules, /function gisWaitForSurface\(kind, token, timeoutMs\)/);
+  assert.match(modules, /gisWaitForSurface\('official', token, 2500\)/);
+  assert.match(modules, /gisWaitForSurface\('schematic', token, 2500\)/);
+  assert.match(modules, /Warehouse map could not be displayed/);
 });
 
 test('Leaflet vendor assets load lazily only on the GIS route', () => {
