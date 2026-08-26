@@ -4339,6 +4339,18 @@ function gisSurfaceVisible(element) {
   return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
 }
 
+function gisSurfaceAbove(element, possibleOccluder) {
+  if (!element || typeof document.elementsFromPoint !== 'function') return false;
+  const rect = element.getBoundingClientRect();
+  const stack = document.elementsFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  const surfaceIndex = stack.findIndex(node => node === element || element.contains(node));
+  if (surfaceIndex < 0) return false;
+  const occluderIndex = possibleOccluder
+    ? stack.findIndex(node => node === possibleOccluder || possibleOccluder.contains(node))
+    : -1;
+  return occluderIndex < 0 || surfaceIndex < occluderIndex;
+}
+
 function gisWaitForSurface(kind, token, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let attempts = 0;
@@ -4354,19 +4366,21 @@ function gisWaitForSurface(kind, token, timeoutMs) {
       let ready = false;
       if (kind === 'official') {
         const leaflet = document.getElementById('gis-ws-leaflet');
+        const topology = document.getElementById('gis-topology');
         const canvas = leaflet && leaflet.querySelector('canvas.gis-planar-canvas');
         if (attempts <= 2 && window.GISOfficial) window.GISOfficial.refresh();
         ready = GIS.official.active && gisSurfaceVisible(leaflet) && !!canvas && canvas.width > 1 && canvas.height > 1
-          && Number(leaflet.dataset.officialFeatureCount || 0) > 0 && stateHidden;
+          && Number(leaflet.dataset.officialFeatureCount || 0) > 0 && stateHidden && gisSurfaceAbove(leaflet, topology);
       } else {
         const viewport = document.getElementById('gis-map-viewport');
+        const leaflet = document.getElementById('gis-ws-leaflet');
         const canvas = document.getElementById('gis-map-canvas');
         if (attempts <= 2) {
           gisShowMap();
           gisDrawMapCanvas();
         }
         ready = gisSurfaceVisible(viewport) && gisSurfaceVisible(canvas) && canvas.width > 1 && canvas.height > 1
-          && Number(canvas.dataset.cellCount || 0) > 0 && stateHidden;
+          && Number(canvas.dataset.cellCount || 0) > 0 && stateHidden && gisSurfaceAbove(viewport, leaflet);
       }
       if (ready) {
         const topology = document.getElementById('gis-topology');

@@ -16,6 +16,7 @@ const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'public/assets/css/dashboard.css'), 'utf8');
 const modules = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-modules.js'), 'utf8');
 const officialSource = fs.readFileSync(path.join(ROOT, 'public/assets/js/gis-official-map.js'), 'utf8');
+const browserSmoke = fs.readFileSync(path.join(ROOT, 'scripts/browser-smoke.js'), 'utf8');
 
 test('the GIS view is an immersive workspace, not a dashboard card', () => {
   assert.match(html, /id="view-gis"[\s\S]*id="gis-workspace"/);
@@ -116,12 +117,18 @@ test('GIS hidden states cannot be overridden by positioned workspace display rul
   assert.match(css, /\.gis-state\[hidden\]\{display:none!important\}/);
   assert.match(css, /\.gis-map-canvas\[hidden\],\.gis-ws-leaflet\[hidden\]\{display:none!important\}/);
   assert.match(css, /\.gis-mode-banner\[hidden\],\.gis-layer-controls\[hidden\],\.gis-map-browser\[hidden\]\{display:none!important\}/);
+  assert.match(css, /\.gis-ws-leaflet\{[^}]*z-index:2/);
   assert.match(css, /\.gis-ws-map \.gis-state\{[^}]*z-index:1000/);
   assert.match(modules, /function gisShowMap\(\)[\s\S]*if \(canvas\) canvas\.hidden = true[\s\S]*if \(canvas\) canvas\.hidden = false/);
   assert.match(modules, /function gisWaitForSurface\(kind, token, timeoutMs\)/);
+  assert.match(modules, /function gisSurfaceAbove\(element, possibleOccluder\)/);
+  assert.match(modules, /gisSurfaceAbove\(leaflet, topology\)/);
   assert.match(modules, /gisWaitForSurface\('official', token, 2500\)/);
   assert.match(modules, /gisWaitForSurface\('schematic', token, 2500\)/);
   assert.match(modules, /Warehouse map could not be displayed/);
+  assert.match(browserSmoke, /GIS loaded before an authenticated warehouse session/);
+  assert.match(browserSmoke, /Clean browser must show sign-in without exposing a GIS loading state/);
+  assert.match(browserSmoke, /Clean browser inherited a service worker or cache entry/);
 });
 
 test('Leaflet vendor assets load lazily only on the GIS route', () => {

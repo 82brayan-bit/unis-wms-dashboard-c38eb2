@@ -321,6 +321,8 @@ async function main() {
 
   const initialChunkRequests = requests.filter(url => /\/assets\/data\/facilities\//.test(url));
   assert(initialChunkRequests.length === 0, 'Facility data was requested before a facility was selected');
+  const preAuthGisRequests = requests.filter(url => /\/api\/proxy\/gis\/|\/assets\/js\/gis-official-map\./.test(url));
+  assert(preAuthGisRequests.length === 0, 'GIS loaded before an authenticated warehouse session: ' + JSON.stringify(preAuthGisRequests));
 
   const summary = await evaluate(`(async () => {
     const captureCanvas = ${JSON.stringify(Boolean(screenshotPath))};
@@ -358,6 +360,15 @@ async function main() {
         foreground:colors.getPropertyValue('--foreground').trim()
       };
     }
+    const cleanSession = {
+      accessToken:localStorage.getItem('wise_token'),
+      refreshToken:localStorage.getItem('wise_refresh_token'),
+      loginVisible:visible(document.getElementById('login-screen')),
+      appVisible:visible(document.getElementById('app')),
+      gisStateVisible:visible(document.getElementById('gis-map-state')),
+      serviceWorkers:'serviceWorker' in navigator ? (await navigator.serviceWorker.getRegistrations()).length : 0,
+      cacheEntries:'caches' in window ? (await caches.keys()).length : 0
+    };
     const lightLogin = themeState('light', 'login');
     const darkLogin = themeState('dark', 'login');
     const lightApp = themeState('light', 'app');
@@ -711,7 +722,7 @@ async function main() {
     }
     document.getElementById('view-dashboard').classList.add('active');
     return {
-      lightLogin,darkLogin,lightApp,darkApp,language,views,initialRobotNavigation,
+      cleanSession,lightLogin,darkLogin,lightApp,darkApp,language,views,initialRobotNavigation,
       officialModuleNotLoaded,
       initialGisFacility,immediateF42Reset,immediateBackReset,backToF1State,staleLoadState,
       f1:{customers:f1.customers.length,presentCustomers:f1.customers.filter(customer => (f1.locations[customer.id] || []).length > 0).length,groups:Object.keys(f1.locations).length,cached:f1.cached},
@@ -821,6 +832,14 @@ async function main() {
       aisles:Number(mapEl.dataset.officialAisleCount),
       source:mapEl.dataset.geometrySource,
       warehouseId:mapEl.dataset.warehouseId,
+      surfaceAboveTopology:(() => {
+        const topology = document.getElementById('gis-topology');
+        const rect = mapEl.getBoundingClientRect();
+        const stack = document.elementsFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        const mapIndex = stack.findIndex(node => node === mapEl || mapEl.contains(node));
+        const topologyIndex = stack.findIndex(node => node === topology || topology.contains(node));
+        return mapIndex >= 0 && (topologyIndex < 0 || mapIndex < topologyIndex);
+      })(),
       mapReady:!!G.state.map,
       leafletContainer:document.getElementById('gis-ws-leaflet').classList.contains('leaflet-container'),
       attribution:document.querySelector('.leaflet-control-attribution') ? document.querySelector('.leaflet-control-attribution').textContent : '',
@@ -981,6 +1000,7 @@ async function main() {
   // Immersive workspace + basemap map with authoritative geometry.
   assert(os.source === 'official-gis' && os.warehouseId === '12', 'Official GIS geometry did not render for LT_F1');
   assert(os.mapReady && os.leafletContainer, 'The interactive basemap map did not initialize');
+  assert(os.surfaceAboveTopology, 'The official GIS surface is covered by the topology lifecycle layer');
   assert(os.attribution.includes('OpenStreetMap') && os.attribution.includes('CARTO'), 'Basemap attribution is missing: ' + os.attribution);
   assert(os.basemapMode === 'map' && os.mapModeButton === 'Satellite' && os.mapModePressed === 'false', 'Map mode button state is wrong');
   assert(os.satellite.mode === 'satellite' && os.satellite.label === 'Map' && os.satellite.pressed === 'true', 'Satellite toggle did not switch the basemap');
@@ -1015,7 +1035,9 @@ async function main() {
   assert(og.restored.source === 'official-gis' && og.restored.schematicHidden && og.restored.banner.includes('Official GIS layout'), 'Switching back did not restore the official map: ' + JSON.stringify(og.restored));
   officialMock.enabled = false;
 
-
+  assert(summary.cleanSession.accessToken === null && summary.cleanSession.refreshToken === null, 'Clean browser unexpectedly inherited a warehouse session');
+  assert(summary.cleanSession.loginVisible && !summary.cleanSession.appVisible && !summary.cleanSession.gisStateVisible, 'Clean browser must show sign-in without exposing a GIS loading state: ' + JSON.stringify(summary.cleanSession));
+  assert(summary.cleanSession.serviceWorkers === 0 && summary.cleanSession.cacheEntries === 0, 'Clean browser inherited a service worker or cache entry: ' + JSON.stringify(summary.cleanSession));
 
   for (const state of [summary.lightLogin, summary.darkLogin, summary.lightApp, summary.darkApp]) {
     assert(state.logoCount === 1, state.theme + ' ' + state.logoCount + ' visible logos');
