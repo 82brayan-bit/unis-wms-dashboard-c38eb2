@@ -1157,10 +1157,15 @@
             <div class="cc-field"><label class="cc-label">Analysis Type</label><select class="cc-input" id="abc-analysis-type"><option value="combined">Inbound + Outbound</option><option value="outbound">Outbound Only</option><option value="inbound">Inbound Only</option></select></div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="abcSyncFromWms()">Sync from WMS</button>
-            <button class="btn btn-secondary" onclick="abcRunAnalysis()">Run Analysis</button>
-            <button class="btn btn-secondary" onclick="abcRefreshAll()">Refresh Results</button>
+            <button class="btn btn-primary" id="abc-sync-btn" onclick="abcSyncFromWms()">Sync from WMS</button>
+            <button class="btn btn-secondary" id="abc-run-btn" onclick="abcRunAnalysis()">Run Analysis</button>
+            <button class="btn btn-secondary" id="abc-refresh-btn" onclick="abcRefreshAll()">Refresh Results</button>
             <span id="abc-status" style="font-size:12px;color:var(--muted-foreground)"></span>
+          </div>
+          <div id="abc-sync-metrics" role="status" aria-live="polite" style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)">
+            <span>Available SKUs <strong id="abc-metric-available">—</strong></span>
+            <span>Skipped unavailable rows <strong id="abc-metric-skipped">—</strong></span>
+            <span>Deactivated stale SKUs <strong id="abc-metric-stale">—</strong></span>
           </div>
         </div>
 
@@ -1178,7 +1183,7 @@
             <div><div class="card-ttl">ABC Item Analysis</div><div class="scheduler-help">Searchable latest calculation results for the selected facility and customer.</div></div>
             <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="cc-input" id="abc-search" placeholder="Search SKU" oninput="abcRenderItems()" style="width:180px"/><select class="cc-input" id="abc-filter-class" onchange="abcRenderItems()" style="width:120px"><option value="">All ABC</option><option>A</option><option>B</option><option>C</option></select></div>
           </div>
-          <div style="overflow:auto"><table class="data-table" style="min-width:1150px"><thead><tr><th>SKU</th><th>ABC</th><th>Trend</th><th>Outbound Units</th><th>Pick Lines</th><th>Inbound Units</th><th>Cube Velocity</th><th>Slotting Score</th><th>Recommended Storage</th><th>Priority</th><th>Status</th></tr></thead><tbody id="abc-items-body"><tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted-foreground)">Select a customer and run or refresh analysis.</td></tr></tbody></table></div>
+          <div style="overflow:auto"><table class="data-table" style="min-width:1400px"><thead><tr><th>SKU</th><th>ABC</th><th>Trend</th><th>In Inventory</th><th>Available Qty</th><th>Location</th><th>Outbound Units</th><th>Pick Lines</th><th>Inbound Units</th><th>Cube Velocity</th><th>Slotting Score</th><th>Recommended Storage</th><th>Priority</th><th>Status</th></tr></thead><tbody id="abc-items-body"><tr><td colspan="14" style="text-align:center;padding:28px;color:var(--muted-foreground)">Select a customer and run or refresh analysis.</td></tr></tbody></table></div>
         </div>
 
         <div class="card" style="margin-bottom:16px">

@@ -202,6 +202,11 @@ CREATE TABLE IF NOT EXISTS abc_sku_master (
   UNIQUE(facility_code, customer_id, sku)
 );
 
+ALTER TABLE abc_sku_master ADD COLUMN IF NOT EXISTS available_quantity NUMERIC DEFAULT 0;
+ALTER TABLE abc_sku_master ADD COLUMN IF NOT EXISTS available_location TEXT;
+ALTER TABLE abc_sku_master ADD COLUMN IF NOT EXISTS availability_checked_at TIMESTAMPTZ;
+ALTER TABLE abc_sku_master ADD COLUMN IF NOT EXISTS inactive_reason TEXT;
+
 CREATE TABLE IF NOT EXISTS abc_location_master (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   facility_code TEXT NOT NULL,
@@ -337,6 +342,8 @@ CREATE TABLE IF NOT EXISTS abc_analysis_runs (
   updated_by TEXT
 );
 
+ALTER TABLE abc_analysis_runs ADD COLUMN IF NOT EXISTS sync_metrics JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE TABLE IF NOT EXISTS abc_calculation_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id UUID NOT NULL REFERENCES abc_analysis_runs(id) ON DELETE CASCADE,
@@ -364,6 +371,11 @@ CREATE TABLE IF NOT EXISTS abc_calculation_results (
   created_by TEXT,
   updated_by TEXT
 );
+
+ALTER TABLE abc_calculation_results ADD COLUMN IF NOT EXISTS currently_in_inventory BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE abc_calculation_results ADD COLUMN IF NOT EXISTS available_quantity NUMERIC DEFAULT 0;
+ALTER TABLE abc_calculation_results ADD COLUMN IF NOT EXISTS available_location TEXT;
+ALTER TABLE abc_calculation_results ADD COLUMN IF NOT EXISTS inactive_reason TEXT;
 
 CREATE TABLE IF NOT EXISTS abc_trend_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -131,8 +131,9 @@ function aiClear() {
 
 
 // ═══ ABC INVENTORY SLOTTING MODULE ═══
-const ABC_STATE = {items: [], recommendations: [], dashboard: null, initialized: false};
+const ABC_STATE = {items: [], recommendations: [], dashboard: null, availabilityMetrics: null, initialized: false};
 function abcSetStatus(msg, color) { const el = document.getElementById('abc-status'); if (el) { el.textContent = msg || ''; el.style.color = color || 'var(--muted-foreground)'; } }
+function abcSetBusy(busy) { ['abc-sync-btn','abc-run-btn','abc-refresh-btn'].forEach(id => { const el = document.getElementById(id); if (el) { el.disabled = !!busy; el.setAttribute('aria-busy', busy ? 'true' : 'false'); } }); }
 function abcCustomerId() { return (document.getElementById('abc-customer') || {}).value || ''; }
 function abcScopeQuery() { return 'facilityId=' + encodeURIComponent(FACILITY_ID) + '&customerId=' + encodeURIComponent(abcCustomerId()); }
 function abcConfigPayload() {
@@ -174,6 +175,7 @@ async function abcFetchJson(url, opts) {
 }
 async function abcRefreshAll() {
   if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
+  abcSetBusy(true);
   abcSetStatus('Loading ABC results…');
   try {
     const [dash, items, recs] = await Promise.all([
@@ -181,36 +183,45 @@ async function abcRefreshAll() {
       abcFetchJson('/api/abc-slotting/items?' + abcScopeQuery() + '&limit=200'),
       abcFetchJson('/api/abc-slotting/recommendations?' + abcScopeQuery()),
     ]);
-    ABC_STATE.dashboard = dash; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
+    ABC_STATE.dashboard = dash; ABC_STATE.availabilityMetrics = dash.availabilityMetrics || null; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
     abcRenderDashboard(); abcRenderItems(); abcRenderRecommendations();
-    abcSetStatus(dash.empty ? 'No official analysis exists yet for this customer.' : 'ABC results loaded.', dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
+    abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : 'ABC results loaded.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
   } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', 'var(--destructive)'); }
+  finally { abcSetBusy(false); }
 }
 async function abcSyncFromWms() {
   if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
   const startDate = (document.getElementById('abc-start') || {}).value;
   const endDate = (document.getElementById('abc-end') || {}).value;
   if (!startDate || !endDate) { abcSetStatus('Select a date range.', 'var(--destructive)'); return; }
+  abcSetBusy(true);
   abcSetStatus('Syncing SKU, location, inventory, inbound, and outbound data from WMS…');
   try {
     const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
     const d = await abcFetchJson('/api/abc-slotting/sync-wms', {method:'POST', body:JSON.stringify(body)});
     const s = d.summary || {};
+    ABC_STATE.availabilityMetrics = s;
+    abcRenderAvailabilityMetrics(s);
     abcSetStatus('WMS sync complete: ' + (s.skuMaster || 0) + ' SKU(s), ' + (s.locations || 0) + ' location(s), ' + (s.inboundTransactions || 0) + ' inbound row(s), ' + (s.outboundTransactions || 0) + ' outbound row(s).', 'var(--chart-3)');
   } catch(e) { abcSetStatus(e.message || 'WMS sync failed.', 'var(--destructive)'); }
+  finally { abcSetBusy(false); }
 }
 async function abcRunAnalysis() {
   if (!abcCustomerId()) { abcSetStatus('Select a customer first.', 'var(--destructive)'); return; }
   const startDate = (document.getElementById('abc-start') || {}).value;
   const endDate = (document.getElementById('abc-end') || {}).value;
   if (!startDate || !endDate) { abcSetStatus('Select a date range.', 'var(--destructive)'); return; }
+  abcSetBusy(true);
   abcSetStatus('Running server-side ABC analysis…');
   try {
     const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, method:(document.getElementById('abc-method')||{}).value || 'outbound_units', analysisType:(document.getElementById('abc-analysis-type')||{}).value || 'combined', config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
     const d = await abcFetchJson('/api/abc-slotting/run-analysis', {method:'POST', body:JSON.stringify(body)});
+    ABC_STATE.availabilityMetrics = d.availabilityMetrics || ABC_STATE.availabilityMetrics;
+    abcRenderAvailabilityMetrics(ABC_STATE.availabilityMetrics);
     abcSetStatus('Analysis completed: ' + (d.resultCount || 0) + ' SKU(s).', 'var(--chart-3)');
     await abcRefreshAll();
   } catch(e) { abcSetStatus(e.message || 'Analysis failed.', 'var(--destructive)'); }
+  finally { abcSetBusy(false); }
 }
 function abcRenderDashboard() {
   const dash = ABC_STATE.dashboard || {}; const abc = {}; (dash.abcCounts || []).forEach(r => abc[r.abc_class] = r.count);
@@ -221,6 +232,14 @@ function abcRenderDashboard() {
   set('abc-kpi-growth', (trends['Rapidly Increasing'] || 0) + (trends['Increasing'] || 0));
   set('abc-kpi-dormant', (trends['Dormant'] || 0) + (trends['No Activity'] || 0));
   set('abc-kpi-recs', recTotal || 0);
+  abcRenderAvailabilityMetrics(dash.availabilityMetrics || ABC_STATE.availabilityMetrics);
+}
+function abcRenderAvailabilityMetrics(metrics) {
+  const m = metrics || {};
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value == null || value === '' ? '—' : Number(value).toLocaleString(); };
+  set('abc-metric-available', m.availableInventorySkus);
+  set('abc-metric-skipped', m.skippedUnavailableInventoryRows);
+  set('abc-metric-stale', m.deactivatedStaleSkus != null ? m.deactivatedStaleSkus : m.inactivatedUnavailableSkus);
 }
 function abcRenderItems() {
   const body = document.getElementById('abc-items-body'); if (!body) return;
@@ -229,19 +248,22 @@ function abcRenderItems() {
   let rows = ABC_STATE.items || [];
   if (q) rows = rows.filter(r => String(r.sku || '').toLowerCase().includes(q));
   if (cls) rows = rows.filter(r => r.abc_class === cls);
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:28px;color:var(--muted-foreground)">No SKU analysis rows found. Import data and run analysis.</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:28px;color:var(--muted-foreground)">No SKU analysis rows found. Sync current inventory and run analysis.</td></tr>'; return; }
   body.innerHTML = rows.map(r => '<tr>' +
     '<td style="font-family:monospace">' + esc(r.sku || '') + '</td>' +
     '<td><strong>' + esc(r.abc_class || '—') + '</strong></td>' +
     '<td>' + esc(r.trend_status || '—') + '</td>' +
+    '<td>' + (r.currently_in_inventory === false || r.master_active === false ? '<span style="color:var(--destructive);font-weight:700">No</span>' : '<span style="color:var(--chart-3);font-weight:700">Yes</span>') + '</td>' +
+    '<td>' + Number(r.current_available_quantity ?? r.available_quantity ?? 0).toLocaleString() + '</td>' +
+    '<td>' + esc(r.current_available_location || r.available_location || '—') + '</td>' +
     '<td>' + Number(r.total_outbound_units || 0).toLocaleString() + '</td>' +
     '<td>' + Number(r.pick_lines || 0).toLocaleString() + '</td>' +
-    '<td>—</td>' +
+    '<td>' + Number(r.total_inbound_units || 0).toLocaleString() + '</td>' +
     '<td>' + Number(r.cube_velocity_score || 0).toFixed(1) + '</td>' +
     '<td>' + Number(r.slotting_score || 0).toFixed(1) + '</td>' +
     '<td>' + esc(r.recommended_storage_type || '—') + '</td>' +
     '<td>' + esc(r.priority || '—') + '</td>' +
-    '<td>' + esc(r.approval_status || '—') + '</td>' +
+    '<td>' + (r.currently_in_inventory === false || r.master_active === false ? '<span style="color:var(--destructive)" title="' + escAttr(r.inactive_reason || r.master_inactive_reason || 'No available inventory in the latest WMS inventory-status result.') + '">Inactive: unavailable</span>' : esc(r.approval_status || '—')) + '</td>' +
     '</tr>').join('');
 }
 function abcRenderRecommendations() {

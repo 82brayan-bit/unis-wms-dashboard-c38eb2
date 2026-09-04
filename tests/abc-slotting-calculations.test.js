@@ -54,3 +54,45 @@ test('upload template validation catches missing headers', () => {
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(e => e.includes('item_description')));
 });
+
+test('inventory-status response envelopes and quantity variants normalize to positive unique SKUs', () => {
+  const payload = {data:{result:{records:[
+    {itemCode:'FAST', availableQuantity:'3', locationName:'A-01'},
+    {itemCode:'FAST', available_units:2, locationId:'B-02'},
+    {itemCode:'ZERO', availableQty:0},
+    {itemCode:'BAD', availableQty:'not-a-number'},
+    {itemCode:'MISSING'}
+  ]}}};
+  const normalized = abc.normalizeInventoryRows(abc._private.wmsRows(payload));
+  assert.deepEqual(normalized.rows.map(r => r.sku), ['FAST']);
+  assert.equal(normalized.rows[0].availableQuantity, 5);
+  assert.equal(normalized.rows[0].availableLocation, 'A-01, B-02');
+  assert.equal(normalized.availableInventorySkus, 1);
+  assert.equal(normalized.skippedUnavailableInventoryRows, 3);
+  assert.equal(normalized.duplicateAvailableInventoryRows, 1);
+});
+
+test('inventory pagination metadata supports nested page and count fields', () => {
+  const rows = abc._private.wmsRows({data:{items:[{itemCode:'A'}]}});
+  assert.equal(rows.length, 1);
+  assert.equal(abc._private.wmsTotalPages({data:{paging:{totalPages:3}}}, rows, 100), 3);
+  assert.equal(abc._private.wmsTotalPages({data:{totalCount:201}}, rows, 100), 3);
+  assert.equal(abc._private.wmsTotalPages({data:{items:[{itemCode:'A'}]}}, rows, 100), 1);
+});
+
+test('transient WMS failures are retryable while business errors are not', () => {
+  assert.equal(abc._private.isTransientWmsError('WMS service unreachable', 502), true);
+  assert.equal(abc._private.isTransientWmsError('invalid customer', 400), false);
+});
+
+test('analysis excludes activity for SKUs outside the current available set', () => {
+  const rows = abc.aggregateAnalysis({
+    skuMaster: [{sku:'AVAILABLE', available_quantity:4}, {sku:'STALE', available_quantity:0}],
+    outbound: [{sku:'AVAILABLE', picked_units:2}, {sku:'STALE', picked_units:999}],
+    inbound: [{sku:'STALE', units_received:999}],
+    availableSkuSet: new Set(['AVAILABLE']),
+    startDate:'2026-01-01', endDate:'2026-01-10'
+  });
+  assert.deepEqual(rows.map(row => row.sku), ['AVAILABLE']);
+  assert.equal(rows[0].totalOutboundUnits, 2);
+});
