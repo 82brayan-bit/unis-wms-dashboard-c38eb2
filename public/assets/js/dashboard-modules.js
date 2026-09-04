@@ -4464,13 +4464,14 @@ async function initGisView(options) {
     if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
     if (officialModule) {
       await gisAwaitWithin(ensureWiseToken(false), 8000, 'Your warehouse session could not be refreshed in time.').catch(() => false);
+      if (token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};
       officialModule.configureRequestContext(gisDashboardRequestContext());
       const official = await gisAwaitWithin(
         officialModule.loadForFacility(facilityId, facilityName),
         17000,
         'The warehouse map service did not respond in time. Try Refresh in a moment.'
       ).catch(error => {
-        officialModule.reset();
+        if (token === GIS.requestToken && facilityId === gisDashboardFacilityContext().facilityId) officialModule.reset();
         return {status:'unavailable', reason:'timeout', message:error.message};
       });
       if (official.stale || token !== GIS.requestToken || facilityId !== gisDashboardFacilityContext().facilityId) return {stale:true};

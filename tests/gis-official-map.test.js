@@ -17,6 +17,52 @@ const modules = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-modu
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const gisSource = modules.slice(modules.indexOf('// ═══ ROBOT COUNT GIS'), modules.indexOf('async function loadRobotWarehouseInventory'));
 const officialSource = fs.readFileSync(path.join(ROOT, 'public/assets/js/gis-official-map.js'), 'utf8');
+const initGisViewSource = modules.slice(modules.indexOf('async function initGisView'), modules.indexOf('function refreshGisView'));
+
+function createInitGisViewHarness({ ensureWiseToken, loadForFacility }) {
+  const selected = { facilityId: 'LT_F1', facilityName: 'Valley View' };
+  let officialResetCalls = 0;
+  const officialModule = {
+    configureRequestContext() {},
+    loadForFacility,
+    reset() { officialResetCalls++; },
+  };
+  const sandbox = {
+    GIS: {
+      facilityId: selected.facilityId,
+      requestToken: 0,
+      records: [],
+      customers: new Map(),
+      map: { selectedKey: '', selectedLocationName: '' },
+      official: { active: false },
+    },
+    FacilityData: { load: async () => ({ unavailable: true, customers: [], locations: {} }) },
+    document: { getElementById: () => null },
+    gisDashboardFacilityContext: () => ({ ...selected }),
+    gisResetFacilityContext: () => ({ ...selected }),
+    gisLoadOfficialModule: async () => officialModule,
+    ensureWiseToken,
+    gisDashboardRequestContext: () => ({}),
+    gisAwaitWithin: promise => Promise.resolve(promise),
+    gisSetLoading() {}, gisSetStatus() {}, gisSetState() {}, gisResetDetail() {}, gisResetMetrics() {},
+    gisPopulateBayPicker() {}, gisRenderOfficialMode() {}, gisExitOfficialMode() {}, gisPopulateFilters() {},
+    gisFlattenLocations: () => ({ records: [], customerNames: new Map() }),
+    renderGisTopology() {}, gisWaitForSurface: async () => ({ ready: false }),
+    console, Map, Promise, Array, Object, String,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(initGisViewSource + '\nthis.initGisView = initGisView;', sandbox);
+  return {
+    GIS: sandbox.GIS,
+    initGisView: sandbox.initGisView,
+    selectFacility(facilityId, facilityName) {
+      selected.facilityId = facilityId;
+      selected.facilityName = facilityName;
+      sandbox.GIS.requestToken++;
+    },
+    officialResetCalls: () => officialResetCalls,
+  };
+}
 
 // ── Sanitized real-shape fixtures (LT_F1 → official GIS warehouse 12) ──
 
@@ -368,6 +414,48 @@ test('official mode honors stale request guards and facility resets', () => {
   assert.match(gisSource, /function gisFitMap\(\)[\s\S]*GIS\.official\.active[\s\S]*GISOfficial\.fitMap/);
   const runtime = fs.readFileSync(path.join(ROOT, 'public/assets/js/dashboard-runtime.js'), 'utf8');
   assert.match(runtime, /activeName === 'gis'[\s\S]*initGisView\(\{facilityChanged:true\}\)/);
+});
+
+test('a facility switch during token refresh cannot start an obsolete official GIS load', async () => {
+  let resumeTokenRefresh;
+  let tokenRefreshStarted;
+  const refreshStarted = new Promise(resolve => { tokenRefreshStarted = resolve; });
+  const refreshGate = new Promise(resolve => { resumeTokenRefresh = resolve; });
+  const loadCalls = [];
+  const harness = createInitGisViewHarness({
+    ensureWiseToken: () => { tokenRefreshStarted(); return refreshGate; },
+    loadForFacility: async (facilityId) => {
+      loadCalls.push(facilityId);
+      return { status: 'unavailable', message: 'No geometry' };
+    },
+  });
+
+  const pending = harness.initGisView();
+  await refreshStarted;
+  harness.selectFacility('LT_F42', 'Airport');
+  resumeTokenRefresh(true);
+
+  assert.equal((await pending).stale, true);
+  assert.deepEqual(loadCalls, [], 'the superseded facility must not start an official GIS read');
+});
+
+test('an obsolete official GIS timeout cannot reset the newer facility context', async () => {
+  let rejectOfficialLoad;
+  let officialLoadStarted;
+  const loadStarted = new Promise(resolve => { officialLoadStarted = resolve; });
+  const officialLoad = new Promise((_, reject) => { rejectOfficialLoad = reject; });
+  const harness = createInitGisViewHarness({
+    ensureWiseToken: async () => true,
+    loadForFacility: () => { officialLoadStarted(); return officialLoad; },
+  });
+
+  const pending = harness.initGisView();
+  await loadStarted;
+  harness.selectFacility('LT_F42', 'Airport');
+  rejectOfficialLoad(new Error('The warehouse map service did not respond in time.'));
+
+  assert.equal((await pending).stale, true);
+  assert.equal(harness.officialResetCalls(), 0, 'a superseded timeout must not reset the newer official map');
 });
 
 test('official GIS source never fabricates coordinates or markers', () => {
