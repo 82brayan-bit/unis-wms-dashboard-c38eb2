@@ -1157,7 +1157,7 @@
             <fieldset class="cc-field abc-analysis-type-field">
               <legend class="cc-label">Analysis Type</legend>
               <div class="abc-analysis-type-options" id="abc-analysis-type">
-                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="combined" checked onchange="abcAnalysisTypeChanged(this.value)"/><span>Inbound + Outbound</span></label>
+                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="combined" checked onchange="abcAnalysisTypeChanged(this.value)"/><span>Inbound + Outbound + Current Inventory</span></label>
                 <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="outbound" onchange="abcAnalysisTypeChanged(this.value)"/><span>Outbound Only</span></label>
                 <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="inbound" onchange="abcAnalysisTypeChanged(this.value)"/><span>Inbound Only</span></label>
                 <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="inventory" onchange="abcAnalysisTypeChanged(this.value)"/><span>Current Inventory</span></label>
@@ -1170,6 +1170,7 @@
             <button class="btn btn-secondary" id="abc-refresh-btn" onclick="abcRefreshAll()">Refresh Results</button>
             <span id="abc-status" style="font-size:12px;color:var(--muted-foreground)"></span>
           </div>
+          <div class="abc-analysis-scope" id="abc-analysis-scope" role="status" aria-live="polite">Inbound + Outbound + Current Inventory · Only current inventory items are included.</div>
           <div id="abc-sync-metrics" role="status" aria-live="polite" style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)">
             <span>Available SKUs <strong id="abc-metric-available">—</strong></span>
             <span>Skipped unavailable rows <strong id="abc-metric-skipped">—</strong></span>

@@ -87,16 +87,18 @@ test('transient WMS failures are retryable while business errors are not', () =>
   assert.equal(abc._private.isTransientWmsError('invalid customer', 400), false);
 });
 
-test('analysis excludes activity for SKUs outside the current available set', () => {
+test('combined analysis keeps inbound and outbound movement only for current available SKUs', () => {
   const rows = abc.aggregateAnalysis({
     skuMaster: [{sku:'AVAILABLE', available_quantity:4}, {sku:'STALE', available_quantity:0}],
     outbound: [{sku:'AVAILABLE', picked_units:2}, {sku:'STALE', picked_units:999}],
-    inbound: [{sku:'STALE', units_received:999}],
+    inbound: [{sku:'AVAILABLE', units_received:7}, {sku:'STALE', units_received:999}],
     availableSkuSet: new Set(['AVAILABLE']),
+    analysisType:'combined',
     startDate:'2026-01-01', endDate:'2026-01-10'
   });
   assert.deepEqual(rows.map(row => row.sku), ['AVAILABLE']);
   assert.equal(rows[0].totalOutboundUnits, 2);
+  assert.equal(rows[0].totalInboundUnits, 7);
 });
 
 test('current inventory analysis ranks positive available SKUs by available quantity', () => {
@@ -132,10 +134,13 @@ test('ABC Analysis Type exposes Current Inventory as an always-visible selectabl
   const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'js', 'assistant.js'), 'utf8');
   const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'css', 'dashboard.css'), 'utf8');
   assert.match(html, /<fieldset class="cc-field abc-analysis-type-field">[\s\S]*?<legend class="cc-label">Analysis Type<\/legend>/);
+  assert.match(html, /value="combined" checked[^>]*\/><span>Inbound \+ Outbound \+ Current Inventory<\/span>/);
   assert.match(html, /<input type="radio" name="abc-analysis-type" value="inventory"[^>]*\/><span>Current Inventory<\/span>/);
+  assert.match(html, /id="abc-analysis-scope"[^>]*>Inbound \+ Outbound \+ Current Inventory · Only current inventory items are included\.<\/div>/);
   assert.doesNotMatch(html, /<select[^>]+id="abc-analysis-type"/);
   assert.match(css, /\.abc-analysis-type-options\{display:grid/);
   assert.match(client, /analysisType\s*[,}]/);
   assert.match(client, /abcAnalysisTypeValue\(\)/);
   assert.match(client, /abcSetAnalysisType\(dash\.analysisType\)/);
+  assert.match(client, /Unavailable historical SKUs are excluded\./);
 });

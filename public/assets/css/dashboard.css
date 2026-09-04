@@ -293,6 +293,7 @@ select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/a
 .abc-analysis-type-option:hover span{border-color:var(--ring);color:var(--foreground)}
 .abc-analysis-type-option input:checked+span{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 14%,var(--card));color:var(--foreground)}
 .abc-analysis-type-option input:focus-visible+span{outline:2px solid var(--ring);outline-offset:2px}
+.abc-analysis-scope{margin-top:10px;padding-left:10px;border-left:3px solid var(--primary);color:var(--muted-foreground);font-size:12px;font-weight:550;line-height:1.45}
 .toggle-wrap{display:flex;align-items:center;height:42px}
 .chip-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:6px 32px 6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);min-height:42px;align-items:center;cursor:pointer;position:relative}
 .chip-wrap:focus-within,.chip-wrap.open{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent)}

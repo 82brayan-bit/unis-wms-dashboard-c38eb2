@@ -148,7 +148,13 @@ function abcSetAnalysisType(value) {
   return true;
 }
 function abcAnalysisTypeLabel(value) {
-  return value === 'inventory' ? 'Current inventory' : (value === 'outbound' ? 'Outbound' : (value === 'inbound' ? 'Inbound' : 'Inbound + outbound'));
+  return value === 'inventory' ? 'Current Inventory' : (value === 'outbound' ? 'Outbound Only' : (value === 'inbound' ? 'Inbound Only' : 'Inbound + Outbound + Current Inventory'));
+}
+function abcRenderAnalysisScope(value, count) {
+  const el = document.getElementById('abc-analysis-scope'); if (!el) return;
+  const hasCount = count !== undefined && count !== null && Number.isFinite(Number(count));
+  const included = hasCount ? Number(count).toLocaleString() + ' current inventory SKU(s) included.' : 'Only current inventory items are included.';
+  el.textContent = abcAnalysisTypeLabel(value) + ' · ' + included + (value === 'inventory' ? ' Ranked by positive available quantity.' : ' Unavailable historical SKUs are excluded.');
 }
 function abcAnalysisTypeChanged(value) {
   if (value) {
@@ -163,6 +169,8 @@ function abcAnalysisTypeChanged(value) {
     method.disabled = false;
     if (method.value === 'available_quantity') method.value = method.dataset.activityMethod || 'outbound_units';
   }
+  const metrics = ABC_STATE.availabilityMetrics || {};
+  abcRenderAnalysisScope(abcAnalysisTypeValue(), metrics.availableInventorySkus);
 }
 function abcConfigPayload() {
   return {
@@ -214,7 +222,7 @@ async function abcRefreshAll() {
     ABC_STATE.dashboard = dash; ABC_STATE.availabilityMetrics = dash.availabilityMetrics || null; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
     if (dash.analysisType) abcSetAnalysisType(dash.analysisType); else abcAnalysisTypeChanged();
     abcRenderDashboard(); abcRenderItems(); abcRenderRecommendations();
-    abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : abcAnalysisTypeLabel(dash.analysisType) + ' ABC results loaded.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
+    abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : abcAnalysisTypeLabel(dash.analysisType) + ' ABC results loaded. Only current inventory items are included.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
   } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', 'var(--destructive)'); }
   finally { abcSetBusy(false); }
 }
@@ -250,7 +258,7 @@ async function abcRunAnalysis() {
     abcRenderAvailabilityMetrics(ABC_STATE.availabilityMetrics);
     await abcRefreshAll();
     const resultCount = Number(d.resultCount || 0);
-    abcSetStatus(analysisType === 'inventory' && !resultCount ? 'No SKUs with available inventory were found for this customer.' : abcAnalysisTypeLabel(analysisType) + ' analysis completed: ' + resultCount + ' SKU(s).', resultCount ? 'var(--chart-3)' : 'var(--chart-4)');
+    abcSetStatus(analysisType === 'inventory' && !resultCount ? 'No SKUs with available inventory were found for this customer.' : abcAnalysisTypeLabel(analysisType) + ' analysis completed: ' + resultCount + ' current inventory SKU(s).', resultCount ? 'var(--chart-3)' : 'var(--chart-4)');
   } catch(e) { abcSetStatus(e.message || 'Analysis failed.', 'var(--destructive)'); }
   finally { abcSetBusy(false); }
 }
@@ -264,6 +272,7 @@ function abcRenderDashboard() {
   set('abc-kpi-dormant', (trends['Dormant'] || 0) + (trends['No Activity'] || 0));
   set('abc-kpi-recs', recTotal || 0);
   abcRenderAvailabilityMetrics(dash.availabilityMetrics || ABC_STATE.availabilityMetrics);
+  abcRenderAnalysisScope(dash.analysisType || abcAnalysisTypeValue(), (dash.availabilityMetrics || {}).availableInventorySkus);
 }
 function abcRenderAvailabilityMetrics(metrics) {
   const m = metrics || {};
@@ -271,6 +280,7 @@ function abcRenderAvailabilityMetrics(metrics) {
   set('abc-metric-available', m.availableInventorySkus);
   set('abc-metric-skipped', m.skippedUnavailableInventoryRows);
   set('abc-metric-stale', m.deactivatedStaleSkus != null ? m.deactivatedStaleSkus : m.inactivatedUnavailableSkus);
+  abcRenderAnalysisScope(abcAnalysisTypeValue(), m.availableInventorySkus);
 }
 function abcRenderItems() {
   const body = document.getElementById('abc-items-body'); if (!body) return;
