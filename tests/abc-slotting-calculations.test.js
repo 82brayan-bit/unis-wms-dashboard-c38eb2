@@ -1,6 +1,8 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const abc = require('../lib/abc-slotting');
 
 test('ABC percentages and cumulative ranking classify A/B/C', () => {
@@ -95,4 +97,40 @@ test('analysis excludes activity for SKUs outside the current available set', ()
   });
   assert.deepEqual(rows.map(row => row.sku), ['AVAILABLE']);
   assert.equal(rows[0].totalOutboundUnits, 2);
+});
+
+test('current inventory analysis ranks positive available SKUs by available quantity', () => {
+  const rows = abc.aggregateAnalysis({
+    skuMaster: [
+      {sku:'FAST', available_quantity:80, available_location:'A-01'},
+      {sku:'MEDIUM', available_quantity:15, available_location:'B-02'},
+      {sku:'SLOW', available_quantity:5, available_location:'C-03'},
+      {sku:'UNAVAILABLE', available_quantity:0},
+    ],
+    outbound: [
+      {sku:'FAST', picked_units:1},
+      {sku:'MEDIUM', picked_units:10},
+      {sku:'SLOW', picked_units:1000},
+      {sku:'UNAVAILABLE', picked_units:5000},
+    ],
+    availableSkuSet: new Set(['FAST', 'MEDIUM', 'SLOW']),
+    analysisType:'inventory',
+    method:'outbound_units',
+    startDate:'2026-01-01',
+    endDate:'2026-01-10',
+  });
+
+  assert.deepEqual(rows.map(row => row.sku), ['FAST', 'MEDIUM', 'SLOW']);
+  assert.deepEqual(rows.map(row => row.abcClass), ['A', 'B', 'C']);
+  assert.deepEqual(rows.map(row => row.rankValue), [80, 15, 5]);
+  assert.equal(rows[0].availableLocation, 'A-01');
+  assert.ok(rows.every(row => row.currentlyInInventory));
+});
+
+test('ABC Analysis Type selector exposes Current Inventory as a real mode', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'js', 'assistant.js'), 'utf8');
+  assert.match(html, /id="abc-analysis-type"[^>]*>[\s\S]*?<option value="inventory">Current Inventory<\/option>/);
+  assert.match(client, /analysisType\s*[,}]/);
+  assert.match(client, /abcAnalysisTypeValue\(\)/);
 });

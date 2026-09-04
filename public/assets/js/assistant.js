@@ -136,6 +136,20 @@ function abcSetStatus(msg, color) { const el = document.getElementById('abc-stat
 function abcSetBusy(busy) { ['abc-sync-btn','abc-run-btn','abc-refresh-btn'].forEach(id => { const el = document.getElementById(id); if (el) { el.disabled = !!busy; el.setAttribute('aria-busy', busy ? 'true' : 'false'); } }); }
 function abcCustomerId() { return (document.getElementById('abc-customer') || {}).value || ''; }
 function abcScopeQuery() { return 'facilityId=' + encodeURIComponent(FACILITY_ID) + '&customerId=' + encodeURIComponent(abcCustomerId()); }
+function abcAnalysisTypeValue() { return (document.getElementById('abc-analysis-type') || {}).value || 'combined'; }
+function abcAnalysisTypeLabel(value) {
+  return value === 'inventory' ? 'Current inventory' : (value === 'outbound' ? 'Outbound' : (value === 'inbound' ? 'Inbound' : 'Inbound + outbound'));
+}
+function abcAnalysisTypeChanged() {
+  const method = document.getElementById('abc-method'); if (!method) return;
+  if (abcAnalysisTypeValue() === 'inventory') {
+    if (method.value !== 'available_quantity') method.dataset.activityMethod = method.value || 'outbound_units';
+    method.value = 'available_quantity'; method.disabled = true;
+  } else {
+    method.disabled = false;
+    if (method.value === 'available_quantity') method.value = method.dataset.activityMethod || 'outbound_units';
+  }
+}
 function abcConfigPayload() {
   return {
     abcThresholdA: Number((document.getElementById('abc-cfg-a') || {}).value || 80),
@@ -160,7 +174,7 @@ function abcInitDates() {
   if (start && !start.value) { const d = new Date(); d.setDate(d.getDate() - 89); start.value = d.toISOString().slice(0,10); }
 }
 async function abcInit() {
-  abcPopulateCustomers(); abcInitDates();
+  abcPopulateCustomers(); abcInitDates(); abcAnalysisTypeChanged();
   if (!ABC_STATE.initialized) { ABC_STATE.initialized = true; abcSetStatus('Select a customer, then run analysis or refresh existing results.'); }
   if (abcCustomerId()) await abcRefreshAll();
 }
@@ -184,8 +198,9 @@ async function abcRefreshAll() {
       abcFetchJson('/api/abc-slotting/recommendations?' + abcScopeQuery()),
     ]);
     ABC_STATE.dashboard = dash; ABC_STATE.availabilityMetrics = dash.availabilityMetrics || null; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
+    if (dash.analysisType) { const type = document.getElementById('abc-analysis-type'); if (type) type.value = dash.analysisType; abcAnalysisTypeChanged(); }
     abcRenderDashboard(); abcRenderItems(); abcRenderRecommendations();
-    abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : 'ABC results loaded.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
+    abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : abcAnalysisTypeLabel(dash.analysisType) + ' ABC results loaded.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
   } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', 'var(--destructive)'); }
   finally { abcSetBusy(false); }
 }
@@ -211,15 +226,17 @@ async function abcRunAnalysis() {
   const startDate = (document.getElementById('abc-start') || {}).value;
   const endDate = (document.getElementById('abc-end') || {}).value;
   if (!startDate || !endDate) { abcSetStatus('Select a date range.', 'var(--destructive)'); return; }
+  const analysisType = abcAnalysisTypeValue();
   abcSetBusy(true);
-  abcSetStatus('Running server-side ABC analysis…');
+  abcSetStatus(analysisType === 'inventory' ? 'Analyzing current available inventory…' : 'Running server-side ABC analysis…');
   try {
-    const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, method:(document.getElementById('abc-method')||{}).value || 'outbound_units', analysisType:(document.getElementById('abc-analysis-type')||{}).value || 'combined', config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
+    const body = {facilityId:FACILITY_ID, customerId:abcCustomerId(), startDate, endDate, method:(document.getElementById('abc-method')||{}).value || 'outbound_units', analysisType, config:abcConfigPayload(), user:admGetCurrentUsername ? admGetCurrentUsername() : ''};
     const d = await abcFetchJson('/api/abc-slotting/run-analysis', {method:'POST', body:JSON.stringify(body)});
     ABC_STATE.availabilityMetrics = d.availabilityMetrics || ABC_STATE.availabilityMetrics;
     abcRenderAvailabilityMetrics(ABC_STATE.availabilityMetrics);
-    abcSetStatus('Analysis completed: ' + (d.resultCount || 0) + ' SKU(s).', 'var(--chart-3)');
     await abcRefreshAll();
+    const resultCount = Number(d.resultCount || 0);
+    abcSetStatus(analysisType === 'inventory' && !resultCount ? 'No SKUs with available inventory were found for this customer.' : abcAnalysisTypeLabel(analysisType) + ' analysis completed: ' + resultCount + ' SKU(s).', resultCount ? 'var(--chart-3)' : 'var(--chart-4)');
   } catch(e) { abcSetStatus(e.message || 'Analysis failed.', 'var(--destructive)'); }
   finally { abcSetBusy(false); }
 }
@@ -248,7 +265,7 @@ function abcRenderItems() {
   let rows = ABC_STATE.items || [];
   if (q) rows = rows.filter(r => String(r.sku || '').toLowerCase().includes(q));
   if (cls) rows = rows.filter(r => r.abc_class === cls);
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:28px;color:var(--muted-foreground)">No SKU analysis rows found. Sync current inventory and run analysis.</td></tr>'; return; }
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:28px;color:var(--muted-foreground)">' + (abcAnalysisTypeValue() === 'inventory' ? 'No SKUs with available inventory were found for this customer.' : 'No SKU analysis rows found. Sync current inventory and run analysis.') + '</td></tr>'; return; }
   body.innerHTML = rows.map(r => '<tr>' +
     '<td style="font-family:monospace">' + esc(r.sku || '') + '</td>' +
     '<td><strong>' + esc(r.abc_class || '—') + '</strong></td>' +

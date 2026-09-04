@@ -720,9 +720,22 @@ async function main() {
       if (view) view.classList.add('active');
       views[id] = !!view && visible(view);
     }
+    const abcType = document.getElementById('abc-analysis-type');
+    const abcMethod = document.getElementById('abc-method');
+    const abcAnalysisType = {
+      options:Array.from(abcType.options).map(option => ({value:option.value,label:option.textContent.trim()}))
+    };
+    abcType.value = 'inventory';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
+    abcAnalysisType.inventory = {selected:abcType.value,method:abcMethod.value,methodDisabled:abcMethod.disabled};
+    abcType.value = 'outbound';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
+    abcAnalysisType.activity = {selected:abcType.value,method:abcMethod.value,methodDisabled:abcMethod.disabled};
+    abcType.value = 'combined';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
     document.getElementById('view-dashboard').classList.add('active');
     return {
-      cleanSession,lightLogin,darkLogin,lightApp,darkApp,language,views,initialRobotNavigation,
+      cleanSession,lightLogin,darkLogin,lightApp,darkApp,language,views,abcAnalysisType,initialRobotNavigation,
       officialModuleNotLoaded,
       initialGisFacility,immediateF42Reset,immediateBackReset,backToF1State,staleLoadState,
       f1:{customers:f1.customers.length,presentCustomers:f1.customers.filter(customer => (f1.locations[customer.id] || []).length > 0).length,groups:Object.keys(f1.locations).length,cached:f1.cached},
@@ -1064,6 +1077,9 @@ async function main() {
   assert(summary.language.robotSequence[1].heading === 'Conteo robotizado · Escaneo de inventario del almacén' && summary.language.robotSequence[2].secondary === '机器人队列状态', 'Robot Count content did not rerender in Spanish and Chinese');
   assert(summary.language.restoredLang === 'en' && summary.language.restoredDir === 'ltr', 'English language restoration failed');
   assert(Object.values(summary.views).every(Boolean), 'A representative production view did not render: ' + JSON.stringify(summary.views));
+  assert(summary.abcAnalysisType.options.some(option => option.value === 'inventory' && option.label === 'Current Inventory'), 'Current Inventory is missing from the ABC Analysis Type selector');
+  assert(summary.abcAnalysisType.inventory.selected === 'inventory' && summary.abcAnalysisType.inventory.method === 'available_quantity' && summary.abcAnalysisType.inventory.methodDisabled, 'Current Inventory did not select and lock the available-quantity ranking method: ' + JSON.stringify(summary.abcAnalysisType));
+  assert(summary.abcAnalysisType.activity.selected === 'outbound' && summary.abcAnalysisType.activity.method === 'outbound_units' && !summary.abcAnalysisType.activity.methodDisabled, 'Switching back to activity analysis did not restore the prior ABC method: ' + JSON.stringify(summary.abcAnalysisType));
   const expectedInitialView = initialAppUrl.hash === '#gis' ? 'view-gis' : 'view-robots';
   const expectedInitialChildActive = initialAppUrl.hash === '#gis' ? summary.initialRobotNavigation.gisActive : summary.initialRobotNavigation.overviewActive;
   assert(summary.initialRobotNavigation.hash === initialAppUrl.hash && summary.initialRobotNavigation.activeView === expectedInitialView, 'Smoke did not start directly in ' + initialAppUrl.hash);

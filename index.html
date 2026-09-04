@@ -1140,7 +1140,7 @@
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
             <div>
               <div class="card-ttl">ABC Inventory Slotting &amp; Trend Analysis</div>
-              <div class="scheduler-help">Analyze inbound/outbound movement by facility, customer, and SKU. Results are calculated server-side and isolated by facility/customer.</div>
+              <div class="scheduler-help">Analyze current inventory or inbound/outbound movement by facility, customer, and SKU. Results are calculated server-side and isolated by facility/customer.</div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <a class="btn btn-secondary" href="/api/abc-slotting/templates/sku-master" style="height:34px;font-size:12px;text-decoration:none">SKU Template</a>
@@ -1153,8 +1153,8 @@
             <div class="cc-field"><label class="cc-label"><span class="req">*</span> Customer</label><select class="cc-input" id="abc-customer"><option value="">Select customer</option></select></div>
             <div class="cc-field"><label class="cc-label">Start Date</label><input class="cc-input" type="date" id="abc-start" /></div>
             <div class="cc-field"><label class="cc-label">End Date</label><input class="cc-input" type="date" id="abc-end" /></div>
-            <div class="cc-field"><label class="cc-label">ABC Method</label><select class="cc-input" id="abc-method"><option value="outbound_units">Outbound Units</option><option value="outbound_cases">Outbound Cases</option><option value="outbound_pallets">Outbound Pallets</option><option value="pick_lines">Pick Lines</option><option value="order_frequency">Order Frequency</option><option value="location_visits">Location Visits</option><option value="cube_movement">Cube Movement</option><option value="composite">Weighted Composite</option></select></div>
-            <div class="cc-field"><label class="cc-label">Analysis Type</label><select class="cc-input" id="abc-analysis-type"><option value="combined">Inbound + Outbound</option><option value="outbound">Outbound Only</option><option value="inbound">Inbound Only</option></select></div>
+            <div class="cc-field"><label class="cc-label">ABC Method</label><select class="cc-input" id="abc-method"><option value="available_quantity" hidden>Available Quantity</option><option value="outbound_units">Outbound Units</option><option value="outbound_cases">Outbound Cases</option><option value="outbound_pallets">Outbound Pallets</option><option value="pick_lines">Pick Lines</option><option value="order_frequency">Order Frequency</option><option value="location_visits">Location Visits</option><option value="cube_movement">Cube Movement</option><option value="composite">Weighted Composite</option></select></div>
+            <div class="cc-field"><label class="cc-label">Analysis Type</label><select class="cc-input" id="abc-analysis-type" onchange="abcAnalysisTypeChanged()"><option value="combined">Inbound + Outbound</option><option value="outbound">Outbound Only</option><option value="inbound">Inbound Only</option><option value="inventory">Current Inventory</option></select></div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" id="abc-sync-btn" onclick="abcSyncFromWms()">Sync from WMS</button>
