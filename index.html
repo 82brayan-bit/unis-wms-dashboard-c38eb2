@@ -1154,15 +1154,15 @@
             <div class="cc-field"><label class="cc-label">Start Date</label><input class="cc-input" type="date" id="abc-start" /></div>
             <div class="cc-field"><label class="cc-label">End Date</label><input class="cc-input" type="date" id="abc-end" /></div>
             <div class="cc-field"><label class="cc-label">ABC Method</label><select class="cc-input" id="abc-method"><option value="available_quantity" hidden>Available Quantity</option><option value="outbound_units">Outbound Units</option><option value="outbound_cases">Outbound Cases</option><option value="outbound_pallets">Outbound Pallets</option><option value="pick_lines">Pick Lines</option><option value="order_frequency">Order Frequency</option><option value="location_visits">Location Visits</option><option value="cube_movement">Cube Movement</option><option value="composite">Weighted Composite</option></select></div>
-            <fieldset class="cc-field abc-analysis-type-field">
-              <legend class="cc-label">Analysis Type</legend>
-              <div class="abc-analysis-type-options" id="abc-analysis-type">
-                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="combined" checked onchange="abcAnalysisTypeChanged(this.value)"/><span>Inbound + Outbound + Current Inventory</span></label>
-                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="outbound" onchange="abcAnalysisTypeChanged(this.value)"/><span>Outbound Only</span></label>
-                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="inbound" onchange="abcAnalysisTypeChanged(this.value)"/><span>Inbound Only</span></label>
-                <label class="abc-analysis-type-option"><input type="radio" name="abc-analysis-type" value="inventory" onchange="abcAnalysisTypeChanged(this.value)"/><span>Current Inventory</span></label>
-              </div>
-            </fieldset>
+            <div class="cc-field abc-analysis-type-field">
+              <label class="cc-label" for="abc-analysis-type">Analysis Type</label>
+              <select class="cc-input" id="abc-analysis-type" onchange="abcAnalysisTypeChanged(this.value)">
+                <option value="combined" selected>Inbound + Outbound + Current Inventory</option>
+                <option value="outbound">Outbound Only</option>
+                <option value="inbound">Inbound Only</option>
+                <option value="inventory">Current Inventory</option>
+              </select>
+            </div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
             <button class="btn btn-primary" id="abc-sync-btn" onclick="abcSyncFromWms()">Sync from WMS</button>

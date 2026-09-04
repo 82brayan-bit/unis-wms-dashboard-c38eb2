@@ -129,16 +129,14 @@ test('current inventory analysis ranks positive available SKUs by available quan
   assert.ok(rows.every(row => row.currentlyInInventory));
 });
 
-test('ABC Analysis Type exposes Current Inventory as an always-visible selectable mode', () => {
+test('ABC Analysis Type is an accessible dropdown with the combined current-inventory mode selected', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const client = fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'js', 'assistant.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'public', 'assets', 'css', 'dashboard.css'), 'utf8');
-  assert.match(html, /<fieldset class="cc-field abc-analysis-type-field">[\s\S]*?<legend class="cc-label">Analysis Type<\/legend>/);
-  assert.match(html, /value="combined" checked[^>]*\/><span>Inbound \+ Outbound \+ Current Inventory<\/span>/);
-  assert.match(html, /<input type="radio" name="abc-analysis-type" value="inventory"[^>]*\/><span>Current Inventory<\/span>/);
+  assert.match(html, /<label class="cc-label" for="abc-analysis-type">Analysis Type<\/label>/);
+  assert.match(html, /<select class="cc-input" id="abc-analysis-type"[^>]*>[\s\S]*?<option value="combined" selected>Inbound \+ Outbound \+ Current Inventory<\/option>/);
+  assert.match(html, /<option value="outbound">Outbound Only<\/option>[\s\S]*?<option value="inbound">Inbound Only<\/option>[\s\S]*?<option value="inventory">Current Inventory<\/option>/);
   assert.match(html, /id="abc-analysis-scope"[^>]*>Inbound \+ Outbound \+ Current Inventory · Only current inventory items are included\.<\/div>/);
-  assert.doesNotMatch(html, /<select[^>]+id="abc-analysis-type"/);
-  assert.match(css, /\.abc-analysis-type-options\{display:grid/);
+  assert.doesNotMatch(html, /input type="radio" name="abc-analysis-type"/);
   assert.match(client, /analysisType\s*[,}]/);
   assert.match(client, /abcAnalysisTypeValue\(\)/);
   assert.match(client, /abcSetAnalysisType\(dash\.analysisType\)/);

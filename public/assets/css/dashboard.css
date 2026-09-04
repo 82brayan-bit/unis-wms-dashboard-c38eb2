@@ -285,14 +285,7 @@ html.dark [data-item-logo]{content:url("/assets/brand/item-logo-dark.svg")}
 .cc-input[disabled]{background:var(--accent);color:var(--muted-foreground)}
 select.cc-input{appearance:none;-webkit-appearance:none;background-image:url("/assets/icons/chevron-down.svg");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer}
 .cc-input.date{background-image:url("/assets/icons/calendar.svg");background-repeat:no-repeat;background-position:12px center;padding-left:36px}
-.abc-analysis-type-field{grid-column:1/-1;border:0;min-width:0}
-.abc-analysis-type-options{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:6px;width:100%}
-.abc-analysis-type-option{position:relative;min-width:0;cursor:pointer}
-.abc-analysis-type-option input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.abc-analysis-type-option span{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;background:var(--card);color:var(--muted-foreground);font-size:12px;font-weight:650;text-align:center;transition:background .15s,border-color .15s,color .15s}
-.abc-analysis-type-option:hover span{border-color:var(--ring);color:var(--foreground)}
-.abc-analysis-type-option input:checked+span{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 14%,var(--card));color:var(--foreground)}
-.abc-analysis-type-option input:focus-visible+span{outline:2px solid var(--ring);outline-offset:2px}
+.abc-analysis-type-field{grid-column:1/-1;width:min(100%,420px);min-width:0}
 .abc-analysis-scope{margin-top:10px;padding-left:10px;border-left:3px solid var(--primary);color:var(--muted-foreground);font-size:12px;font-weight:550;line-height:1.45}
 .toggle-wrap{display:flex;align-items:center;height:42px}
 .chip-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:6px 32px 6px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);min-height:42px;align-items:center;cursor:pointer;position:relative}
@@ -646,8 +639,6 @@ html[dir="rtl"] .language-option small{text-align:left}
   .language-trigger .language-current,.language-trigger svg{display:none}
 }
 @media (max-width:760px){html[dir="rtl"] .language-popover{right:12px;left:12px}}
-@media (max-width:760px){.abc-analysis-type-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:420px){.abc-analysis-type-options{grid-template-columns:1fr}}
 
 /* ═══ IMMERSIVE GIS WORKSPACE ═══ */
 #view-gis.active{height:calc(100vh - 62px);overflow:hidden;margin:-22px -24px;padding:0}

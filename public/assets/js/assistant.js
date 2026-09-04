@@ -137,14 +137,14 @@ function abcSetBusy(busy) { ['abc-sync-btn','abc-run-btn','abc-refresh-btn'].for
 function abcCustomerId() { return (document.getElementById('abc-customer') || {}).value || ''; }
 function abcScopeQuery() { return 'facilityId=' + encodeURIComponent(FACILITY_ID) + '&customerId=' + encodeURIComponent(abcCustomerId()); }
 function abcAnalysisTypeValue() {
-  const selected = document.querySelector('input[name="abc-analysis-type"]:checked');
-  return selected ? selected.value : 'combined';
+  const select = document.getElementById('abc-analysis-type');
+  return select ? select.value : 'combined';
 }
 function abcSetAnalysisType(value) {
-  const option = Array.from(document.querySelectorAll('input[name="abc-analysis-type"]')).find(input => input.value === value);
-  if (!option) return false;
-  option.checked = true;
-  abcAnalysisTypeChanged(option.value);
+  const select = document.getElementById('abc-analysis-type');
+  if (!select || !Array.from(select.options).some(option => option.value === value)) return false;
+  select.value = value;
+  abcAnalysisTypeChanged(value);
   return true;
 }
 function abcAnalysisTypeLabel(value) {
@@ -157,10 +157,8 @@ function abcRenderAnalysisScope(value, count) {
   el.textContent = abcAnalysisTypeLabel(value) + ' · ' + included + (value === 'inventory' ? ' Ranked by positive available quantity.' : ' Unavailable historical SKUs are excluded.');
 }
 function abcAnalysisTypeChanged(value) {
-  if (value) {
-    const option = Array.from(document.querySelectorAll('input[name="abc-analysis-type"]')).find(input => input.value === value);
-    if (option) option.checked = true;
-  }
+  const select = document.getElementById('abc-analysis-type');
+  if (value && select && Array.from(select.options).some(option => option.value === value)) select.value = value;
   const method = document.getElementById('abc-method'); if (!method) return;
   if (abcAnalysisTypeValue() === 'inventory') {
     if (method.value !== 'available_quantity') method.dataset.activityMethod = method.value || 'outbound_units';

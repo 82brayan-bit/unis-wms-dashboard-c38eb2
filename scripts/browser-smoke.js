@@ -723,23 +723,25 @@ async function main() {
     document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
     document.getElementById('view-abcSlotting').classList.add('active');
     const abcType = document.getElementById('abc-analysis-type');
-    const abcTypeInputs = Array.from(abcType.querySelectorAll('input[name="abc-analysis-type"]'));
     const abcMethod = document.getElementById('abc-method');
     const abcAnalysisType = {
+      control:abcType.tagName,
+      visible:visible(abcType),
       defaultSelection:abcAnalysisTypeValue(),
-      options:abcTypeInputs.map(option => ({
+      defaultLabel:abcType.options[abcType.selectedIndex].textContent.trim(),
+      options:Array.from(abcType.options).map(option => ({
         value:option.value,
-        label:option.nextElementSibling.textContent.trim(),
-        visible:visible(option.closest('label'))
+        label:option.textContent.trim()
       }))
     };
-    const inventoryOption = abcTypeInputs.find(option => option.value === 'inventory');
-    inventoryOption.click();
-    abcAnalysisType.inventory = {selected:abcAnalysisTypeValue(),checked:inventoryOption.checked,method:abcMethod.value,methodDisabled:abcMethod.disabled,summary:document.getElementById('abc-analysis-scope').textContent};
-    const outboundOption = abcTypeInputs.find(option => option.value === 'outbound');
-    outboundOption.click();
-    abcAnalysisType.activity = {selected:abcAnalysisTypeValue(),checked:outboundOption.checked,method:abcMethod.value,methodDisabled:abcMethod.disabled,summary:document.getElementById('abc-analysis-scope').textContent};
-    abcTypeInputs.find(option => option.value === 'combined').click();
+    abcType.value = 'inventory';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
+    abcAnalysisType.inventory = {selected:abcAnalysisTypeValue(),method:abcMethod.value,methodDisabled:abcMethod.disabled,summary:document.getElementById('abc-analysis-scope').textContent};
+    abcType.value = 'outbound';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
+    abcAnalysisType.activity = {selected:abcAnalysisTypeValue(),method:abcMethod.value,methodDisabled:abcMethod.disabled,summary:document.getElementById('abc-analysis-scope').textContent};
+    abcType.value = 'combined';
+    abcType.dispatchEvent(new Event('change', {bubbles:true}));
     document.getElementById('view-dashboard').classList.add('active');
     return {
       cleanSession,lightLogin,darkLogin,lightApp,darkApp,language,views,abcAnalysisType,initialRobotNavigation,
@@ -1084,11 +1086,12 @@ async function main() {
   assert(summary.language.robotSequence[1].heading === 'Conteo robotizado · Escaneo de inventario del almacén' && summary.language.robotSequence[2].secondary === '机器人队列状态', 'Robot Count content did not rerender in Spanish and Chinese');
   assert(summary.language.restoredLang === 'en' && summary.language.restoredDir === 'ltr', 'English language restoration failed');
   assert(Object.values(summary.views).every(Boolean), 'A representative production view did not render: ' + JSON.stringify(summary.views));
-  assert(summary.abcAnalysisType.options.length === 4 && summary.abcAnalysisType.options.every(option => option.visible), 'Every ABC Analysis Type choice must be directly visible: ' + JSON.stringify(summary.abcAnalysisType.options));
-  assert(summary.abcAnalysisType.defaultSelection === 'combined' && summary.abcAnalysisType.options.some(option => option.value === 'combined' && option.label === 'Inbound + Outbound + Current Inventory'), 'The default combined ABC choice is not explicit about current inventory: ' + JSON.stringify(summary.abcAnalysisType));
-  assert(summary.abcAnalysisType.options.some(option => option.value === 'inventory' && option.label === 'Current Inventory' && option.visible), 'Current Inventory is not directly visible in the ABC Analysis Type control');
-  assert(summary.abcAnalysisType.inventory.selected === 'inventory' && summary.abcAnalysisType.inventory.checked && summary.abcAnalysisType.inventory.method === 'available_quantity' && summary.abcAnalysisType.inventory.methodDisabled && summary.abcAnalysisType.inventory.summary.includes('Only current inventory items are included.') && summary.abcAnalysisType.inventory.summary.includes('positive available quantity'), 'Clicking Current Inventory did not select and summarize the available-quantity ranking method: ' + JSON.stringify(summary.abcAnalysisType));
-  assert(summary.abcAnalysisType.activity.selected === 'outbound' && summary.abcAnalysisType.activity.checked && summary.abcAnalysisType.activity.method === 'outbound_units' && !summary.abcAnalysisType.activity.methodDisabled && summary.abcAnalysisType.activity.summary.includes('Unavailable historical SKUs are excluded.'), 'Switching back to activity analysis did not preserve current-inventory scope: ' + JSON.stringify(summary.abcAnalysisType));
+  assert(summary.abcAnalysisType.control === 'SELECT' && summary.abcAnalysisType.visible, 'ABC Analysis Type must be a visible standard dropdown: ' + JSON.stringify(summary.abcAnalysisType));
+  assert(summary.abcAnalysisType.options.length === 4, 'ABC Analysis Type dropdown must retain all four choices: ' + JSON.stringify(summary.abcAnalysisType.options));
+  assert(summary.abcAnalysisType.defaultSelection === 'combined' && summary.abcAnalysisType.defaultLabel === 'Inbound + Outbound + Current Inventory', 'The closed ABC dropdown is not explicit about current inventory by default: ' + JSON.stringify(summary.abcAnalysisType));
+  assert(summary.abcAnalysisType.options.some(option => option.value === 'inventory' && option.label === 'Current Inventory'), 'Current Inventory is missing from the ABC Analysis Type dropdown');
+  assert(summary.abcAnalysisType.inventory.selected === 'inventory' && summary.abcAnalysisType.inventory.method === 'available_quantity' && summary.abcAnalysisType.inventory.methodDisabled && summary.abcAnalysisType.inventory.summary.includes('Only current inventory items are included.') && summary.abcAnalysisType.inventory.summary.includes('positive available quantity'), 'Selecting Current Inventory did not select and summarize the available-quantity ranking method: ' + JSON.stringify(summary.abcAnalysisType));
+  assert(summary.abcAnalysisType.activity.selected === 'outbound' && summary.abcAnalysisType.activity.method === 'outbound_units' && !summary.abcAnalysisType.activity.methodDisabled && summary.abcAnalysisType.activity.summary.includes('Unavailable historical SKUs are excluded.'), 'Switching back to activity analysis did not preserve current-inventory scope: ' + JSON.stringify(summary.abcAnalysisType));
   const expectedInitialView = initialAppUrl.hash === '#gis' ? 'view-gis' : 'view-robots';
   const expectedInitialChildActive = initialAppUrl.hash === '#gis' ? summary.initialRobotNavigation.gisActive : summary.initialRobotNavigation.overviewActive;
   assert(summary.initialRobotNavigation.hash === initialAppUrl.hash && summary.initialRobotNavigation.activeView === expectedInitialView, 'Smoke did not start directly in ' + initialAppUrl.hash);
