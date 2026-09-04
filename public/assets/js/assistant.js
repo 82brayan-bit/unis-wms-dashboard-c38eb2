@@ -136,11 +136,25 @@ function abcSetStatus(msg, color) { const el = document.getElementById('abc-stat
 function abcSetBusy(busy) { ['abc-sync-btn','abc-run-btn','abc-refresh-btn'].forEach(id => { const el = document.getElementById(id); if (el) { el.disabled = !!busy; el.setAttribute('aria-busy', busy ? 'true' : 'false'); } }); }
 function abcCustomerId() { return (document.getElementById('abc-customer') || {}).value || ''; }
 function abcScopeQuery() { return 'facilityId=' + encodeURIComponent(FACILITY_ID) + '&customerId=' + encodeURIComponent(abcCustomerId()); }
-function abcAnalysisTypeValue() { return (document.getElementById('abc-analysis-type') || {}).value || 'combined'; }
+function abcAnalysisTypeValue() {
+  const selected = document.querySelector('input[name="abc-analysis-type"]:checked');
+  return selected ? selected.value : 'combined';
+}
+function abcSetAnalysisType(value) {
+  const option = Array.from(document.querySelectorAll('input[name="abc-analysis-type"]')).find(input => input.value === value);
+  if (!option) return false;
+  option.checked = true;
+  abcAnalysisTypeChanged(option.value);
+  return true;
+}
 function abcAnalysisTypeLabel(value) {
   return value === 'inventory' ? 'Current inventory' : (value === 'outbound' ? 'Outbound' : (value === 'inbound' ? 'Inbound' : 'Inbound + outbound'));
 }
-function abcAnalysisTypeChanged() {
+function abcAnalysisTypeChanged(value) {
+  if (value) {
+    const option = Array.from(document.querySelectorAll('input[name="abc-analysis-type"]')).find(input => input.value === value);
+    if (option) option.checked = true;
+  }
   const method = document.getElementById('abc-method'); if (!method) return;
   if (abcAnalysisTypeValue() === 'inventory') {
     if (method.value !== 'available_quantity') method.dataset.activityMethod = method.value || 'outbound_units';
@@ -198,7 +212,7 @@ async function abcRefreshAll() {
       abcFetchJson('/api/abc-slotting/recommendations?' + abcScopeQuery()),
     ]);
     ABC_STATE.dashboard = dash; ABC_STATE.availabilityMetrics = dash.availabilityMetrics || null; ABC_STATE.items = items.list || []; ABC_STATE.recommendations = recs.list || [];
-    if (dash.analysisType) { const type = document.getElementById('abc-analysis-type'); if (type) type.value = dash.analysisType; abcAnalysisTypeChanged(); }
+    if (dash.analysisType) abcSetAnalysisType(dash.analysisType); else abcAnalysisTypeChanged();
     abcRenderDashboard(); abcRenderItems(); abcRenderRecommendations();
     abcSetStatus(dash.noAvailableInventory ? 'No currently available inventory was returned for this customer.' : (dash.empty ? 'No official analysis exists yet for this customer.' : abcAnalysisTypeLabel(dash.analysisType) + ' ABC results loaded.'), dash.empty ? 'var(--chart-4)' : 'var(--chart-3)');
   } catch(e) { abcSetStatus(e.message || 'Could not load ABC results.', 'var(--destructive)'); }
