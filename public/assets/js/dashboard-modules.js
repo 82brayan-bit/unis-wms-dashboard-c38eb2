@@ -7937,20 +7937,64 @@ function picalGenerateTemplate(mode) {
 (contactEmails ? 'Contacts:       ' + contactEmails + '\n' : '') +
 (notes ? 'Notes:          ' + notes + '\n' : '') +
 '\n' +
-'SCOPE & INSTRUCTIONS\n' +
-'-------------------------------------------\n' +
-'- Count type: Wall-to-wall physical inventory' + (notes ? ' - ' + notes : '') + '\n' +
-'- All inventory in designated areas must be counted\n' +
-'- Discrepancies will be documented and reviewed post-count\n\n' +
-'PREPARATION CHECKLIST\n' +
-'-------------------------------------------\n' +
-'[ ] Confirm date and time with all participants\n' +
-'[ ] Notify warehouse operations of inventory freeze window\n' +
-'[ ] Ensure all inbound receiving is completed or staged before cutoff\n' +
-'[ ] Complete all open picks and putaways in count areas\n' +
-'[ ] Prepare count sheets / RF devices / scanning equipment\n' +
-'[ ] Assign count teams and zone responsibilities\n' +
-'[ ] Brief counters on count method and exception handling\n\n' +
+"PREPARATION CHECKLIST\n" +
+"-------------------------------------------\n" +
+"1. Customer Scheduling & Confirmation\n" +
+"0/6\n" +
+"\n" +
+"[ ] Email the account point of contact with proposed PI dates, providing 6–8 weeks' advance notice.\n" +
+"[ ] Confirm available dates with the UNIS contact.\n" +
+"[ ] Finalize the Physical Inventory date.\n" +
+"[ ] Confirm whether the customer auditor will be onsite or UNIS will send the Final Count Report.\n" +
+"[ ] Establish the inbound and outbound cutoff date and time.\n" +
+"[ ] Confirm that all inventory activity will stop and all locations will be locked during PI.\n" +
+"\n" +
+"2. WISE System & Inventory Preparation\n" +
+"0/10\n" +
+"\n" +
+"[ ] Complete and close all pending WISE tasks for the customer account.\n" +
+"[ ] Verify that all system locations are assigned to the correct customer.\n" +
+"[ ] Consolidate the customer's inventory in the designated area.\n" +
+"[ ] Update WISE locations to match physical inventory locations.\n" +
+"[ ] Process and receive all outstanding returns in the system.\n" +
+"[ ] Process damaged inventory and consolidate it in the designated damage area.\n" +
+"[ ] Perform pre-counts by location or item, depending on location setup.\n" +
+"[ ] Perform mandatory cycle counts for all bulk locations and verify 100% accuracy.\n" +
+"[ ] Move inventory missing from the system during pre-counts to a customer-specific SUSPENSE location.\n" +
+"[ ] Review the customer contract for any shrinkage allowance and potential financial exposure.\n" +
+"\n" +
+"3. Final WIP Clearance – Before Generating Cycle Count\n" +
+"0/12\n" +
+"\n" +
+"[ ] Verify that all orders have shipped or been closed.\n" +
+"[ ] Verify that all receipts are closed, with nothing in progress.\n" +
+"[ ] Clear all door and staging locations.\n" +
+"[ ] Complete or clear all loading tasks.\n" +
+"[ ] Complete or clear all picking tasks.\n" +
+"[ ] Complete or clear all receiving tasks.\n" +
+"[ ] Complete or clear all pending cycle count tasks.\n" +
+"[ ] Complete or clear all opportunity count tasks.\n" +
+"[ ] Save the On Hand Report (book quantity), using the Summary Report from Report Center.\n" +
+"[ ] Save the current LP report.\n" +
+"[ ] Turn off automation for accounts using automation; contact WISE Support or Harold Cuarezma for assistance.\n" +
+"[ ] Disable automatic recount for Cycle Count, if applicable (optional).\n" +
+"\n" +
+"4. Physical Inventory Counting\n" +
+"0/2\n" +
+"\n" +
+"[ ] Conduct the Physical Inventory using the Manual or Android Cycle Count Process in WISE.\n" +
+"[ ] Maintain the no-activity restriction and locked locations throughout counting.\n" +
+"\n" +
+"5. Variance Review & Inventory Release\n" +
+"0/6\n" +
+"\n" +
+"[ ] Export the comparison report after physical counting is completed.\n" +
+"[ ] Collect supporting data explaining inventory variances.\n" +
+"[ ] Submit variance explanations and pending write-offs to the customer for approval.\n" +
+"[ ] Receive customer approval by email.\n" +
+"[ ] Approve pending write-offs only after receiving customer email confirmation.\n" +
+"[ ] Release inventory after the required approvals are completed.\n" +
+"\n" +
 'INVENTORY FREEZE / CUTOFF\n' +
 '-------------------------------------------\n' +
 '- Freeze begins: ' + freezeStart + '\n' +
@@ -7985,8 +8029,64 @@ function picalGenerateTemplateText(rec) {
     'PHYSICAL INVENTORY DETAILS\n-------------------------------------------\n' +
     'Date:           ' + formattedDate + '\nCustomer:       ' + customer + '\nFacility:       ' + facility + '\nConfirmation:   ' + confirmation + '\n' +
     (quote ? 'Quote Amount:   $' + quote + '\n' : '') + (emails ? 'Contacts:       ' + emails + '\n' : '') + (notes ? 'Notes:          ' + notes + '\n' : '') +
-    '\nSCOPE & INSTRUCTIONS\n-------------------------------------------\n- Count type: Wall-to-wall physical inventory\n- All inventory in designated areas must be counted\n- Discrepancies documented and reviewed post-count\n\n' +
-    'PREPARATION CHECKLIST\n-------------------------------------------\n[ ] Confirm date and time with all participants\n[ ] Notify warehouse operations of inventory freeze window\n[ ] Ensure all inbound receiving completed before cutoff\n[ ] Complete all open picks and putaways in count areas\n[ ] Prepare count sheets / RF devices / scanning equipment\n[ ] Assign count teams and zone responsibilities\n\n' +
+    "\nPREPARATION CHECKLIST\n" +
+    "-------------------------------------------\n" +
+    "1. Customer Scheduling & Confirmation\n" +
+    "0/6\n" +
+    "\n" +
+    "[ ] Email the account point of contact with proposed PI dates, providing 6–8 weeks' advance notice.\n" +
+    "[ ] Confirm available dates with the UNIS contact.\n" +
+    "[ ] Finalize the Physical Inventory date.\n" +
+    "[ ] Confirm whether the customer auditor will be onsite or UNIS will send the Final Count Report.\n" +
+    "[ ] Establish the inbound and outbound cutoff date and time.\n" +
+    "[ ] Confirm that all inventory activity will stop and all locations will be locked during PI.\n" +
+    "\n" +
+    "2. WISE System & Inventory Preparation\n" +
+    "0/10\n" +
+    "\n" +
+    "[ ] Complete and close all pending WISE tasks for the customer account.\n" +
+    "[ ] Verify that all system locations are assigned to the correct customer.\n" +
+    "[ ] Consolidate the customer's inventory in the designated area.\n" +
+    "[ ] Update WISE locations to match physical inventory locations.\n" +
+    "[ ] Process and receive all outstanding returns in the system.\n" +
+    "[ ] Process damaged inventory and consolidate it in the designated damage area.\n" +
+    "[ ] Perform pre-counts by location or item, depending on location setup.\n" +
+    "[ ] Perform mandatory cycle counts for all bulk locations and verify 100% accuracy.\n" +
+    "[ ] Move inventory missing from the system during pre-counts to a customer-specific SUSPENSE location.\n" +
+    "[ ] Review the customer contract for any shrinkage allowance and potential financial exposure.\n" +
+    "\n" +
+    "3. Final WIP Clearance – Before Generating Cycle Count\n" +
+    "0/12\n" +
+    "\n" +
+    "[ ] Verify that all orders have shipped or been closed.\n" +
+    "[ ] Verify that all receipts are closed, with nothing in progress.\n" +
+    "[ ] Clear all door and staging locations.\n" +
+    "[ ] Complete or clear all loading tasks.\n" +
+    "[ ] Complete or clear all picking tasks.\n" +
+    "[ ] Complete or clear all receiving tasks.\n" +
+    "[ ] Complete or clear all pending cycle count tasks.\n" +
+    "[ ] Complete or clear all opportunity count tasks.\n" +
+    "[ ] Save the On Hand Report (book quantity), using the Summary Report from Report Center.\n" +
+    "[ ] Save the current LP report.\n" +
+    "[ ] Turn off automation for accounts using automation; contact WISE Support or Harold Cuarezma for assistance.\n" +
+    "[ ] Disable automatic recount for Cycle Count, if applicable (optional).\n" +
+    "\n" +
+    "4. Physical Inventory Counting\n" +
+    "0/2\n" +
+    "\n" +
+    "[ ] Conduct the Physical Inventory using the Manual or Android Cycle Count Process in WISE.\n" +
+    "[ ] Maintain the no-activity restriction and locked locations throughout counting.\n" +
+    "\n" +
+    "5. Variance Review & Inventory Release\n" +
+    "0/6\n" +
+    "\n" +
+    "[ ] Export the comparison report after physical counting is completed.\n" +
+    "[ ] Collect supporting data explaining inventory variances.\n" +
+    "[ ] Submit variance explanations and pending write-offs to the customer for approval.\n" +
+    "[ ] Receive customer approval by email.\n" +
+    "[ ] Approve pending write-offs only after receiving customer email confirmation.\n" +
+    "[ ] Release inventory after the required approvals are completed.\n" +
+    "\n" +
     'INVENTORY FREEZE / CUTOFF\n-------------------------------------------\n- Freeze begins: [Confirm time - typically evening before count date]\n- No movement in/out of count areas during freeze\n- Freeze ends: Upon completion and sign-off of physical count\n\n' +
     'NEXT STEPS\n-------------------------------------------\n1. Reply to confirm attendance and role\n2. Report any scheduling conflicts immediately\n3. Review assigned zones before count date\n4. Contact PI coordinator with questions\n\nBest regards,\nWarehouse Operations - ' + facility + '\n';
 }
