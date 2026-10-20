@@ -7373,7 +7373,7 @@ function picalRender() {
       ticketId: s.ticketId || '',
       ticketNumber: s.ticketNumber || '',
       ticketStatus: s.ticketStatus || '',
-      state: s.ticketId ? 'Ticket Created' : 'Local only — not created in WMS',
+      state: s.ticketId ? 'Setup ticket created — no WMS count linked' : 'Local plan — no setup ticket created',
       dateSource: 'local',
       notes: s.notes || '',
       source: 'local',
@@ -7412,7 +7412,7 @@ function picalRender() {
     const stateCls = /Completed/.test(e.state) && !/Empty/.test(e.state) ? 'color:var(--chart-3)' :
                      /Canceled|Cancelled/.test(e.state) ? 'color:var(--muted-foreground);text-decoration:line-through' :
                      /Counting/.test(e.state) ? 'color:var(--chart-4)' :
-                     /Local only/.test(e.state) ? 'color:var(--chart-5);font-style:italic' :
+                     /Local plan/.test(e.state) ? 'color:var(--chart-5);font-style:italic' :
                      /Empty.*Invalid/.test(e.state) ? 'color:var(--destructive)' : 'color:var(--foreground)';
     const sourceTag = e.source === 'local' ? ' <span style="font-size:9px;background:color-mix(in srgb,var(--chart-5) 18%,var(--card));color:var(--chart-5);padding:1px 4px;border-radius:3px">Local</span>' : '';
     let actionsCell;
@@ -7640,13 +7640,13 @@ async function picalSaveEdit(localId) {
   const date = (document.getElementById('pical-edit-date') || {}).value;
   const customerId = (document.getElementById('pical-edit-customer') || {}).value;
   const confirmation = (document.getElementById('pical-edit-confirmation') || {}).value || 'Pending';
-  const internalEmail = rec.internalEmail || rec.contactEmail || picalGetDefaultContactEmail();
   const quoteAmount = (document.getElementById('pical-edit-quote') || {}).value || '';
   const notes = (document.getElementById('pical-edit-notes') || {}).value || '';
   if (!date) { alert('Date is required.'); return; }
   picalLoadLocal();
   const rec = PICAL_LOCAL.find(s => s.id === localId);
   if (!rec) { alert('Record not found.'); return; }
+  const internalEmail = rec.internalEmail || rec.contactEmail || picalGetDefaultContactEmail();
   rec.date = date;
   rec.customerId = customerId;
   rec.confirmation = confirmation;
@@ -8091,7 +8091,33 @@ function picalGenerateTemplateText(rec) {
     'NEXT STEPS\n-------------------------------------------\n1. Reply to confirm attendance and role\n2. Report any scheduling conflicts immediately\n3. Review assigned zones before count date\n4. Contact PI coordinator with questions\n\nBest regards,\nWarehouse Operations - ' + facility + '\n';
 }
 
+const PICAL_TICKET_IN_FLIGHT = new Set();
+
+function picalUpdateTicketDraft(facilityId, localId, changes) {
+  // Update only the existing originating draft, even if the user switches
+  // warehouses while a read or creation confirmation is outstanding.
+  const key = 'physical_inv_cal_' + facilityId;
+  const drafts = JSON.parse(localStorage.getItem(key) || '[]');
+  const draft = drafts.find(s => s.id === localId);
+  if (draft) { Object.assign(draft, changes); localStorage.setItem(key, JSON.stringify(drafts)); }
+}
+
 async function picalCreateTicket(rec, opts) {
+  const facilityId = FACILITY_ID;
+  const key = facilityId + ':' + rec.id;
+  picalLoadLocal();
+  if (PICAL_LOCAL.some(s => s.id === rec.id && s.ticketId)) return;
+  if (PICAL_TICKET_IN_FLIGHT.has(key)) {
+    picalShowTicketDiag([{step:'Create Ticket',status:'warning',msg:'This setup ticket is already being processed. Please wait.'}]);
+    return;
+  }
+  PICAL_TICKET_IN_FLIGHT.add(key);
+  try { await picalCreateTicketRequest(rec, opts, facilityId); }
+  catch (_) { picalShowTicketDiag([{step:'Save Ticket Status',status:'error',msg:'Ticket status could not be saved. Check the Ticket System before retrying, and keep your PI draft open.'}]); }
+  finally { PICAL_TICKET_IN_FLIGHT.delete(key); }
+}
+
+async function picalCreateTicketRequest(rec, opts, facilityId) {
   const diag = [];
   const custLookup = {};
   (FACILITY_CUSTOMERS[FACILITY_ID] || []).forEach(c => custLookup[c.id] = c.name);
@@ -8117,61 +8143,92 @@ async function picalCreateTicket(rec, opts) {
 
   const requesterName = picalGetRequesterName();
   const requesterEmail = String(opts.contactEmail || picalGetDefaultContactEmail()).split(/[,;]/)[0].trim();
+  if (!requesterEmail || !requesterName) {
+    const msg = 'A requester name and email are required. Your PI draft is saved. Please sign in again.';
+    picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: ' + msg});
+    picalRender();
+    picalShowTicketDiag([{step:'Validate Fields',status:'error',msg}]);
+    return;
+  }
+  let formEntries;
+  try {
+    picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Checking ticket setup…'});
+    picalRender();
+    if (!await ensureWiseToken(false)) throw new Error('Please sign in again. Your PI draft is saved.');
+    const configResponse = await fetch('/api/pi-ticket-config?topicId=' + encodeURIComponent(opts.topic), {
+      headers:{Accept:'application/json',Authorization:'Bearer ' + WISE_TOKEN,'x-facility-id':facilityId},
+      cache:'no-store',signal:AbortSignal.timeout(35000),
+    });
+    const setup = await configResponse.json();
+    if (!configResponse.ok || setup.success !== true) throw new Error(setup.msg || 'Ticket setup could not be verified. Your PI draft is saved.');
+    if (FACILITY_ID !== facilityId) throw new Error('Warehouse changed. Return to the original warehouse before retrying this PI draft.');
+    if (setup.data?.topicId !== String(opts.topic) || setup.data?.facilityId !== facilityId || !Array.isArray(setup.data?.formEntries) || setup.data.formEntries.some(entry => !/^[1-9]\d*$/.test(String(entry.formId || '')) || !entry.values || Array.isArray(entry.values) || typeof entry.values !== 'object' || Object.keys(entry.values).length)) throw new Error('Ticket setup changed. Your PI draft is saved. Please review the topic before retrying.');
+    formEntries = setup.data.formEntries;
+    diag.push({step:'Check Ticket Setup',status:'success',msg:'Current topic forms checked.'});
+  } catch (error) {
+    const msg = error.name === 'TimeoutError' || error.name === 'AbortError' ? 'Ticket setup could not be verified right now. Your PI draft is saved. Please try again later.' : error.message;
+    diag.push({step:'Check Ticket Setup',status:'error',msg});
+    picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: ' + msg,ticketDiag:diag});
+    picalRender(); picalShowTicketDiag(diag);
+    return;
+  }
   const payload = {
     departmentId: String(opts.dept),
     topicId: String(opts.topic),
     priorityId: 1,
     // Ticket "Requestor" is driven by customerName/customerEmail. Use the
-    // logged-in dashboard user here; keep the PI customer in title/message/form data.
+    // logged-in dashboard user here; keep the PI customer in the message.
     customerName: requesterName,
     customerEmail: requesterEmail,
     title: opts.title,
-    message: { content: opts.msg },
+    message: { content: opts.msg + '\n\nPI scheduling context\nCustomer: ' + customerName + '\nFacility: ' + (FACILITY_NAME || facilityId) + ' (' + facilityId + ')' },
     dueDate: dueDate,
-    formEntries: [
-      {key:'physicalInventoryCustomer', value: customerName},
-      {key:'facility', value: (FACILITY_NAME || FACILITY_ID) + ' (' + FACILITY_ID + ')'}
-    ],
+    // Each entry has a real topic-bound formId and a values map; no arbitrary
+    // metadata keys are sent as forms. PI context stays in the message.
+    formEntries,
   };
   diag.push({step:'Build Payload', status:'success', msg:'Keys: ' + Object.keys(payload).join(', ') + '. message.content: ' + (opts.msg||'').length + ' chars'});
 
   try {
-    const resp = await safeFetch(TICKET_API, {
+    picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Creating setup ticket…'});
+    picalRender();
+    // One explicit attempt only. Never automatically retry a ticket mutation.
+    const httpResponse = await fetch(TICKET_API, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',Accept:'application/json',Authorization:'Bearer ' + WISE_TOKEN},
       body: JSON.stringify(payload),
+      signal:AbortSignal.timeout(20000),
     });
+    let resp = null;
+    try { resp = await httpResponse.json(); } catch (_) {}
 
     const respCode = resp ? (resp.code || resp.status || '') : 'null';
     const respMsg = resp ? (resp.msg || resp.message || (resp.data && (resp.data.msg || resp.data.message)) || '') : 'No response';
 
-    // Detect nginx 405 blocking — ticket service not accessible from this server
+    // A missing response cannot confirm whether the service created a ticket.
     if (resp === null || (typeof resp === 'string' && resp.includes('405'))) {
-      diag.push({step:'Create Ticket', status:'error', msg:'Ticket service is not accepting requests from this dashboard server (HTTP 405 blocked by upstream firewall). This requires IT/network configuration to allow the dashboard server access to the ticket API. Contact your administrator.'});
-      picalLoadLocal(); const local = PICAL_LOCAL.find(s=>s.id===rec.id); if(local){local.ticketStatus='Failed: Ticket service blocked (405). Requires IT network config.'; local.ticketDiag=diag; picalSaveLocal();}
+      diag.push({step:'Create Ticket', status:'error', msg:'Ticket creation could not be confirmed. Check the Ticket System before retrying. Your PI draft is saved.'});
+      picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: Creation not confirmed. Check the Ticket System before retrying.',ticketDiag:diag});
       picalRender();
       picalShowTicketDiag(diag);
       return;
     }
 
-    if (resp && resp._needsAuth) {
+    if (httpResponse.status === 401 || resp && resp._needsAuth) {
       diag.push({step:'Create Ticket', status:'error', msg:'Session expired or not authenticated. Please sign in again and retry.'});
-      picalLoadLocal(); const local = PICAL_LOCAL.find(s=>s.id===rec.id); if(local){local.ticketStatus='Failed: Authentication required'; local.ticketDiag=diag; picalSaveLocal();}
+      picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: Please sign in again before retrying.',ticketDiag:diag});
       picalRender();
       picalShowTicketDiag(diag);
       return;
     }
 
-    if (resp && (resp.success === true || String(resp.code) === '200' || String(resp.code) === '0' || resp.id || resp.ticketId || (resp.data && (resp.data.id || resp.data.ticketId || resp.data.no || resp.data.ticketNo)))) {
-      const rd = resp.data || resp;
-      const tid = rd.id || rd.ticketId || rd.no || rd.ticketNo || resp.id || resp.ticketId || '';
+    if (httpResponse.ok && resp && resp.success === true && String(resp.code) === '200' && /^[1-9]\d*$/.test(String(resp.data?.id || ''))) {
+      const rd = resp.data;
+      const tid = String(rd.id);
       const tnum = rd.number || rd.ticketNumber || rd.no || rd.ticketNo || resp.number || resp.ticketNumber || tid;
       diag.push({step:'Create Ticket', status:'success', msg:'Ticket: ' + (tnum||tid) + '. Code: ' + respCode});
-      console.log('Ticket created:', {tid, tnum, code: respCode});
-
-      picalLoadLocal();
-      const local = PICAL_LOCAL.find(s => s.id === rec.id);
-      if (local) { local.ticketId = tid; local.ticketNumber = tnum; local.ticketStatus = 'Created'; if (opts.teamId) local.teamId = opts.teamId; if (opts.teamName) local.teamName = opts.teamName; picalSaveLocal(); }
+      picalUpdateTicketDraft(facilityId, rec.id, {ticketId:tid,ticketNumber:tnum,ticketStatus:'Created',...(opts.teamId?{teamId:opts.teamId}:{}),...(opts.teamName?{teamName:opts.teamName}:{})});
+      if (FACILITY_ID !== facilityId) return;
 
       if (opts.teamId && tid) {
         try {
@@ -8190,7 +8247,7 @@ async function picalCreateTicket(rec, opts) {
           } catch(_) { fail++; }
         }
         diag.push({step:'Upload Attachments', status: fail > 0 ? 'warning' : 'success', msg: ok + ' uploaded, ' + fail + ' failed'});
-        picalLoadLocal(); const l3 = PICAL_LOCAL.find(s=>s.id===rec.id); if(l3){l3.attachments={uploaded:ok,total:ok+fail};picalSaveLocal();}
+        picalUpdateTicketDraft(facilityId, rec.id, {attachments:{uploaded:ok,total:ok+fail}});
       }
 
       picalRender();
@@ -8199,8 +8256,7 @@ async function picalCreateTicket(rec, opts) {
       const respMsg = (resp && (resp.msg || resp.message || (resp.data && resp.data.msg))) || 'Ticket service did not confirm creation.';
       const isConfig = resp && resp._configError;
       diag.push({step:'Create Ticket', status:'error', msg:'Rejected. ' + respMsg});
-      console.warn('Ticket creation failed:', resp);
-      picalLoadLocal(); const local = PICAL_LOCAL.find(s=>s.id===rec.id); if(local){local.ticketStatus='Failed: '+respMsg; local.ticketDiag=diag; picalSaveLocal();}
+      picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: '+respMsg,ticketDiag:diag});
       picalRender();
       if (isConfig) {
         picalShowTicketDiag(diag, 'Ticket integration is not properly configured on the server. Contact an administrator to update Ticket API configuration (TICKET_API_HOST and TICKET_API_KEY).');
@@ -8209,9 +8265,8 @@ async function picalCreateTicket(rec, opts) {
       }
     }
   } catch(e) {
-    diag.push({step:'Create Ticket', status:'error', msg:'Network error: ' + (e.message||'unknown')});
-    console.error('Ticket exception:', e);
-    picalLoadLocal(); const local = PICAL_LOCAL.find(s=>s.id===rec.id); if(local){local.ticketStatus='Failed: network'; local.ticketDiag=diag; picalSaveLocal();}
+    diag.push({step:'Create Ticket', status:'error', msg:'Ticket creation could not be confirmed. Check the Ticket System before retrying. Your PI draft is saved.'});
+    picalUpdateTicketDraft(facilityId, rec.id, {ticketStatus:'Failed: Creation not confirmed. Check the Ticket System before retrying.',ticketDiag:diag});
     picalRender();
     picalShowTicketDiag(diag);
   }

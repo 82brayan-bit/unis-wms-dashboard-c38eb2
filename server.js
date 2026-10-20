@@ -2,6 +2,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const piTicketConfig = require('./lib/pi-ticket-config').createPiTicketConfigHandler();
 const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
 const abcSlotting = require('./lib/abc-slotting');
@@ -109,10 +110,11 @@ async function dbQuery(sql, params) {
 // Ticket API configuration
 // Correct path: https://unisticket.item.com/api/item-tickets/v1/...
 // The UI proxy base includes /api/item-tickets prefix before /v1/iam|staff|open
-const TICKET_API_HOST = process.env.TICKET_API_HOST || 'unisticket.item.com';
-const TICKET_API_BASE_PATH = process.env.TICKET_API_BASE_PATH || '/api/item-tickets';
+const TICKET_CONFIG_URL = process.env.TICKET_API_BASE_URL ? new URL(process.env.TICKET_API_BASE_URL) : null;
+const TICKET_API_HOST = TICKET_CONFIG_URL ? TICKET_CONFIG_URL.hostname : (process.env.TICKET_API_HOST || 'unisticket.item.com');
+const TICKET_API_BASE_PATH = TICKET_CONFIG_URL ? TICKET_CONFIG_URL.pathname.replace(/\/+$/, '') : (process.env.TICKET_API_BASE_PATH || '/api/item-tickets');
 const TICKET_API_KEY = process.env.TICKET_API_KEY || '';
-const TICKET_TENANT_ID = process.env.TICKET_TENANT_ID || 'LT';
+const TICKET_TENANT_ID = process.env.WMS_TENANT_ID || process.env.TICKET_TENANT_ID || 'LT';
 
 console.log('[ticket-proxy] Config: host=' + TICKET_API_HOST + ' basePath=' + TICKET_API_BASE_PATH + ' apiKey=' + (TICKET_API_KEY ? 'configured' : 'not set') + ' tenant=' + TICKET_TENANT_ID);
 
@@ -557,6 +559,10 @@ async function handleApi(req, res, url) {
       return send(res, out2.status, out2.json || out2.raw || {success:false,msg:'Refresh failed'});
     }
 
+
+    if (url.pathname === '/api/pi-ticket-config') {
+      return piTicketConfig({req, res, url, send});
+    }
 
     if (url.pathname.startsWith('/api/abc-slotting')) {
       return abcSlotting.handleApi({
